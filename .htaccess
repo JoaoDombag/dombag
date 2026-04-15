@@ -1,0 +1,76 @@
+Options -Indexes
+RewriteEngine On
+
+# Base do projeto (raiz do domínio em produção)
+RewriteBase /
+
+# Força HTTPS (somente em produção — desabilitado no localhost)
+RewriteCond %{HTTPS} off
+RewriteCond %{HTTP_HOST} !^localhost [NC]
+RewriteCond %{HTTP_HOST} !^127\.0\.0\.1 [NC]
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Não redireciona arquivos e pastas que existem de verdade
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# ── Rotas ───────────────────────────────────────────────────────────
+# Login / Logout
+RewriteRule ^login$                    modules/login/login.php    [L,QSA]
+RewriteRule ^logout$                   modules/login/logout.php   [L,QSA]
+
+# Dashboard
+RewriteRule ^dashboard$                modules/dashboard/dashboard.php         [L,QSA]
+RewriteRule ^dashboard/widgets$        modules/parametros/widgets.php          [L,QSA]
+
+# Vendas (módulo Pedidos)
+RewriteRule ^vendas$                   modules/pedidos/pedidos_importados.php  [L,QSA]
+RewriteRule ^vendas/simulacao$         modules/pedidos/simulacao_venda.php     [L,QSA]
+
+# ERP Yzidro
+RewriteRule ^yzidro/pedidos$           modules/yzidro/pedidos.php              [L,QSA]
+RewriteRule ^yzidro/consulta$          modules/yzidro/consulta_vendas.php      [L,QSA]
+
+# PCP — Produção
+RewriteRule ^pcp/kanban$               modules/pcp/kanban.php                  [L,QSA]
+RewriteRule ^pcp/planejamento$         modules/pcp/planejamento.php            [L,QSA]
+RewriteRule ^pcp/ordens$               modules/pcp/pcp_ordens.php              [L,QSA]
+RewriteRule ^pcp/programacao$          modules/pcp/programacao_diaria.php      [L,QSA]
+RewriteRule ^pcp/producao$             modules/pcp/producao.php                [L,QSA]
+RewriteRule ^pcp/fila$                 modules/pcp/fila_maquinas.php           [L,QSA]
+RewriteRule ^pcp/pdf$                  modules/pcp/gerar_pdf.php               [L,QSA]
+RewriteRule ^pcp/reuniao$              modules/pcp/planejamento_dia.php        [L,QSA]
+
+# Financeiro
+RewriteRule ^financeiro$               modules/financeiro/index.php            [L,QSA]
+RewriteRule ^financeiro/receber$       modules/financeiro/contas_receber.php   [L,QSA]
+RewriteRule ^financeiro/pagar$         modules/financeiro/contas_pagar.php     [L,QSA]
+RewriteRule ^financeiro/fluxo$         modules/financeiro/fluxo_caixa.php      [L,QSA]
+
+# Relatórios
+RewriteRule ^relatorios/producao$          modules/relatorios/rel_producao.php         [L,QSA]
+RewriteRule ^relatorios/estoque-futuro$    modules/relatorios/rel_estoque_futuro.php   [L,QSA]
+RewriteRule ^relatorios/controle-estoque$  modules/relatorios/rel_controle_estoque.php [L,QSA]
+
+# Máquinas
+RewriteRule ^maquinas$                 modules/maquinas/cad_maquinas.php       [L,QSA]
+
+# Produtos
+RewriteRule ^produtos$                 modules/produtos/cadastro_produtos.php  [L,QSA]
+
+# Usuários
+RewriteRule ^usuarios$                 modules/usuarios/usuarios.php           [L,QSA]
+
+# Trello
+RewriteRule ^trello$                   modules/trello/trello.php               [L,QSA]
+
+# Admin
+RewriteRule ^admin/atualiza-bd$        modules/admin/atualiza_bd.php           [L,QSA]
+RewriteRule ^admin/menus-ativos$       modules/admin/menus_ativos.php          [L,QSA]
+
+# CRM
+RewriteRule ^crm/leads$                modules/crm/qualificacao_leads.php      [L,QSA]
+RewriteRule ^crm/resultados$           modules/crm/leads_resultados.php        [L,QSA]
+
+# Rota raiz → login
+RewriteRule ^$                         modules/login/login.php                 [L,QSA]

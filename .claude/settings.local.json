@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find \"/c/xampp/htdocs/dombag/{config,backend\" -type f)"
+    ]
+  }
+}
