@@ -1,4 +1,4 @@
 <?php
 
-header('Location: dombag/login');
+header('Location: /login');
 exit;
