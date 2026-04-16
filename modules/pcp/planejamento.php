@@ -208,7 +208,9 @@ $js_cats = json_encode(CATEGORIAS);
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Planejamento de Produção | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
+.content{overflow-y:auto;overflow-x:hidden;}
 /* ─── Filtros ──────────────────────────────────────────────── */
 .filter-bar{display:flex;gap:10px;align-items:flex-end;padding:14px 18px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
 
@@ -224,7 +226,7 @@ $js_cats = json_encode(CATEGORIAS);
 
 /* Tabela dentro da categoria */
 .cat-table{width:100%;border-collapse:collapse;}
-.cat-table th{padding:8px 14px;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:rgba(0,0,0,.08);white-space:nowrap;text-align:left;}
+.cat-table th{padding:8px 14px;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:#112240;white-space:nowrap;text-align:left;position:sticky;top:0;z-index:2;}
 .cat-table td{padding:10px 14px;font-size:12.5px;border-bottom:1px solid var(--border);vertical-align:middle;}
 .cat-table tr:last-child td{border-bottom:none;}
 .cat-table tbody tr{transition:background .1s;}
@@ -295,7 +297,7 @@ $js_cats = json_encode(CATEGORIAS);
 @media(max-width:900px){.filter-bar{flex-direction:column;align-items:stretch;}.status-sel{min-width:0;width:100%;}.entrega-input{width:100%;}}
 @media(max-width:640px){.prog-bar-wrap{width:60px;}}
 .cat-section{min-width:0;}
-.cat-section .cat-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.cat-section .cat-table-wrap{-webkit-overflow-scrolling:touch;}
 </style>
 </head>
 <body>
@@ -415,7 +417,7 @@ foreach ($kpiDefs as $kd):
               Total: <?= number_format($totalQtd, 0, ',', '.') ?> un
             </div>
           </div>
-          <div class="cat-table-wrap">
+          <div class="cat-table-wrap table-wrap">
             <table class="cat-table">
               <thead>
                 <tr>

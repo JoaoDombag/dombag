@@ -89,8 +89,6 @@ $filtStatus   = trim((string) ($_GET['status'] ?? ''));
 $filtScore    = max(0, (int) ($_GET['score_min'] ?? 0));
 $filtBusca    = trim((string) ($_GET['q'] ?? ''));
 $filtUsuario  = ($_GET['usuario'] ?? '') === '' ? '' : (string)(int)$_GET['usuario'];
-$page         = max(1, (int) ($_GET['page'] ?? 1));
-$perPage      = 30;
 
 // ── Query ─────────────────────────────────────────────────────────────────────
 $rows      = [];
@@ -146,10 +144,7 @@ try {
     $stmtCt->execute($params);
     $total = (int) $stmtCt->fetchColumn();
 
-    $totalPags = max(1, (int) ceil($total / $perPage));
-    $offset    = ($page - 1) * $perPage;
-
-    $stmt = $pdo->prepare("SELECT * FROM leads_prospectados WHERE $whereSql ORDER BY gravado_em DESC LIMIT $perPage OFFSET $offset");
+    $stmt = $pdo->prepare("SELECT * FROM leads_prospectados WHERE $whereSql ORDER BY gravado_em DESC");
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -171,14 +166,6 @@ function rUrl(array $extra = [], array $remove = []): string
     $params = $_GET;
     foreach ($remove as $k) unset($params[$k]);
     foreach ($extra as $k => $v) $params[$k] = $v;
-    unset($params['page']);
-    return '?' . http_build_query($params);
-}
-
-function pgUrl(int $p): string
-{
-    $params = $_GET;
-    $params['page'] = $p;
     return '?' . http_build_query($params);
 }
 ?>
@@ -189,6 +176,7 @@ function pgUrl(int $p): string
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prospecção com IA — Resultados | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
 .nav-pills{display:flex;gap:8px;margin-bottom:20px}
 .nav-pill{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text-secondary);font-size:12px;font-weight:600;text-decoration:none}
@@ -201,9 +189,9 @@ function pgUrl(int $p): string
 .stats-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px}
 .stat-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid var(--border);font-size:12px;color:var(--text-secondary)}
 .stat-chip strong{color:var(--text-primary)}
-.leads-table-wrap{overflow-x:auto}
+.leads-table-wrap{}
 .leads-table{width:100%;border-collapse:collapse}
-.leads-table th{padding:9px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:rgba(0,0,0,.1);white-space:nowrap}
+.leads-table th{padding:9px 14px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--text-muted);border-bottom:1px solid var(--border);background:#112240;white-space:nowrap;position:sticky;top:0;z-index:2;}
 .leads-table td{padding:10px 14px;font-size:12.5px;border-bottom:1px solid var(--border);color:var(--text-primary);vertical-align:middle}
 .leads-table tbody tr:hover td{background:rgba(255,255,255,.025)}
 .leads-table tbody tr.selected td{background:rgba(45,106,255,.07)}
@@ -231,11 +219,6 @@ function pgUrl(int $p): string
 .bulk-btn-del:hover{background:rgba(239,68,68,.18)}
 .bulk-btn-clear{background:transparent;border:1px solid var(--border);color:var(--text-muted)}
 .bulk-btn-clear:hover{background:rgba(255,255,255,.05)}
-.pagination{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:16px;padding:12px 16px;border-top:1px solid var(--border)}
-.pg-btn{display:inline-flex;align-items:center;justify-content:center;min-width:32px;height:32px;padding:0 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text-secondary);font-size:12px;text-decoration:none}
-.pg-btn:hover{background:rgba(255,255,255,.07)}
-.pg-btn.active{background:rgba(45,106,255,.15);border-color:rgba(45,106,255,.35);color:#7db3ff;font-weight:700}
-.pg-btn.disabled{opacity:.35;pointer-events:none}
 .empty-state{padding:60px 20px;text-align:center;color:var(--text-muted);font-size:14px}
 </style>
 </head>
@@ -342,7 +325,7 @@ function pgUrl(int $p): string
     <a href="leads_resultados.php" class="btn-secondary" style="height:36px;padding:0 14px;font-size:12px;display:inline-flex;align-items:center;">Limpar</a>
   </form>
 
-  <div class="panel">
+  <div class="panel-table">
     <div class="panel-header">
       <span class="panel-title">Resultados</span>
       <span class="count-badge"><?= $total ?></span>
@@ -358,7 +341,7 @@ function pgUrl(int $p): string
         <?php endif; ?>
       </div>
     <?php else: ?>
-    <div class="leads-table-wrap">
+    <div class="leads-table-wrap table-wrap">
       <table class="leads-table" id="leadsTable">
         <thead>
           <tr>
@@ -429,25 +412,6 @@ function pgUrl(int $p): string
       </table>
     </div>
 
-    <!-- Paginação -->
-    <?php if ($totalPags > 1): ?>
-    <div class="pagination">
-      <a href="<?= iaH(pgUrl($page - 1)) ?>" class="pg-btn <?= $page <= 1 ? 'disabled' : '' ?>">‹ Ant.</a>
-      <?php
-        $start = max(1, $page - 2);
-        $end   = min($totalPags, $page + 2);
-        if ($start > 1) echo '<span class="pg-btn disabled">…</span>';
-        for ($i = $start; $i <= $end; $i++):
-      ?>
-        <a href="<?= iaH(pgUrl($i)) ?>" class="pg-btn <?= $i === $page ? 'active' : '' ?>"><?= $i ?></a>
-      <?php
-        endfor;
-        if ($end < $totalPags) echo '<span class="pg-btn disabled">…</span>';
-      ?>
-      <a href="<?= iaH(pgUrl($page + 1)) ?>" class="pg-btn <?= $page >= $totalPags ? 'disabled' : '' ?>">Próx. ›</a>
-      <span style="font-size:11px;color:var(--text-muted);margin-left:6px;">Página <?= $page ?> de <?= $totalPags ?> (<?= $total ?> leads)</span>
-    </div>
-    <?php endif; ?>
 
     <?php endif; ?>
   </div>

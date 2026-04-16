@@ -103,6 +103,7 @@ $statusMap = [
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Leads do Webhook | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
 /* ── Status pills ── */
 .sl-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:999px; font-size:11px; font-weight:700; white-space:nowrap; }
@@ -133,7 +134,7 @@ $statusMap = [
 
 /* ── Leads table ── */
 .leads-tbl { width:100%; border-collapse:collapse; }
-.leads-tbl th { padding:9px 14px; text-align:left; font-size:10px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--text-muted); border-bottom:1px solid var(--border); background:rgba(0,0,0,.1); white-space:nowrap; }
+.leads-tbl th { padding:9px 14px; text-align:left; font-size:10px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:var(--text-muted); border-bottom:1px solid var(--border); background:#112240; white-space:nowrap; position:sticky; top:0; z-index:2; }
 .leads-tbl td { padding:12px 14px; font-size:12.5px; border-bottom:1px solid var(--border); vertical-align:top; color:var(--text-primary); }
 .leads-tbl tbody tr:hover td { background:rgba(255,255,255,.025); }
 .leads-tbl tbody tr.row-saving td { opacity:.6; }
@@ -245,7 +246,7 @@ $statusMap = [
   </div>
 
   <!-- Tabela -->
-  <div class="panel">
+  <div class="panel-table">
     <div class="panel-header">
       <span class="panel-title">Leads</span>
       <span class="count-badge"><?= count($rows) ?></span>
@@ -254,7 +255,7 @@ $statusMap = [
     <?php if (empty($rows)): ?>
       <div class="empty-state">Nenhum lead encontrado<?= $f['busca'] || $f['status'] || $f['lp'] ? ' com os filtros aplicados.' : '.' ?></div>
     <?php else: ?>
-    <div style="overflow-x:auto;">
+    <div class="table-wrap">
       <table class="leads-tbl">
         <thead>
           <tr>

@@ -62,13 +62,32 @@ body {
 
 /* ── Content ───────────────────────────────────────── */
 .content {
-  flex:1; overflow-y:auto; overflow-x:hidden; padding:24px;
+  flex:1; overflow:hidden; display:flex; flex-direction:column; padding:24px;
 }
-.content::-webkit-scrollbar { width:4px; }
-.content::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
 
-/* ── Wrapper para tabelas com scroll horizontal ─────── */
-.table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+/* ── Wrapper de tabela com scroll completo ──────────── */
+.table-wrap {
+  overflow:auto; flex:1; min-height:0;
+  -webkit-overflow-scrolling:touch;
+}
+
+/* ── Toda tabela fora de table-wrap ganha scroll próprio ── */
+.content table:not(.table-wrap table) {
+  display:block; overflow-x:auto; width:100%;
+  -webkit-overflow-scrolling:touch;
+}
+/* ── Scrollbar discreta global ───────────────────────── */
+::-webkit-scrollbar { width:5px; height:5px; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+
+/* ── Painel que contém tabela e cresce para preencher espaço ── */
+.panel-table {
+  background:var(--card-bg); border:1px solid var(--border);
+  border-radius:var(--radius); overflow:hidden;
+  flex:1; min-height:0; display:flex; flex-direction:column;
+}
+.panel-table .panel-header { flex-shrink:0; }
 
 /* ── Botões ────────────────────────────────────────── */
 .btn-primary, .btn-refresh {
@@ -215,7 +234,8 @@ th {
   font-size:10px; font-weight:700; letter-spacing:.7px;
   color:var(--text-muted); text-transform:uppercase;
   border-bottom:1px solid var(--border);
-  background:rgba(0,0,0,.1); white-space:nowrap;
+  background:#112240; white-space:nowrap;
+  position:sticky; top:0; z-index:2;
 }
 td {
   padding:11px 14px; font-size:12.5px;
@@ -406,7 +426,9 @@ tbody tr:hover td { background:rgba(255,255,255,.025); }
   body         { overflow-x:hidden !important; overflow-y:auto !important; height:auto !important; }
   .app-wrapper { height:auto !important; min-height:100vh; overflow:visible !important; }
   .main        { height:auto !important; overflow:visible !important; padding-top:52px; }
-  .content     { padding:14px; overflow-x:hidden !important; overflow-y:visible !important; height:auto !important; flex:none !important; }
+  .content     { padding:14px; overflow:visible !important; height:auto !important; flex:none !important; display:block !important; }
+  .table-wrap  { overflow:auto !important; flex:none !important; height:auto !important; max-height:60vh; }
+  .panel-table { flex:none !important; min-height:0 !important; }
 
   /* Oculta sidebar no mobile — mobile-topbar assume a navegação */
   .sidebar { display:none !important; }

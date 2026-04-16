@@ -131,7 +131,7 @@ $grupos = [
       ['label' => 'Dashboard',        'href' => '/financeiro'],
       ['label' => 'Contas a Receber', 'href' => '/financeiro/receber'],
       ['label' => 'Contas a Pagar',   'href' => '/financeiro/pagar'],
-      ['label' => 'Fluxo de Caixa',   'href' => '/financeiro/fluxo'],
+      ['label' => 'Baixas a Pagar',   'href' => '/financeiro/baixas-pagar'],
     ],
   ],
   'crm' => [
@@ -158,6 +158,7 @@ $grupos = [
     'itens' => [
       ['label' => 'Relatório de Produção',    'href' => '/relatorios/producao'],
       ['label' => 'Estoque Futuro',           'href' => '/relatorios/estoque-futuro'],
+      ['label' => 'Posição de Estoque',       'href' => '/relatorios/posicao-estoque'],
       ['label' => 'Controle de Estoque',      'href' => '/relatorios/controle-estoque'],
     ],
   ],
@@ -557,7 +558,7 @@ $grupoAdmin = [
 
     <?php if (sb_can('/dashboard') && sb_ativo('standalone:dashboard')): ?>
     <a class="nav-item <?= nav_active('/dashboard') ?>"
-       href="/modules/dashboard/dashboard.php"
+       href="/dashboard"
        data-tooltip="Dashboard">
       <span class="nav-icon">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

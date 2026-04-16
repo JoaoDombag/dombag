@@ -377,6 +377,7 @@ $data_plano_js = json_encode($data_plano);
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Reunião de Planejamento | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
 /* ══════════════════════════════════════════════════════════════
    REUNIÃO DE PLANEJAMENTO

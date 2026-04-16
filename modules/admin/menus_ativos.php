@@ -66,10 +66,10 @@ $todosMenus = [
         'grupo_key' => 'grupo:financeiro',
         'grupo_label' => 'Financeiro',
         'itens' => [
-            ['key' => '/financeiro',        'label' => 'Dashboard'],
-            ['key' => '/financeiro/receber','label' => 'Contas a Receber'],
-            ['key' => '/financeiro/pagar',  'label' => 'Contas a Pagar'],
-            ['key' => '/financeiro/fluxo',  'label' => 'Fluxo de Caixa'],
+            ['key' => '/financeiro',             'label' => 'Dashboard'],
+            ['key' => '/financeiro/receber',     'label' => 'Contas a Receber'],
+            ['key' => '/financeiro/pagar',       'label' => 'Contas a Pagar'],
+            ['key' => '/financeiro/baixas-pagar','label' => 'Baixas a Pagar'],
         ],
     ],
     [
@@ -86,6 +86,7 @@ $todosMenus = [
         'itens' => [
             ['key' => '/relatorios/producao',        'label' => 'Relatório de Produção'],
             ['key' => '/relatorios/estoque-futuro',  'label' => 'Estoque Futuro'],
+            ['key' => '/relatorios/posicao-estoque', 'label' => 'Posição de Estoque'],
         ],
     ],
     [
@@ -162,6 +163,7 @@ function esc($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Menus Ativos | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);color:var(--text-primary);overflow:hidden;height:100vh;}

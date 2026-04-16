@@ -303,6 +303,7 @@ foreach ($plan['prog'] as $pr) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agenda de Produção | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
 /* ── Layout ────────────────────────────────────────────────── */
 .page-cols{display:grid;grid-template-columns:320px 1fr;gap:20px;align-items:start;}
@@ -367,7 +368,7 @@ foreach ($plan['prog'] as $pr) {
 .ocu-fill{height:100%;border-radius:3px;}
 
 /* ── Agenda grid ───────────────────────────────────────────── */
-.agenda-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+.agenda-wrap{-webkit-overflow-scrolling:touch;}
 .agenda-table{border-collapse:collapse;font-size:11.5px;min-width:100%;}
 .agenda-table th{padding:8px 10px;text-align:center;border-bottom:2px solid var(--border);background:var(--card-bg);white-space:nowrap;position:sticky;top:0;z-index:2;}
 .agenda-table th.maq-head{text-align:left;min-width:160px;position:sticky;left:0;z-index:3;background:var(--card-bg);}
@@ -522,7 +523,7 @@ foreach ($plan['prog'] as $pr) {
       <div id="resultArea"></div>
 
       <!-- Agenda grid -->
-      <div class="panel">
+      <div class="panel-table">
         <div class="panel-header">
           <span class="panel-title">Agenda — próximos 21 dias por máquina</span>
           <div class="legenda">
@@ -533,7 +534,7 @@ foreach ($plan['prog'] as $pr) {
           </div>
         </div>
 
-        <div class="agenda-wrap" style="padding:0 0 8px;">
+        <div class="agenda-wrap table-wrap" style="padding:0 0 8px;">
           <table class="agenda-table" id="agendaTable">
             <thead>
               <tr>

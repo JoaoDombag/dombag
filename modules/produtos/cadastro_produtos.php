@@ -153,9 +153,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .btn-primary:hover{background:var(--blue-light);}
 .icon-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s;}
 .icon-btn:hover{background:var(--card-hover);color:var(--text-primary);}
-.content{flex:1;overflow-y:auto;padding:24px;}
-.content::-webkit-scrollbar{width:4px;}
-.content::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.content{flex:1;overflow:hidden;padding:24px;display:flex;flex-direction:column;}
 
 /* Stats */
 .stat-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;}
@@ -183,11 +181,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .results-count{font-size:11.5px;color:var(--text-muted);}
 
 /* Tabela */
-.orders-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-.orders-panel .panel-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.orders-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;flex:1;min-height:0;display:flex;flex-direction:column;}
+.orders-panel .panel-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .panel-title{font-size:13px;font-weight:600;}
 .prod-table{width:100%;border-collapse:collapse;}
-.prod-table th{padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;border-bottom:1px solid var(--border);background:rgba(0,0,0,.1);white-space:nowrap;cursor:pointer;user-select:none;}
+.prod-table th{padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;border-bottom:1px solid var(--border);background:#112240;white-space:nowrap;cursor:pointer;user-select:none;position:sticky;top:0;z-index:2;}
 .prod-table th:hover{color:var(--text-primary);}
 .prod-table td{padding:10px 14px;font-size:12.5px;border-bottom:1px solid var(--border);color:var(--text-primary);white-space:nowrap;}
 .prod-table tr:last-child td{border-bottom:none;}
@@ -207,13 +205,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .btn-del:hover{background:rgba(239,68,68,.25);}
 .vinc-badge{background:rgba(0,201,167,.08);color:var(--teal);font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600;}
 
-/* Paginação */
-.pagination{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted);}
-.page-btns{display:flex;align-items:center;gap:4px;}
-.page-btn{min-width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:12px;font-family:'Segoe UI',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0 6px;transition:.15s;}
-.page-btn:hover{background:var(--card-hover);color:var(--text-primary);}
-.page-btn.active{background:rgba(45,106,255,.2);color:#7db3ff;border-color:rgba(45,106,255,.4);}
-.page-btn:disabled{opacity:.35;cursor:default;pointer-events:none;}
 
 /* Modal Formulário */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);z-index:1000;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
@@ -278,6 +269,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 </style>
 
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 </head>
 <body>
 <div class="app-wrapper">
@@ -369,7 +361,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
         <span class="panel-title">Produtos cadastrados</span>
         <span class="results-count" id="resultsPanel"></span>
       </div>
-      <div style="overflow-x:auto;">
+      <div class="table-wrap">
         <table class="prod-table">
           <thead><tr>
             <th data-col="pro_descricao">Produto <span class="sort-icon active" id="s-pro_descricao">↑</span></th>
@@ -390,7 +382,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
         <p style="font-size:13px;">Nenhum produto encontrado.</p>
         <button onclick="abrirModal()" style="margin-top:12px;background:var(--blue-accent);color:white;border:none;padding:8px 18px;border-radius:7px;font-size:13px;font-weight:600;cursor:pointer;">+ Cadastrar primeiro produto</button>
       </div>
-      <div class="pagination"><span id="pInfo"></span><div class="page-btns" id="pBtns"></div></div>
     </div>
 
   </div><!-- /content -->
@@ -478,8 +469,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 
 <script>
 let PRODUTOS = <?= $produtos_js ?>;
-const PER = 15;
-let page = 1, sortCol = 'pro_descricao', sortAsc = true, filtered = [...PRODUTOS];
+let sortCol = 'pro_descricao', sortAsc = true, filtered = [...PRODUTOS];
 
 function boolPill(v){ return v==='SIM' ? '<span class="bool-yes">Sim</span>' : '<span class="bool-no">Não</span>'; }
 function tipoPill(v){
@@ -506,18 +496,18 @@ function applyFilters(){
     if(va2 > vb2) return sortAsc ?  1 : -1;
     return 0;
   });
-  page = 1; render();
+  render();
 }
 
 function render(){
-  const tot = filtered.length, start = (page-1)*PER, slice = filtered.slice(start, start+PER);
+  const tot = filtered.length;
   document.getElementById('resultsCount').textContent = tot+' produto(s)';
   document.getElementById('resultsPanel').textContent = tot+' produto(s)';
   const tbody = document.getElementById('tbody'), empty = document.getElementById('emptyState');
-  if(!tot){ tbody.innerHTML=''; empty.style.display='block'; document.getElementById('pInfo').textContent=''; document.getElementById('pBtns').innerHTML=''; return; }
+  if(!tot){ tbody.innerHTML=''; empty.style.display='block'; return; }
   empty.style.display = 'none';
 
-  tbody.innerHTML = slice.map(p => `
+  tbody.innerHTML = filtered.map(p => `
     <tr>
       <td title="${p.pro_descricao||''}" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;">${(p.pro_descricao||'').length>48?(p.pro_descricao).slice(0,48)+'…':p.pro_descricao||'—'}</td>
       <td>${tipoPill(p.pro_tipo)}</td>
@@ -536,17 +526,6 @@ function render(){
       </td>
     </tr>`).join('');
 
-  // Paginação
-  const totalP = Math.ceil(tot/PER), s = start+1, e = Math.min(start+PER, tot);
-  document.getElementById('pInfo').textContent = `${s}–${e} de ${tot}`;
-  const pb = document.getElementById('pBtns'); pb.innerHTML = '';
-  const mk = (l,pg,dis,act) => { const b=document.createElement('button'); b.className='page-btn'+(act?' active':''); b.textContent=l; b.disabled=dis; if(!dis&&pg) b.onclick=()=>{page=pg;render();}; return b; };
-  pb.appendChild(mk('←', page-1, page===1, false));
-  for(let i=1;i<=totalP;i++){
-    if(totalP>6&&i>2&&i<totalP-1&&Math.abs(i-page)>1){ if(i===3||i===totalP-2){const sp=document.createElement('span');sp.textContent='…';sp.style.cssText='padding:0 4px;color:var(--text-muted);font-size:12px;line-height:28px;';pb.appendChild(sp);}continue;}
-    pb.appendChild(mk(i,i,false,i===page));
-  }
-  pb.appendChild(mk('→', page+1, page===totalP, false));
 }
 
 // ── Sort ────────────────────────────────────────────────────────────

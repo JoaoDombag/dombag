@@ -174,6 +174,7 @@ function efEsc($v): string {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Estoque Futuro | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
 /* ── Layout ── */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
@@ -185,9 +186,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .page-title h1{font-size:17px;font-weight:600;letter-spacing:-.2px;}
 .page-title p{font-size:11.5px;color:var(--text-muted);margin-top:1px;}
 .topbar-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;}
-.content{flex:1;overflow-y:auto;padding:24px;}
-.content::-webkit-scrollbar{width:4px;}
-.content::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.content{flex:1;overflow:hidden;padding:24px;display:flex;flex-direction:column;}
 
 /* ── Botões ── */
 .btn-primary{background:var(--blue-accent);color:#fff;border:none;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;font-family:'Segoe UI',sans-serif;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background .15s;white-space:nowrap;}
@@ -220,14 +219,16 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .filter-field input{min-width:260px;}
 
 /* ── Tabela ── */
-.panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-.panel-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;flex:1;min-height:0;}
+.panel-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0;}
 .panel-title{font-size:13px;font-weight:600;}
 .source-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:5px;font-size:10.5px;font-weight:600;}
 .src-pg{background:rgba(56,189,248,.1);color:#38bdf8;}
-.table-wrap{overflow-x:auto;}
+.table-wrap{overflow:auto;flex:1;min-height:0;}
+.table-wrap::-webkit-scrollbar{width:5px;height:5px;}
+.table-wrap::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
 table{width:100%;border-collapse:collapse;}
-th{padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.07em;text-transform:uppercase;border-bottom:1px solid var(--border);background:rgba(0,0,0,.1);white-space:nowrap;}
+th{padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.07em;text-transform:uppercase;border-bottom:1px solid var(--border);background:#112240;white-space:nowrap;position:sticky;top:0;z-index:2;}
 td{padding:10px 14px;font-size:12.5px;border-bottom:1px solid var(--border);color:var(--text-primary);white-space:nowrap;}
 tr:last-child td{border-bottom:none;}
 tbody tr:hover td{background:rgba(255,255,255,.03);}
@@ -262,6 +263,10 @@ tbody tr:hover td{background:rgba(255,255,255,.03);}
         <button class="btn-secondary" id="btnCsv">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Exportar CSV
+        </button>
+        <button class="btn-secondary" id="btnPdf">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          Gerar PDF
         </button>
         <button class="btn-primary" onclick="location.reload()">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
@@ -473,6 +478,17 @@ document.getElementById('btnCsv').addEventListener('click',()=>{
   a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
   a.download='estoque_futuro_<?= date('Y-m-d') ?>.csv';
   a.click();
+});
+
+// ── Gerar PDF ─────────────────────────────────────────────────────────────────
+document.getElementById('btnPdf').addEventListener('click', () => {
+    const params = new URLSearchParams();
+    const prod = fProduto.value.trim();
+    const sit  = fSit.value;
+    if (prod) params.set('produto', prod);
+    if (sit)  params.set('situacao', sit);
+    const qs = params.toString();
+    window.open('/relatorios/estoque-futuro/pdf' + (qs ? '?' + qs : ''), '_blank');
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────

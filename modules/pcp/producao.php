@@ -293,7 +293,6 @@ try {
         INNER JOIN departamentos d ON d.dp_codigo=m.dp_codigo
         $where
         ORDER BY pd.pd_data DESC, pd.pd_horario_ini DESC
-        LIMIT 300
     ");
     $stmt->execute($params);
     $registros = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -390,8 +389,13 @@ $maquinas_json = json_encode(array_map(fn ($m) => [
 <title>Produção Diária | DOMBAG</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
 /* ─── Exclusivo desta página ─────────────────────────────────── */
+/* layout fixo: content não rola, tabela rola internamente */
+.content{overflow:hidden;}
+.kpi-strip,.bi-section-head,.bi-empty,.alert{flex-shrink:0;}
+.maq-cards-grid{flex-shrink:0;max-height:200px;overflow-y:auto;}
 
 /* Botões contextuais de tabela */
 .btn-teal{background:rgba(0,201,167,.12);color:var(--teal);border:1px solid rgba(0,201,167,.25);border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:all .15s;}
@@ -433,9 +437,17 @@ $maquinas_json = json_encode(array_map(fn ($m) => [
 .maq-card-footer .ped-tag{background:rgba(45,106,255,.1);color:#7db3ff;padding:1px 6px;border-radius:4px;font-weight:700;font-size:10.5px;}
 .bi-empty{text-align:center;padding:32px 20px;color:var(--text-muted);font-size:12.5px;background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:24px;}
 
-/* Layout form+tabela */
-.page-grid{display:grid;grid-template-columns:360px 1fr;gap:20px;align-items:start;}
-@media(max-width:1100px){.page-grid{grid-template-columns:1fr;}.maq-cards-grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));}}
+/* Layout form+tabela — ocupa o espaço restante do content */
+.page-grid{display:grid;grid-template-columns:360px 1fr;grid-template-rows:1fr;gap:20px;align-items:start;flex:1;min-height:0;}
+.page-grid>.panel-table{align-self:stretch;}
+@media(max-width:1100px){.page-grid{grid-template-columns:1fr;grid-template-rows:auto;}.maq-cards-grid{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));}}
+
+/* Botão colapsar formulário */
+.form-toggle{width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0;}
+.form-toggle:hover{background:var(--card-hover);color:var(--text-primary);}
+.form-toggle svg{transition:transform .25s;}
+.form-panel.collapsed .form-toggle svg{transform:rotate(180deg);}
+.form-panel.collapsed .form-body,.form-panel.collapsed .form-actions{display:none;}
 
 /* Badges de tabela */
 .qtd-val{font-weight:700;color:#7db3ff;}
@@ -445,7 +457,7 @@ $maquinas_json = json_encode(array_map(fn ($m) => [
 .badge-edit{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(245,158,11,.12);color:var(--amber);display:none;}
 .badge-edit.visible{display:inline-flex;align-items:center;gap:4px;}
 .td-actions{display:flex;align-items:center;gap:5px;}
-.table-panel-head{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.table-panel-head{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;flex-shrink:0;}
 .table-panel-head h2{font-size:14px;font-weight:600;}
 .table-panel-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 
@@ -492,13 +504,14 @@ $maquinas_json = json_encode(array_map(fn ($m) => [
 .lote-config-field select{width:100%;height:38px;padding:0 10px;font-size:13px;}
 
 /* Tabela do lote */
-.lote-table-wrap{overflow-x:auto;padding:0 20px;}
+.lote-table-wrap{padding:0 20px;}
 .lote-table{width:100%;border-collapse:collapse;min-width:620px;}
 .lote-table thead th{
   padding:8px 6px;font-size:10px;font-weight:700;letter-spacing:.6px;
   color:var(--text-muted);text-transform:uppercase;
-  border-bottom:1px solid var(--border);background:rgba(0,0,0,.1);
+  border-bottom:1px solid var(--border);background:#112240;
   white-space:nowrap;text-align:left;
+  position:sticky;top:0;z-index:2;
 }
 .lote-table tbody tr td{padding:4px 4px;border-bottom:1px solid rgba(255,255,255,.04);}
 .lote-table tbody tr:last-child td{border-bottom:none;}
@@ -664,10 +677,15 @@ $maquinas_json = json_encode(array_map(fn ($m) => [
         <div class="form-panel" id="formPanel">
           <div class="form-panel-head">
             <h2 id="formTitle">Novo Apontamento</h2>
-            <span class="badge-edit" id="badgeEdit">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              Editando
-            </span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="badge-edit" id="badgeEdit">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Editando
+              </span>
+              <button type="button" class="form-toggle" id="btnFormToggle" onclick="toggleForm()" title="Minimizar formulário">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="18 15 12 9 6 15"/></svg>
+              </button>
+            </div>
           </div>
           <form method="POST" id="frmProducao" onsubmit="return validarForm()">
             <input type="hidden" name="acao" value="salvar">
@@ -741,7 +759,7 @@ if ($depto_atual) {
         </div>
 
         <!-- Tabela de apontamentos -->
-        <div class="panel">
+        <div class="panel-table">
           <div class="table-panel-head">
             <h2>Apontamentos</h2>
             <div class="table-panel-filters">
@@ -770,7 +788,7 @@ if ($depto_atual) {
             <p>Nenhum apontamento encontrado.<br>Use o formulário ao lado para registrar.</p>
           </div>
           <?php else: ?>
-          <div style="overflow-x:auto;">
+          <div class="table-wrap">
             <table>
               <thead>
                 <tr>
@@ -890,7 +908,7 @@ if ($dp) {
     </div>
 
     <!-- Tabela de turnos -->
-    <div class="lote-table-wrap" style="padding-bottom:4px;">
+    <div class="lote-table-wrap table-wrap" style="padding-bottom:4px;">
       <table class="lote-table">
         <thead>
           <tr>
@@ -1514,6 +1532,13 @@ if (alertOk) setTimeout(() => {
   alertOk.style.opacity = '0';
   setTimeout(() => alertOk.style.display='none', 500);
 }, 4000);
+
+function toggleForm() {
+  const panel = document.getElementById('formPanel');
+  panel.classList.toggle('collapsed');
+  document.getElementById('btnFormToggle').title =
+    panel.classList.contains('collapsed') ? 'Expandir formulário' : 'Minimizar formulário';
+}
 </script>
 </body>
 </html>

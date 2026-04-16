@@ -205,9 +205,10 @@ $grupos_select = $pdo->query('SELECT GRU_CODIGO, GRU_NOME FROM grupo_usuario ORD
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Usuários | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
 /* ─── Exclusivos desta página ─────────────────────── */
-.page-grid{display:grid;grid-template-columns:360px 1fr;gap:20px;align-items:start;}
+.page-grid{display:grid;grid-template-columns:360px 1fr;gap:20px;align-items:start;flex:1;min-height:0;}
 @media(max-width:1100px){.page-grid{grid-template-columns:1fr;}}
 
 /* Badges e pills */
@@ -413,8 +414,8 @@ $grupos_select = $pdo->query('SELECT GRU_CODIGO, GRU_NOME FROM grupo_usuario ORD
         </div>
 
         <!-- ─── TABELA ─────────────────────────────────────────────────── -->
-        <div class="panel">
-          <div style="padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div class="panel-table">
+          <div class="panel-header">
             <h2 style="font-size:14px;font-weight:600;">Usuários Cadastrados</h2>
             <span class="count-badge"><?= $total ?></span>
           </div>
@@ -425,7 +426,7 @@ $grupos_select = $pdo->query('SELECT GRU_CODIGO, GRU_NOME FROM grupo_usuario ORD
             <p>Nenhum usuário cadastrado.<br>Crie o primeiro usando o formulário ao lado.</p>
           </div>
           <?php else: ?>
-          <div style="overflow-x:auto;">
+          <div class="table-wrap">
             <table>
               <thead>
                 <tr>

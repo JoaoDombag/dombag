@@ -230,6 +230,7 @@ $totalAndamento = $totalVendas - $totalFin;
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pedidos de Venda | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
   /* KPIs */
   .kpi-grid-4 {
@@ -266,7 +267,7 @@ $totalAndamento = $totalVendas - $totalFin;
   .filter-actions { margin-top: 16px; display: flex; gap: 12px; }
 
   /* Tabela */
-  .pi-table-wrap { overflow-x: auto; }
+  .pi-table-wrap { /* scroll gerido pela classe .table-wrap do unified_admin.css */ }
   .pi-toggle-cell { width: 52px; text-align: center; }
   .pi-right       { text-align: right; }
   .pi-nowrap      { white-space: nowrap; }
@@ -528,12 +529,12 @@ $totalAndamento = $totalVendas - $totalFin;
       </div>
 
       <!-- Tabela de pedidos -->
-      <div class="panel">
+      <div class="panel-table">
         <div class="panel-header">
           <span class="panel-title">Pedidos de Venda</span>
           <span class="source-badge src-mysql">MySQL</span>
         </div>
-        <div class="pi-table-wrap">
+        <div class="pi-table-wrap table-wrap">
           <table>
             <thead>
               <tr>

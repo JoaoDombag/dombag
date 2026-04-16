@@ -45,11 +45,14 @@ RewriteRule ^pcp/reuniao$              modules/pcp/planejamento_dia.php        [
 RewriteRule ^financeiro$               modules/financeiro/index.php            [L,QSA]
 RewriteRule ^financeiro/receber$       modules/financeiro/contas_receber.php   [L,QSA]
 RewriteRule ^financeiro/pagar$         modules/financeiro/contas_pagar.php     [L,QSA]
+RewriteRule ^financeiro/baixas-pagar$  modules/financeiro/baixas_pagar.php     [L,QSA]
 RewriteRule ^financeiro/fluxo$         modules/financeiro/fluxo_caixa.php      [L,QSA]
 
 # Relatórios
 RewriteRule ^relatorios/producao$          modules/relatorios/rel_producao.php         [L,QSA]
-RewriteRule ^relatorios/estoque-futuro$    modules/relatorios/rel_estoque_futuro.php   [L,QSA]
+RewriteRule ^relatorios/estoque-futuro$        modules/relatorios/rel_estoque_futuro.php      [L,QSA]
+RewriteRule ^relatorios/posicao-estoque$       modules/relatorios/rel_posicao_estoque.php     [L,QSA]
+RewriteRule ^relatorios/estoque-futuro/pdf$    modules/relatorios/rel_estoque_futuro_pdf.php  [L,QSA]
 RewriteRule ^relatorios/controle-estoque$  modules/relatorios/rel_controle_estoque.php [L,QSA]
 
 # Máquinas

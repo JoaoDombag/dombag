@@ -222,6 +222,7 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Consulta de Vendas | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
   /* ── Apenas estilos específicos desta página.
      Layout, topbar, sidebar, inputs, botões e tabela base
@@ -288,7 +289,7 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
   }
 
   /* Tabela específica desta página */
-  .cv-table-wrap { overflow-x: auto; }
+  .cv-table-wrap { }
 
   .cv-toggle-cell { width: 52px; text-align: center; }
   .cv-right       { text-align: right; }
@@ -355,7 +356,8 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
     padding: 8px 14px; font-size: 10px; font-weight: 700;
     text-transform: uppercase; letter-spacing: .06em;
     color: var(--text-muted); border-bottom: 1px solid var(--border);
-    background: rgba(0,0,0,.08); white-space: nowrap;
+    background: #112240; white-space: nowrap;
+    position: sticky; top: 0; z-index: 2;
   }
   .cv-subtable td {
     padding: 10px 14px; font-size: 12.5px;
@@ -497,12 +499,12 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
       </div>
 
       <!-- Tabela de pedidos -->
-      <div class="panel">
+      <div class="panel-table">
         <div class="panel-header">
           <span class="panel-title">Pedidos faturados</span>
           <span class="source-badge src-erp">ERP</span>
         </div>
-        <div class="cv-table-wrap">
+        <div class="cv-table-wrap table-wrap">
           <table>
             <thead>
               <tr>

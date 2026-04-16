@@ -240,20 +240,18 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .icon-btn:hover{background:var(--card-hover);color:var(--text-primary);}
 
 /* Content */
-.content{flex:1;overflow-y:auto;padding:24px;}
-.content::-webkit-scrollbar{width:4px;}
-.content::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.content{flex:1;overflow:hidden;padding:24px;display:flex;flex-direction:column;}
 
 /* Alert */
 .alert-err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--red);border-radius:8px;padding:10px 16px;font-size:12.5px;display:flex;align-items:center;gap:8px;margin-bottom:18px;}
 
 /* ── Abas ── */
-.tabs-bar{display:flex;align-items:center;gap:4px;margin-bottom:22px;border-bottom:1px solid var(--border);padding-bottom:0;}
+.tabs-bar{display:flex;align-items:center;gap:4px;margin-bottom:0;border-bottom:1px solid var(--border);padding-bottom:0;flex-shrink:0;}
 .tab-btn{padding:8px 18px;border:none;background:transparent;color:var(--text-muted);font-family:'Segoe UI',sans-serif;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s,border-color .15s;}
 .tab-btn:hover{color:var(--text-primary);}
 .tab-btn.active{color:#7db3ff;border-bottom-color:var(--blue-light);font-weight:600;}
 .tab-content{display:none;}
-.tab-content.active{display:block;}
+.tab-content.active{display:flex;flex-direction:column;flex:1;min-height:0;overflow-y:auto;padding-top:22px;}
 
 /* ── Gráficos globais ── */
 .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:0;}
@@ -310,11 +308,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .footer-item span{font-size:11.5px;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;}
 
 /* Tabela relatório */
-.report-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-.report-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.report-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;flex:1;min-height:0;}
+.report-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;flex-shrink:0;}
 .report-head h2{font-size:14px;font-weight:600;}
 .report-table{width:100%;border-collapse:collapse;}
-.report-table th{padding:9px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;border-bottom:1px solid var(--border);background:rgba(0,0,0,.1);white-space:nowrap;}
+.report-table th{padding:9px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;border-bottom:1px solid var(--border);background:#112240;white-space:nowrap;position:sticky;top:0;z-index:2;}
 .report-table td{padding:11px 16px;font-size:12.5px;border-bottom:1px solid var(--border);color:var(--text-primary);vertical-align:middle;}
 .report-table tbody tr:last-child td{border-bottom:none;}
 .report-table tfoot td{border-top:2px solid var(--border);border-bottom:none;}
@@ -345,6 +343,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 </style>
 
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 </head>
 <body>
 <div class="app-wrapper">
@@ -797,7 +796,7 @@ function initGraficosGlobais() {
 
   let somaReal = 0, somaMeta = 0, somaEsp = 0;
 
-  let html = `<div style="overflow-x:auto;"><table class="report-table">
+  let html = `<div class="table-wrap"><table class="report-table">
     <thead><tr>
       <th>Máquina</th><th>Depto</th>
       <th style="text-align:right;">Real</th>
@@ -906,7 +905,7 @@ function renderFinalizados(modo) {
 
   const comDataFin = modo === 'mes';
 
-  let html = `<div style="overflow-x:auto;"><table class="report-table"><thead><tr>
+  let html = `<div class="table-wrap"><table class="report-table"><thead><tr>
     ${comDataFin ? '<th>Finalizado em</th>' : ''}
     <th>Pedido</th>
     <th>Cliente</th>

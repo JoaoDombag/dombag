@@ -171,6 +171,7 @@ function esc($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Widgets do Dashboard | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
 .tip { font-size:12px; color:var(--text-muted); margin-bottom:20px; line-height:1.6; }
 

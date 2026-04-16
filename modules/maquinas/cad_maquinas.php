@@ -161,13 +161,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .btn-secondary:hover{background:var(--card-hover);color:var(--text-primary);}
 .btn-danger{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);color:var(--red);padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;font-family:'Segoe UI',sans-serif;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:5px;}
 .btn-danger:hover{background:rgba(239,68,68,.22);}
-.content{flex:1;overflow-y:auto;padding:24px;}
-.content::-webkit-scrollbar{width:4px;}
-.content::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.content{flex:1;overflow:hidden;padding:24px;display:flex;flex-direction:column;}
 .alert{border-radius:8px;padding:10px 16px;font-size:12.5px;display:flex;align-items:center;gap:8px;margin-bottom:18px;}
 .alert-err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--red);}
 .alert-ok{background:rgba(0,201,167,.1);border:1px solid rgba(0,201,167,.2);color:var(--teal);}
-.page-grid{display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start;}
+.page-grid{display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start;flex:1;min-height:0;}
 @media(max-width:1000px){.page-grid{grid-template-columns:1fr;}}
 .form-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;position:sticky;top:0;}
 .form-panel-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
@@ -189,12 +187,12 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .calc-box-unit{font-size:11px;color:rgba(0,201,167,.6);margin-top:1px;}
 .form-actions{padding:16px 20px;border-top:1px solid var(--border);display:flex;gap:8px;}
 .form-actions .btn-primary{flex:1;justify-content:center;}
-.table-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-.table-panel-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.table-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;min-height:0;}
+.table-panel-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .table-panel-head h2{font-size:14px;font-weight:600;}
 .count-badge{font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:rgba(45,106,255,.12);color:#7db3ff;}
 .maq-table{width:100%;border-collapse:collapse;}
-.maq-table th{padding:9px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;border-bottom:1px solid var(--border);background:rgba(0,0,0,.1);}
+.maq-table th{padding:9px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;border-bottom:1px solid var(--border);background:#112240;position:sticky;top:0;z-index:2;}
 .maq-table td{padding:12px 16px;font-size:13px;border-bottom:1px solid var(--border);color:var(--text-primary);vertical-align:middle;}
 .maq-table tr:last-child td{border-bottom:none;}
 .maq-table tbody tr{transition:background .12s;}
@@ -225,6 +223,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
   </style>
 
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 </head>
 <body>
 <div class="app-wrapper">
@@ -371,7 +370,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
             <p>Nenhuma máquina cadastrada.<br>Use o formulário ao lado para adicionar.</p>
           </div>
           <?php else: ?>
-          <div style="overflow-x:auto;">
+          <div class="table-wrap">
             <table class="maq-table" id="tblMaquinas">
               <thead>
                 <tr>

@@ -44,9 +44,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .topbar-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;}
 .icon-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s;flex-shrink:0;}
 .icon-btn:hover{background:var(--card-hover);color:var(--text-primary);}
-.content{flex:1;overflow-y:auto;padding:24px;}
-.content::-webkit-scrollbar{width:4px;}
-.content::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.content{flex:1;overflow:hidden;padding:24px;display:flex;flex-direction:column;}
 .sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--blue-mid);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;transition:width var(--transition),min-width var(--transition);position:relative;z-index:100;}
 .sidebar.collapsed{width:var(--sidebar-w-col);min-width:var(--sidebar-w-col);}
 .status-pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600;}
@@ -78,13 +76,14 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .search-box input::placeholder{color:var(--text-muted);}
 .filter-select{background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:0 10px;height:36px;font-family:'Segoe UI',sans-serif;font-size:12.5px;color:var(--text-primary);cursor:pointer;outline:none;}
 .filter-select option{background:#112240;}
-.pcp-layout{display:grid;grid-template-columns:1fr 290px;gap:16px;min-width:0;}
+.pcp-layout{display:grid;grid-template-columns:1fr 290px;gap:16px;min-width:0;flex:1;min-height:0;}
 .pcp-layout>*{min-width:0;}
-.orders-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+.orders-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;min-height:0;}
+.orders-panel .panel-header{flex-shrink:0;}
 .panel-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
 .panel-title{font-size:13px;font-weight:600;}
 .pcp-table{width:100%;border-collapse:collapse;}
-.pcp-table th{padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;border-bottom:1px solid var(--border);background:rgba(0,0,0,.1);white-space:nowrap;cursor:pointer;user-select:none;}
+.pcp-table th{padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;border-bottom:1px solid var(--border);background:#112240;white-space:nowrap;cursor:pointer;user-select:none;position:sticky;top:0;z-index:2;}
 .pcp-table th:hover{color:var(--text-primary);}
 .pcp-table td{padding:10px 14px;font-size:12.5px;border-bottom:1px solid var(--border);color:var(--text-primary);white-space:nowrap;}
 .pcp-table tr:last-child td{border-bottom:none;}
@@ -94,13 +93,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .order-num{font-weight:700;color:#7db3ff;font-size:12px;}
 .sort-icon{margin-left:3px;opacity:.4;font-size:9px;}
 .sort-icon.active{opacity:1;color:var(--blue-light);}
-.pagination{display:flex;align-items:center;justify-content:space-between;padding:10px 18px;border-top:1px solid var(--border);font-size:12px;color:var(--text-muted);}
-.page-btns{display:flex;align-items:center;gap:4px;}
-.page-btn{min-width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:12px;font-family:'Segoe UI',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0 6px;transition:all .15s;}
-.page-btn:hover{background:var(--card-hover);color:var(--text-primary);}
-.page-btn.active{background:rgba(45,106,255,.2);color:#7db3ff;border-color:rgba(45,106,255,.4);}
-.page-btn:disabled{opacity:.35;cursor:default;pointer-events:none;}
-.detail-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;}
+.detail-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;min-height:0;}
 .detail-panel .panel-header{padding:13px 18px;border-bottom:1px solid var(--border);}
 .detail-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;color:var(--text-muted);}
 .detail-empty svg{opacity:.2;margin-bottom:10px;}
@@ -129,6 +122,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 </style>
 
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 </head>
 <body>
 <div class="app-wrapper">
@@ -207,7 +201,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
       <div class="pcp-layout">
         <div class="orders-panel">
           <div class="panel-header"><span class="panel-title">Ordens</span><span style="font-size:11.5px;color:var(--text-muted);" id="rPanel"></span></div>
-          <div style="overflow-x:auto;">
+          <div class="table-wrap">
             <table class="pcp-table">
               <thead><tr>
                 <th data-col="prioridade">Prior. <span class="sort-icon active" id="s-prioridade">↑</span></th>
@@ -221,7 +215,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
             </table>
           </div>
           <div id="emptyState" style="display:none;text-align:center;padding:40px 20px;color:var(--text-muted);"><p style="font-size:13px;">Nenhuma ordem encontrada.</p></div>
-          <div class="pagination"><span id="pInfo"></span><div class="page-btns" id="pBtns"></div></div>
         </div>
 
         <div style="display:flex;flex-direction:column;gap:12px;">
@@ -248,16 +241,16 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 const PEDIDOS  = <?= $PEDIDOS  ?>;
 const MAQUINAS = <?= $MAQUINAS ?>;
 
-const PER=12;let page=1,sortCol='prioridade',sortAsc=true,filtered=[...PEDIDOS],selIdx=null;
+let sortCol='prioridade',sortAsc=true,filtered=[...PEDIDOS],selIdx=null;
 function pillSt(s){if(s==='OK')return'<span class="status-pill ok">No Prazo</span>';if(s==='ATRASADO')return'<span class="status-pill danger">Atrasado</span>';if(s==='RISCO')return'<span class="status-pill warn">Risco</span>';if(s==='PENDENTE')return'<span class="status-pill warn">Pendente</span>';return'—';}
 function tipoPill(v){if(v==='BAG')return'<span style="background:rgba(45,106,255,.12);color:#7db3ff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">BAG</span>';if(v==='SACARIA')return'<span style="background:rgba(0,201,167,.1);color:var(--teal);padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;">SAC</span>';return'—';}
 (function(){const dias=['Domingo','Segunda-feira','Terça-feira','Quarta-feira','Quinta-feira','Sexta-feira','Sábado'],meses=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'],d=new Date();document.getElementById('topbar-date').textContent=dias[d.getDay()]+', '+d.getDate()+' de '+meses[d.getMonth()]+' de '+d.getFullYear();})();
 
 function kpis(){document.getElementById('k-total').textContent=PEDIDOS.length;document.getElementById('k-ok').textContent=PEDIDOS.filter(p=>p.status_prazo==='OK').length;document.getElementById('k-pend').textContent=PEDIDOS.filter(p=>p.status_prazo==='PENDENTE').length;document.getElementById('k-late').textContent=PEDIDOS.filter(p=>p.status_prazo==='ATRASADO').length;}
 
-function applyFilters(){const q=document.getElementById('searchInput').value.toLowerCase(),fs=document.getElementById('fStatus').value,ft=document.getElementById('fTipo').value,fg=document.getElementById('fGrupo').value;filtered=PEDIDOS.filter(p=>{if(q&&!p.num.includes(q)&&!p.cliente.toLowerCase().includes(q)&&!p.produto.toLowerCase().includes(q))return false;if(fs&&p.status_prazo!==fs)return false;if(ft&&p.tipo!==ft)return false;if(fg&&p.grupo!==fg)return false;return true;});filtered.sort((a,b)=>{let va=a[sortCol]??'',vb=b[sortCol]??'';if(sortCol==='entrega'){const pa=va.split('/').reverse().join(''),pb=vb.split('/').reverse().join('');return sortAsc?pa.localeCompare(pb):pb.localeCompare(pa);}if(va<vb)return sortAsc?-1:1;if(va>vb)return sortAsc?1:-1;return 0;});page=1;render();}
+function applyFilters(){const q=document.getElementById('searchInput').value.toLowerCase(),fs=document.getElementById('fStatus').value,ft=document.getElementById('fTipo').value,fg=document.getElementById('fGrupo').value;filtered=PEDIDOS.filter(p=>{if(q&&!p.num.includes(q)&&!p.cliente.toLowerCase().includes(q)&&!p.produto.toLowerCase().includes(q))return false;if(fs&&p.status_prazo!==fs)return false;if(ft&&p.tipo!==ft)return false;if(fg&&p.grupo!==fg)return false;return true;});filtered.sort((a,b)=>{let va=a[sortCol]??'',vb=b[sortCol]??'';if(sortCol==='entrega'){const pa=va.split('/').reverse().join(''),pb=vb.split('/').reverse().join('');return sortAsc?pa.localeCompare(pb):pb.localeCompare(pa);}if(va<vb)return sortAsc?-1:1;if(va>vb)return sortAsc?1:-1;return 0;});render();}
 
-function render(){const tot=filtered.length,start=(page-1)*PER,slice=filtered.slice(start,start+PER);document.getElementById('rCount').textContent=tot+' ordem(ns)';document.getElementById('rPanel').textContent=tot+' ordem(ns)';const tbody=document.getElementById('tbody'),empty=document.getElementById('emptyState');if(!tot){tbody.innerHTML='';empty.style.display='block';document.getElementById('pInfo').textContent='';document.getElementById('pBtns').innerHTML='';return;}empty.style.display='none';tbody.innerHTML=slice.map(p=>{const ri=PEDIDOS.indexOf(p);return`<tr class="${ri===selIdx?'selected':''}" onclick="selectOrder(${ri})"><td style="font-weight:700;color:var(--text-muted);">${p.prioridade||'—'}</td><td><span class="order-num">${p.num}</span></td><td title="${p.produto}">${p.produto.length>38?p.produto.slice(0,38)+'…':p.produto}</td><td title="${p.cliente}">${(p.fantasia||p.cliente).slice(0,22)}</td><td>${p.entrega||'—'}</td><td>${(p.qtd||0).toLocaleString('pt-BR')}</td><td>${tipoPill(p.tipo)}</td><td>${pillSt(p.status_prazo)}</td><td style="font-size:11px;color:var(--text-muted);">${(p.gargalo||'—').slice(0,22)}</td></tr>`;}).join('');const totalP=Math.ceil(tot/PER),s=start+1,e=Math.min(start+PER,tot);document.getElementById('pInfo').textContent=`${s}–${e} de ${tot}`;const pb=document.getElementById('pBtns');pb.innerHTML='';const mk=(l,pg,dis,act)=>{const b=document.createElement('button');b.className='page-btn'+(act?' active':'');b.textContent=l;b.disabled=dis;if(!dis&&pg)b.onclick=()=>{page=pg;render();};return b;};pb.appendChild(mk('←',page-1,page===1,false));for(let p2=1;p2<=totalP;p2++){if(totalP>6&&p2>2&&p2<totalP-1&&Math.abs(p2-page)>1){if(p2===3||p2===totalP-2){const ss=document.createElement('span');ss.textContent='…';ss.style.cssText='padding:0 4px;color:var(--text-muted);font-size:12px;line-height:28px;';pb.appendChild(ss);}continue;}pb.appendChild(mk(p2,p2,false,p2===page));}pb.appendChild(mk('→',page+1,page===totalP,false));}
+function render(){const tot=filtered.length;document.getElementById('rCount').textContent=tot+' ordem(ns)';document.getElementById('rPanel').textContent=tot+' ordem(ns)';const tbody=document.getElementById('tbody'),empty=document.getElementById('emptyState');if(!tot){tbody.innerHTML='';empty.style.display='block';return;}empty.style.display='none';tbody.innerHTML=filtered.map(p=>{const ri=PEDIDOS.indexOf(p);return`<tr class="${ri===selIdx?'selected':''}" onclick="selectOrder(${ri})"><td style="font-weight:700;color:var(--text-muted);">${p.prioridade||'—'}</td><td><span class="order-num">${p.num}</span></td><td title="${p.produto}">${p.produto.length>38?p.produto.slice(0,38)+'…':p.produto}</td><td title="${p.cliente}">${(p.fantasia||p.cliente).slice(0,22)}</td><td>${p.entrega||'—'}</td><td>${(p.qtd||0).toLocaleString('pt-BR')}</td><td>${tipoPill(p.tipo)}</td><td>${pillSt(p.status_prazo)}</td><td style="font-size:11px;color:var(--text-muted);">${(p.gargalo||'—').slice(0,22)}</td></tr>`;}).join('');}
 
 function selectOrder(idx){selIdx=idx;render();const p=PEDIDOS[idx];document.getElementById('detEmpty').style.display='none';const body=document.getElementById('detBody');body.style.display='block';const filaHTML=p.fila&&p.fila.length?p.fila.sort((a,b)=>a.seq-b.seq).map(f=>`<div class="fluxo-step"><div class="fluxo-num">${f.seq}</div><div class="fluxo-info"><div class="fluxo-maq">${f.maquina}</div><div class="fluxo-dates">${f.inicio}→${f.termino} · ${f.horas}h<span class="${f.status==='RISCO'?'pill-risco':'pill-ok-f'}">${f.status}</span></div></div></div>`).join(''):p.fluxo?`<div style="font-size:12px;color:var(--text-muted);line-height:1.6;">${p.fluxo.split('>').map(s=>`<span style="display:inline-block;background:rgba(255,255,255,.04);padding:2px 8px;border-radius:4px;margin:2px;">${s.trim()}</span>`).join('<span style="color:var(--blue-light);margin:0 2px;">→</span>')}</div>`:'<p style="font-size:12px;color:var(--text-muted);">Sem fluxo definido.</p>';body.innerHTML=`<div class="det-num">${p.num}</div><div style="font-size:13px;font-weight:500;margin-top:2px;">${p.fantasia||p.cliente}</div><div style="margin:10px 0;">${pillSt(p.status_prazo)}</div><div class="det-section"><div class="det-title">Dados</div><div class="det-grid"><div class="det-item"><label>Entrega</label><span>${p.entrega||'—'}</span></div><div class="det-item"><label>Quantidade</label><span>${(p.qtd||0).toLocaleString('pt-BR')}</span></div><div class="det-item"><label>Tipo</label><span>${p.tipo||'—'}</span></div><div class="det-item"><label>Prioridade</label><span>${p.prioridade}</span></div><div class="det-item"><label>Hrs Totais</label><span>${p.hrs_totais||0}h</span></div><div class="det-item"><label>Gargalo</label><span style="color:var(--red);font-size:11.5px;">${p.gargalo||'—'}</span></div></div></div><div class="det-section"><div class="det-title">Fluxo de Produção</div>${filaHTML}</div>${p.pendencia?`<div class="det-section"><div style="font-size:12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:7px;padding:8px 12px;color:var(--amber);">⚠ ${p.pendencia}</div></div>`:''}`;} 
 

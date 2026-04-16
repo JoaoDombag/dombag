@@ -10,6 +10,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Controle de Estoque | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
 .src-gsheet { background:rgba(34,197,94,.12); color:#22c55e; }
 

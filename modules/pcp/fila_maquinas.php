@@ -45,9 +45,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .topbar-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;}
 .icon-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s;flex-shrink:0;}
 .icon-btn:hover{background:var(--card-hover);color:var(--text-primary);}
-.content{flex:1;overflow-y:auto;padding:24px;}
-.content::-webkit-scrollbar{width:4px;}
-.content::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+.content{flex:1;overflow:hidden;padding:24px;display:flex;flex-direction:column;}
 .sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--blue-mid);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;transition:width var(--transition),min-width var(--transition);position:relative;z-index:100;}
 .sidebar.collapsed{width:var(--sidebar-w-col);min-width:var(--sidebar-w-col);}
 .alert-warn{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 16px;font-size:12.5px;color:var(--amber);margin-bottom:16px;display:flex;align-items:center;gap:8px;}
@@ -61,13 +59,13 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .maq-tab{padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);font-size:12.5px;font-weight:500;font-family:'Segoe UI',sans-serif;cursor:pointer;transition:all .15s;white-space:nowrap;}
 .maq-tab:hover{background:var(--card-hover);color:var(--text-primary);}
 .maq-tab.active{background:rgba(45,106,255,.2);color:#7db3ff;border-color:rgba(45,106,255,.4);}
-.fila-layout{display:grid;grid-template-columns:1fr 260px;gap:16px;min-width:0;}
+.fila-layout{display:grid;grid-template-columns:1fr 260px;gap:16px;min-width:0;flex:1;min-height:0;}
 .fila-layout>*{min-width:0;}
-.orders-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-.orders-panel .panel-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.orders-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;min-height:0;}
+.orders-panel .panel-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .panel-title{font-size:13px;font-weight:600;}
 .fila-table{width:100%;border-collapse:collapse;}
-.fila-table th{padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;border-bottom:1px solid var(--border);background:rgba(0,0,0,.1);white-space:nowrap;}
+.fila-table th{padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;border-bottom:1px solid var(--border);background:#112240;white-space:nowrap;position:sticky;top:0;z-index:2;}
 .fila-table td{padding:11px 14px;font-size:12.5px;border-bottom:1px solid var(--border);color:var(--text-primary);white-space:nowrap;}
 .fila-table tr:last-child td{border-bottom:none;}
 .fila-table tbody tr:hover td{background:rgba(255,255,255,.03);}
@@ -90,6 +88,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 </style>
 
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 </head>
 <body>
 <div class="app-wrapper">
@@ -163,7 +162,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
             <span class="panel-title" id="filaTitle">Fila</span>
             <span style="font-size:11.5px;color:var(--text-muted);" id="filaCount"></span>
           </div>
-          <div style="overflow-x:auto;">
+          <div class="table-wrap">
             <table class="fila-table">
               <thead><tr><th>Seq</th><th>Pedido</th><th>Produto</th><th>Cliente</th><th>Entrega</th><th>Qtd</th><th>Horas</th><th>Início</th><th>Término</th><th>Status</th></tr></thead>
               <tbody id="filaBody"></tbody>

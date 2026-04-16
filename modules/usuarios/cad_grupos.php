@@ -120,8 +120,9 @@ $total = count($grupos_db);
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grupos de Usuários | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
-.page-grid{display:grid;grid-template-columns:360px 1fr;gap:20px;align-items:start;}
+.page-grid{display:grid;grid-template-columns:360px 1fr;gap:20px;align-items:start;flex:1;min-height:0;}
 @media(max-width:1100px){.page-grid{grid-template-columns:1fr;}}
 
 .badge-edit{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(245,158,11,.12);color:var(--amber);display:none;}
@@ -248,8 +249,8 @@ $total = count($grupos_db);
         </div>
 
         <!-- ─── TABELA ─────────────────────────────────────────────────── -->
-        <div class="panel">
-          <div style="padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <div class="panel-table">
+          <div class="panel-header">
             <h2 style="font-size:14px;font-weight:600;">Grupos Cadastrados</h2>
             <span class="count-badge"><?= $total ?></span>
           </div>
@@ -260,7 +261,7 @@ $total = count($grupos_db);
             <p>Nenhum grupo cadastrado.<br>Crie o primeiro usando o formulário ao lado.</p>
           </div>
           <?php else: ?>
-          <div style="overflow-x:auto;">
+          <div class="table-wrap">
             <table>
               <thead>
                 <tr>

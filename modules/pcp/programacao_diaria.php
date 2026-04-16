@@ -212,8 +212,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .topbar-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;}
 .icon-btn{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s;flex-shrink:0;}
 .icon-btn:hover{background:var(--card-hover);color:var(--text-primary);}
-.content{flex:1;overflow-y:auto;padding:24px;}
+.content{flex:1;overflow:hidden;display:flex;flex-direction:column;padding:24px;}
 .content::-webkit-scrollbar{width:4px;}
+.prog-layout > div:last-child{display:flex;flex-direction:column;min-height:0;}
+.prog-layout > div:last-child > .orders-panel{flex:1;}
 .content::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
 .sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--blue-mid);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;transition:width var(--transition),min-width var(--transition);position:relative;z-index:100;}
 .sidebar.collapsed{width:var(--sidebar-w-col);min-width:var(--sidebar-w-col);}
@@ -226,7 +228,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .stat-card{background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:12px 16px;text-align:center;}
 .stat-val{font-size:20px;font-weight:700;letter-spacing:-.5px;}
 .stat-lbl{font-size:11px;color:var(--text-muted);margin-top:2px;}
-.prog-layout{display:grid;grid-template-columns:220px 1fr;gap:16px;min-width:0;transition:grid-template-columns .22s cubic-bezier(.4,0,.2,1);}
+.prog-layout{display:grid;grid-template-columns:220px 1fr;gap:16px;min-width:0;flex:1;min-height:0;transition:grid-template-columns .22s cubic-bezier(.4,0,.2,1);}
 .prog-layout>*{min-width:0;}
 .prog-layout.cal-collapsed{grid-template-columns:36px 1fr;}
 .calendar-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;height:fit-content;transition:width .22s;}
@@ -252,11 +254,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .date-badge{font-size:10px;background:rgba(255,255,255,.08);padding:2px 7px;border-radius:10px;color:var(--text-muted);}
 .date-item.active .date-badge{background:rgba(45,106,255,.2);color:#7db3ff;}
 .date-item.has-manual .date-badge{background:rgba(251,191,36,.15);color:var(--amber);}
-.orders-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
-.orders-panel .panel-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.orders-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column;min-height:0;}
+.orders-panel .panel-header{padding:13px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;}
 .panel-title{font-size:13px;font-weight:600;}
 .prog-table{width:100%;border-collapse:collapse;}
-.prog-table th{padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;border-bottom:1px solid var(--border);background:rgba(0,0,0,.1);white-space:nowrap;}
+.prog-table th{padding:9px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.7px;text-transform:uppercase;border-bottom:1px solid var(--border);background:#112240;white-space:nowrap;position:sticky;top:0;z-index:2;}
 .prog-table td{padding:10px 14px;font-size:12.5px;border-bottom:1px solid var(--border);color:var(--text-primary);white-space:nowrap;}
 .prog-table tr:last-child td{border-bottom:none;}
 .prog-table tbody tr:hover td{background:rgba(255,255,255,.03);}
@@ -282,6 +284,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 </style>
 
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 </head>
 <body>
 <div class="app-wrapper">
@@ -339,7 +342,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
               <span style="font-size:11.5px;color:var(--text-muted);" id="progCount"></span>
               <span id="overloadAlert" style="display:none;"></span>
             </div>
-            <div style="overflow-x:auto;">
+            <div class="table-wrap">
               <table class="prog-table">
                 <thead>
                   <tr>

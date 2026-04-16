@@ -85,7 +85,9 @@ $presets = LEADS_PRESETS;
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prospecção com IA — Automático | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
+.content{overflow-y:auto;overflow-x:hidden;}
 .nav-pills{display:flex;gap:8px;margin-bottom:20px}
 .nav-pill{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text-secondary);font-size:12px;font-weight:600;text-decoration:none}
 .nav-pill:hover{background:rgba(255,255,255,.07);color:var(--text-primary)}

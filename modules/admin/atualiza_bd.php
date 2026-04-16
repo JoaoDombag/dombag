@@ -55,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Console SQL | DOMBAG</title>
   <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
   <style>
 .content{display:flex;flex-direction:column;gap:18px;}
 
@@ -79,10 +80,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 .result-header.ok {background:rgba(0,201,167,.08);color:var(--teal);}
 .result-header.err{background:rgba(239,68,68,.08);color:var(--red);}
 .result-header.info{background:rgba(45,106,255,.08);color:#7db3ff;}
-.result-body{overflow-x:auto;}
+.result-body{}
 
 .res-table{width:100%;border-collapse:collapse;font-size:12.5px;}
-.res-table th{padding:9px 14px;text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);background:rgba(0,0,0,.15);border-bottom:1px solid var(--border);white-space:nowrap;}
+.res-table th{padding:9px 14px;text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-muted);background:#112240;border-bottom:1px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:2;}
 .res-table td{padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text-primary);font-variant-numeric:tabular-nums;white-space:pre;}
 .res-table tbody tr:last-child td{border-bottom:none;}
 .res-table tbody tr:hover td{background:rgba(255,255,255,.025);}
@@ -181,7 +182,7 @@ ALTER TABLE tabela ADD COLUMN coluna VARCHAR(100) NULL;"
           <?php if (empty($result['rows'])): ?>
             <div class="affected-sub" style="padding:18px 20px;">Nenhum resultado.</div>
           <?php else: ?>
-          <div class="result-body">
+          <div class="result-body table-wrap">
             <table class="res-table">
               <thead>
                 <tr>

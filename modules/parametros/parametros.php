@@ -81,6 +81,7 @@ if (!in_array($aba_ativa, ['integracoes', 'aparencia', 'crm'])) $aba_ativa = 'in
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Parâmetros | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
 /* ── Abas ─────────────────────────────────────────────────────────────────── */
 .tabs-bar {

@@ -589,6 +589,7 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pedidos ERP Yzidro | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
   /* KPIs */
   .kpi-grid-4 {
@@ -625,7 +626,7 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
   .filter-actions { margin-top: 16px; display: flex; gap: 12px; }
 
   /* Tabela */
-  .yz-table-wrap { overflow-x: auto; }
+  .yz-table-wrap { }
   .yz-toggle-cell { width: 52px; text-align: center; }
   .yz-check-cell  { width: 44px; text-align: center; }
   .yz-right       { text-align: right; }
@@ -711,7 +712,8 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
     padding: 8px 14px; font-size: 10px; font-weight: 700;
     text-transform: uppercase; letter-spacing: .06em;
     color: var(--text-muted); border-bottom: 1px solid var(--border);
-    background: rgba(0,0,0,.08); white-space: nowrap;
+    background: #112240; white-space: nowrap;
+    position: sticky; top: 0; z-index: 2;
   }
   .yz-subtable td {
     padding: 10px 14px; font-size: 12.5px;
@@ -918,7 +920,7 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
       </div>
 
       <!-- Tabela de pedidos -->
-      <div class="panel" style="padding-bottom: 4px;">
+      <div class="panel-table" style="padding-bottom: 4px;">
         <div class="panel-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
           <div style="display:flex;align-items:center;gap:12px;">
             <span class="panel-title">Pedidos ERP</span>
@@ -929,7 +931,7 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
             Selecionar todos os novos
           </label>
         </div>
-        <div class="yz-table-wrap">
+        <div class="yz-table-wrap table-wrap">
           <table>
             <thead>
               <tr>

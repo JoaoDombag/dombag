@@ -153,22 +153,58 @@ try {
         LIMIT 5
     ')->fetchAll(PDO::FETCH_ASSOC);
 
+    // financeiro widget: load from ERP if available, fallback to local tables
     if (dashW('financeiro')) {
-        $r = $pdo->query(
-            "SELECT COALESCE(SUM(valor - COALESCE(valor_pago,0)),0) AS total,
-                    COALESCE(SUM(CASE WHEN status='VENCIDO' THEN valor - COALESCE(valor_pago,0) ELSE 0 END),0) AS vencido
-             FROM fin_contas_pagar WHERE status IN ('ABERTO','PARCIAL','VENCIDO')"
-        )->fetch(PDO::FETCH_ASSOC);
-        $fin_pagar_total   = (float)($r['total']   ?? 0);
-        $fin_pagar_vencido = (float)($r['vencido'] ?? 0);
+        $fin_pagar_total   = 0.0; $fin_pagar_vencido   = 0.0;
+        $fin_receber_total = 0.0; $fin_receber_vencido = 0.0;
+        $fin_from_erp = false;
+        $pgFin = dbPG();
+        if ($pgFin) {
+            $hj = date('Y-m-d');
+            $resFin = pg_query($pgFin,
+                "SELECT
+                    COALESCE(SUM(COALESCE(CP_SALDO_MP,0)),0) AS total,
+                    COALESCE(SUM(CASE WHEN CP_VENCIMENTO < '$hj' THEN COALESCE(CP_SALDO_MP,0) ELSE 0 END),0) AS vencido
+                 FROM CONTAS_PAGAR
+                 WHERE CP_TIPO='D' AND CP_VINCULO IS NULL AND EMP_CODIGO=1
+                   AND COALESCE(CP_SALDO_MP,0) > 0"
+            );
+            if ($resFin && $rowFin = pg_fetch_assoc($resFin)) {
+                $fin_pagar_total   = (float)$rowFin['total'];
+                $fin_pagar_vencido = (float)$rowFin['vencido'];
+                $fin_from_erp = true;
+            }
+            $resFin = pg_query($pgFin,
+                "SELECT
+                    COALESCE(SUM(COALESCE(CR_SALDO_PARCELA_MP,0)),0) AS total,
+                    COALESCE(SUM(CASE WHEN CR_VENCIMENTO < '$hj' THEN COALESCE(CR_SALDO_PARCELA_MP,0) ELSE 0 END),0) AS vencido
+                 FROM CONTAS_RECEBER
+                 WHERE CR_TIPO='C' AND CR_VINCULO IS NULL AND EMP_CODIGO=1
+                   AND COALESCE(CR_SALDO_PARCELA_MP,0) > 0"
+            );
+            if ($resFin && $rowFin = pg_fetch_assoc($resFin)) {
+                $fin_receber_total   = (float)$rowFin['total'];
+                $fin_receber_vencido = (float)$rowFin['vencido'];
+            }
+        }
+        if (!$fin_from_erp) {
+            // fallback: local MySQL tables
+            $r = $pdo->query(
+                "SELECT COALESCE(SUM(valor - COALESCE(valor_pago,0)),0) AS total,
+                        COALESCE(SUM(CASE WHEN status='VENCIDO' THEN valor - COALESCE(valor_pago,0) ELSE 0 END),0) AS vencido
+                 FROM fin_contas_pagar WHERE status IN ('ABERTO','PARCIAL','VENCIDO')"
+            )->fetch(PDO::FETCH_ASSOC);
+            $fin_pagar_total   = (float)($r['total']   ?? 0);
+            $fin_pagar_vencido = (float)($r['vencido'] ?? 0);
 
-        $r = $pdo->query(
-            "SELECT COALESCE(SUM(valor - COALESCE(valor_pago,0)),0) AS total,
-                    COALESCE(SUM(CASE WHEN status='VENCIDO' THEN valor - COALESCE(valor_pago,0) ELSE 0 END),0) AS vencido
-             FROM fin_contas_receber WHERE status IN ('ABERTO','PARCIAL','VENCIDO')"
-        )->fetch(PDO::FETCH_ASSOC);
-        $fin_receber_total   = (float)($r['total']   ?? 0);
-        $fin_receber_vencido = (float)($r['vencido'] ?? 0);
+            $r = $pdo->query(
+                "SELECT COALESCE(SUM(valor - COALESCE(valor_pago,0)),0) AS total,
+                        COALESCE(SUM(CASE WHEN status='VENCIDO' THEN valor - COALESCE(valor_pago,0) ELSE 0 END),0) AS vencido
+                 FROM fin_contas_receber WHERE status IN ('ABERTO','PARCIAL','VENCIDO')"
+            )->fetch(PDO::FETCH_ASSOC);
+            $fin_receber_total   = (float)($r['total']   ?? 0);
+            $fin_receber_vencido = (float)($r['vencido'] ?? 0);
+        }
     }
 } catch (PDOException) {}
 
@@ -305,17 +341,21 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard | DOMBAG</title>
   <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
     /* ── Layout do dashboard ───────────────────────── */
-    .content           { display:flex; flex-direction:column; gap:16px; }
+    .content           { display:flex; flex-direction:column; gap:16px; overflow-y:auto; overflow-x:hidden; }
     .dash-grid         { display:grid; gap:16px; align-items:stretch; }
     .dash-grid > div   { display:flex; flex-direction:column; }
     .dash-grid > div > .panel { flex:1; }
     @media(max-width:1100px) { .dash-grid { grid-template-columns:1fr !important; } }
 
     /* ── KPI grid ──────────────────────────────────── */
-    .kpi-grid { grid-template-columns:repeat(5,1fr); }
+    .kpi-grid{
+        display:grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    }
     @media(max-width:1400px) { .kpi-grid { grid-template-columns:repeat(3,1fr); } }
     @media(max-width:1100px) { .kpi-grid { grid-template-columns:repeat(2,1fr); } }
     @media(max-width:768px)  { .kpi-grid { grid-template-columns:repeat(2,1fr); } }
@@ -667,7 +707,11 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
             <div class="panel-header">
               <div style="display:flex;align-items:center;gap:8px;">
                 <span class="panel-title">Contas a Pagar</span>
+                <?php if ($fin_from_erp): ?>
+                <span class="source-badge src-erp">ERP</span>
+                <?php else: ?>
                 <span class="source-badge src-local">Local</span>
+                <?php endif; ?>
               </div>
               <a class="panel-action" href="/financeiro/pagar">Ver →</a>
             </div>
@@ -690,7 +734,11 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
             <div class="panel-header">
               <div style="display:flex;align-items:center;gap:8px;">
                 <span class="panel-title">Contas a Receber</span>
+                <?php if ($fin_from_erp): ?>
+                <span class="source-badge src-erp">ERP</span>
+                <?php else: ?>
                 <span class="source-badge src-local">Local</span>
+                <?php endif; ?>
               </div>
               <a class="panel-action" href="/financeiro/receber">Ver →</a>
             </div>

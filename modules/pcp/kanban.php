@@ -207,6 +207,7 @@ $hoje = new DateTime();
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kanban de Pedidos | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
+<link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
 /* ── Layout Kanban ─────────────────────────────────────────────────────── */
 .content { padding: 20px; overflow: hidden; display: flex; flex-direction: column; gap: 16px; }
