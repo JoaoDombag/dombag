@@ -1,5 +1,4 @@
 # Credenciais — nunca commitar
-config/secrets.php
 .env
 .env.*
 
