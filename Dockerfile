@@ -12,11 +12,10 @@ RUN docker-php-ext-install pdo pdo_mysql pgsql
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Remove fisicamente os módulos MPM conflitantes e garante só o mpm_prefork
-RUN rm -f /etc/apache2/mods-enabled/mpm_event.conf \
-          /etc/apache2/mods-enabled/mpm_event.load \
-          /etc/apache2/mods-enabled/mpm_worker.conf \
-          /etc/apache2/mods-enabled/mpm_worker.load \
+# Remove TODOS os módulos MPM do mods-enabled (find cobre qualquer variação de nome)
+# e re-habilita somente o mpm_prefork, que é compatível com mod_php
+# CACHE_BUST: 4
+RUN find /etc/apache2/mods-enabled/ -name "mpm_*" -delete \
     && a2enmod mpm_prefork rewrite
 
 # Permite que o .htaccess funcione
