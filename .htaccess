@@ -18,7 +18,8 @@ RewriteRule ^(config|shared|migrations)(/|$) - [F,L]
 RewriteBase /
 
 # Força HTTPS (somente em produção — desabilitado no localhost)
-RewriteCond %{HTTPS} off
+# Usa X-Forwarded-Proto porque Railway termina SSL no load balancer
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
 RewriteCond %{HTTP_HOST} !^localhost [NC]
 RewriteCond %{HTTP_HOST} !^127\.0\.0\.1 [NC]
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
