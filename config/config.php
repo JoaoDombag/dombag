@@ -6,13 +6,13 @@
 // ══════════════════════════════════════════════════
 
 // ── Credenciais: variáveis de ambiente (produção) ou secrets.php (local) ──
-if (getenv('DB_PASS') !== false) {
-    // Produção: lê das variáveis de ambiente configuradas no Railway
-define('DB_HOST', getenv('MYSQLHOST'));
-define('DB_PORT', getenv('MYSQLPORT'));
-define('DB_NAME', getenv('MYSQLDATABASE'));
-define('DB_USER', getenv('MYSQLUSER'));
-define('DB_PASS', getenv('MYSQLPASSWORD'));
+if (getenv('MYSQLPASSWORD') !== false) {
+    // Produção: lê das variáveis de ambiente do Railway (serviço MySQL)
+    define('DB_HOST',    getenv('MYSQLHOST'));
+    define('DB_PORT',    getenv('MYSQLPORT')    ?: '3306');
+    define('DB_NAME',    getenv('MYSQLDATABASE'));
+    define('DB_USER',    getenv('MYSQLUSER'));
+    define('DB_PASS',    getenv('MYSQLPASSWORD'));
     define('DB_CHARSET', 'utf8mb4');
 
     define('PG_HOST',   getenv('PG_HOST')   ?: '');
