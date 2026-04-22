@@ -12,8 +12,9 @@ RUN docker-php-ext-install pdo pdo_mysql pgsql
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Habilita mod_rewrite (necessário para as rotas do .htaccess)
-RUN a2enmod rewrite
+# Garante somente um MPM ativo (mpm_prefork é compatível com mod_php)
+RUN a2dismod mpm_event mpm_worker 2>/dev/null || true \
+    && a2enmod mpm_prefork rewrite
 
 # Permite que o .htaccess funcione
 RUN sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
