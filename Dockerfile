@@ -14,7 +14,7 @@ COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 # Remove TODOS os módulos MPM do mods-enabled (find cobre qualquer variação de nome)
 # e re-habilita somente o mpm_prefork, que é compatível com mod_php
-# CACHE_BUST: 4
+# CACHE_BUST: 5
 RUN find /etc/apache2/mods-enabled/ -name "mpm_*" -delete \
     && a2enmod mpm_prefork rewrite
 
