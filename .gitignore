@@ -1,0 +1,20 @@
+# Credenciais — nunca commitar
+config/secrets.php
+.env
+.env.*
+
+# Dependências
+vendor/
+
+# Uploads de usuários
+uploads/
+
+# Arquivos de sistema
+.DS_Store
+Thumbs.db
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp

@@ -45,25 +45,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                     ROUND(iv.iv_qtde) AS iv_qtde,
                     iv.iv_status,
                     v.ven_codigo_yzidro AS pedido,
-                    COALESCE(v.ven_fantasia, v.ven_cliente) AS cliente,
+                    COALESCE(NULLIF(TRIM(v.ven_fantasia),''), NULLIF(TRIM(v.ven_cliente),''), '') AS cliente,
                     DATE_FORMAT(v.ven_entrega,'%d/%m/%Y')  AS entrega,
                     v.ven_entrega AS entrega_iso,
                     p.pro_descricao,
-                    COALESCE((
-                        SELECT SUM(pp2.pp_qtde_prod)
-                        FROM pcp_planejamento pp2
-                        WHERE pp2.iv_codigo = iv.iv_codigo
-                          AND pp2.pp_qtde_prod IS NOT NULL
-                    ), 0) AS total_produzido
+                    p.pro_categoria,
+                    COALESCE(ps.total_produzido, 0) AS total_produzido
                 FROM itens_vendas iv
-                INNER JOIN vendas   v ON v.ven_codigo  = iv.ven_codigo
-                INNER JOIN produtos p ON p.pro_codigo  = iv.pro_codigo
+                INNER JOIN vendas   v  ON v.ven_codigo  = iv.ven_codigo
+                INNER JOIN produtos p  ON p.pro_codigo  = iv.pro_codigo
+                LEFT JOIN (
+                    SELECT iv_codigo, SUM(pp_qtde_prod) AS total_produzido
+                    FROM pcp_planejamento
+                    WHERE pp_qtde_prod IS NOT NULL
+                    GROUP BY iv_codigo
+                ) ps ON ps.iv_codigo = iv.iv_codigo
                 WHERE iv.iv_status IN ('Pendente de produção','Produção')
                 ORDER BY
                     CASE WHEN iv.iv_prioridade > 0 THEN iv.iv_prioridade ELSE 999999 END,
                     v.ven_entrega,
                     v.ven_codigo_yzidro
-                LIMIT 300
             ")->fetchAll(PDO::FETCH_ASSOC);
             echo json_encode(['ok' => true, 'pedidos' => $rows]);
 
@@ -83,12 +84,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                 VALUES (:data, :maq, :iv, :qtde)
             ")->execute([':data' => $data, ':maq' => $maq_cod, ':iv' => $iv_cod, ':qtde' => $qtde]);
 
-            // Muda status para 'Produção' se ainda estava 'Pendente'
-            $pdo->prepare("
-                UPDATE itens_vendas SET iv_status='Produção', iv_atualizado_em=NOW()
-                WHERE iv_codigo=:id AND iv_status='Pendente de produção'
-            ")->execute([':id' => $iv_cod]);
-
             echo json_encode(['ok' => true]);
 
         // ── Remover do plano ───────────────────────────────────────────────
@@ -104,15 +99,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             $pdo->prepare("DELETE FROM pcp_planejamento WHERE pp_codigo=:id AND pp_status='Planejado'")
                 ->execute([':id' => $pp_cod]);
 
-            // Se não há mais nenhum plano (planejado ou registrado) para esse item, reverte status
-            if ($iv) {
-                $count = $pdo->prepare("SELECT COUNT(*) FROM pcp_planejamento WHERE iv_codigo=:iv");
-                $count->execute([':iv' => $iv]);
-                if ((int)$count->fetchColumn() === 0) {
-                    $pdo->prepare("UPDATE itens_vendas SET iv_status='Pendente de produção', iv_atualizado_em=NOW() WHERE iv_codigo=:iv AND iv_status='Produção'")
-                        ->execute([':iv' => $iv]);
-                }
-            }
             echo json_encode(['ok' => true]);
 
         // ── Registrar produção ─────────────────────────────────────────────
@@ -177,14 +163,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             ")->execute([':data' => $data, ':maq' => $maq_cod, ':iv' => $iv_cod, ':qtde' => $qtde]);
             echo json_encode(['ok' => true]);
 
-        // ── Finalizar pedido ───────────────────────────────────────────────
+        // ── Finalizar pedido (status gerenciado manualmente no kanban) ────────
         } elseif ($acao === 'finalizar_pedido') {
-            $iv_cod = (int)($body['iv_codigo'] ?? 0);
-            if (!$iv_cod) { echo json_encode(['ok' => false, 'msg' => 'ID inválido.']); exit; }
-            $pdo->prepare("
-                UPDATE itens_vendas SET iv_status='Finalizado', iv_atualizado_em=NOW()
-                WHERE iv_codigo=:id
-            ")->execute([':id' => $iv_cod]);
             echo json_encode(['ok' => true]);
 
         // ── Próxima máquina ────────────────────────────────────────────────
@@ -255,10 +235,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                 INSERT INTO pcp_planejamento (pp_data, maq_codigo, iv_codigo, pp_qtde_plan)
                 VALUES (:data, :maq, :iv, :qtde)
             ");
-            $stStatus = $pdo->prepare("
-                UPDATE itens_vendas SET iv_status='Produção', iv_atualizado_em=NOW()
-                WHERE iv_codigo=:id AND iv_status='Pendente de produção'
-            ");
 
             foreach ($progDia as $pr) {
                 $maqNome = $pr['maquina'];
@@ -280,7 +256,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                 if ($qtde <= 0) $qtde = 1;
 
                 $stIns->execute([':data' => $data, ':maq' => $maqCod, ':iv' => $ivCod, ':qtde' => $qtde]);
-                $stStatus->execute([':id' => $ivCod]);
                 $inseridos++;
             }
 
@@ -292,6 +267,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                     ? "{$inseridos} sugestão(ões) importada(s) com sucesso."
                     : 'Todas as sugestões já estavam no plano.',
             ]);
+
+        // ── Buscar pedidos por cliente ─────────────────────────────────────
+        } elseif ($acao === 'buscar_por_cliente') {
+            $termo = trim((string)($body['cliente'] ?? ''));
+            if (strlen($termo) < 2) {
+                echo json_encode(['ok' => false, 'msg' => 'Termo muito curto.']); exit;
+            }
+            $rows = $pdo->prepare("
+                SELECT
+                    iv.iv_codigo,
+                    ROUND(iv.iv_qtde) AS iv_qtde,
+                    iv.iv_status,
+                    v.ven_codigo_yzidro AS pedido,
+                    COALESCE(NULLIF(TRIM(v.ven_fantasia),''), NULLIF(TRIM(v.ven_cliente),''), '') AS cliente,
+                    DATE_FORMAT(v.ven_entrega,'%d/%m/%Y')  AS entrega,
+                    v.ven_entrega AS entrega_iso,
+                    p.pro_descricao,
+                    p.pro_categoria,
+                    COALESCE(ps.total_produzido, 0) AS total_produzido
+                FROM itens_vendas iv
+                INNER JOIN vendas   v  ON v.ven_codigo  = iv.ven_codigo
+                INNER JOIN produtos p  ON p.pro_codigo  = iv.pro_codigo
+                LEFT JOIN (
+                    SELECT iv_codigo, SUM(pp_qtde_prod) AS total_produzido
+                    FROM pcp_planejamento
+                    WHERE pp_qtde_prod IS NOT NULL
+                    GROUP BY iv_codigo
+                ) ps ON ps.iv_codigo = iv.iv_codigo
+                WHERE iv.iv_status IN ('Pendente de produção','Produção')
+                  AND (COALESCE(v.ven_fantasia, v.ven_cliente) LIKE :termo)
+                ORDER BY
+                    CASE WHEN iv.iv_prioridade > 0 THEN iv.iv_prioridade ELSE 999999 END,
+                    v.ven_entrega,
+                    v.ven_codigo_yzidro
+            ");
+            $rows->execute([':termo' => '%' . $termo . '%']);
+            echo json_encode(['ok' => true, 'pedidos' => $rows->fetchAll(PDO::FETCH_ASSOC)]);
 
         } else {
             echo json_encode(['ok' => false, 'msg' => 'Ação desconhecida.']);
@@ -335,7 +347,7 @@ $stmt = $pdo->prepare("
         ROUND(iv.iv_qtde)                            AS iv_qtde,
         iv.iv_status                                 AS iv_status,
         v.ven_codigo_yzidro                          AS pedido,
-        COALESCE(v.ven_fantasia, v.ven_cliente)      AS cliente,
+        COALESCE(NULLIF(TRIM(v.ven_fantasia),''), NULLIF(TRIM(v.ven_cliente),''), '') AS cliente,
         DATE_FORMAT(v.ven_entrega,'%d/%m/%Y')        AS entrega,
         p.pro_descricao,
         COALESCE((
@@ -488,13 +500,13 @@ $data_plano_js = json_encode($data_plano);
 /* ── Modal ───────────────────────────────────────────────────── */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);backdrop-filter:blur(5px);z-index:700;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s;}
 .modal-overlay.open{opacity:1;pointer-events:all;}
-.modal-box{background:#0e1d33;border:1px solid rgba(255,255,255,.1);border-radius:16px;width:100%;max-width:520px;box-shadow:0 24px 64px rgba(0,0,0,.65);transform:translateY(10px) scale(.98);transition:transform .2s;}
+.modal-box{background:#0e1d33;border:1px solid rgba(255,255,255,.1);border-radius:16px;width:100%;max-width:700px;box-shadow:0 24px 64px rgba(0,0,0,.65);transform:translateY(10px) scale(.98);transition:transform .2s;}
 .modal-overlay.open .modal-box{transform:translateY(0) scale(1);}
 .modal-head{padding:15px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;}
 .modal-head h3{font-size:15px;font-weight:700;margin:0;}
 .modal-close{background:rgba(255,255,255,.07);border:1px solid var(--border);color:var(--text-muted);width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;font-family:inherit;}
 .modal-close:hover{background:rgba(255,255,255,.12);}
-.modal-body{padding:18px 20px;max-height:68vh;overflow-y:auto;}
+.modal-body{padding:18px 20px;max-height:76vh;overflow-y:auto;}
 .modal-footer{padding:13px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:flex-end;gap:8px;}
 
 /* ── Form ─────────────────────────────────────────────────────── */
@@ -506,13 +518,19 @@ $data_plano_js = json_encode($data_plano);
 .search-wrap{position:relative;}
 .search-wrap .si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;}
 .search-wrap input{padding-left:32px;}
-.pedido-list{max-height:210px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:6px;}
+.pedido-list{height:300px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-top:6px;}
 .pedido-opt{padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .12s;}
 .pedido-opt:last-child{border-bottom:none;}
 .pedido-opt:hover,.pedido-opt.sel{background:rgba(45,106,255,.12);}
 .pedido-opt-num{font-size:12px;font-weight:700;color:#7db3ff;}
 .pedido-opt-desc{font-size:11.5px;color:var(--text-primary);}
 .pedido-opt-meta{font-size:10.5px;color:var(--text-muted);display:flex;gap:8px;flex-wrap:wrap;margin-top:2px;}
+
+/* ── Client autocomplete ─────────────────────────────────────── */
+.cli-wrap{position:relative;}
+.cli-wrap .si{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none;}
+.cli-wrap input{padding-left:32px;}
+.cli-wrap input.has-val{border-color:rgba(0,201,167,.4);}
 
 /* ── Registration modal result ───────────────────────────────── */
 .result-card{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;padding:15px;margin-bottom:14px;}
@@ -607,10 +625,6 @@ $data_plano_js = json_encode($data_plano);
   <div class="date-spacer"></div>
   <div id="date-bar-action" style="display:flex;gap:8px;align-items:center;">
     <?php if ($tab === 'planejar'): ?>
-    <button class="btn-amber" onclick="importarSugestoes()" id="btn-importar">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Importar do PCP
-    </button>
     <button class="btn-new-plan" onclick="openAddModal(null)">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       Adicionar ao plano
@@ -832,11 +846,25 @@ $data_plano_js = json_encode($data_plano);
         <select class="form-control" id="add-maq" onchange="updateCapacity()">
           <?php foreach ($maquinas as $m): ?>
           <option value="<?= $m['maq_codigo'] ?>"
-                  data-cap="<?= round((float)$m['maq_producao_min'] * 60 * (float)$m['maq_horas_dia']) ?>">
+                  data-cap="<?= round((float)$m['maq_producao_min'] * 60 * (float)$m['maq_horas_dia']) ?>"
+                  data-depto="<?= htmlspecialchars(strtoupper($m['dp_descricao'])) ?>">
             <?= htmlspecialchars($m['maq_descricao']) ?> — <?= htmlspecialchars($m['dp_descricao']) ?>
           </option>
           <?php endforeach; ?>
         </select>
+        <div id="add-maq-tipo-badge" style="margin-top:5px;display:none;">
+          <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:6px;background:rgba(167,139,250,.12);color:#a78bfa;border:1px solid rgba(167,139,250,.25);" id="add-maq-tipo-txt"></span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Filtrar por Cliente <span style="font-weight:400;color:var(--text-muted);text-transform:none;letter-spacing:0;">(opcional)</span></label>
+        <div class="cli-wrap">
+          <span class="si"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+          <input type="text" class="form-control" id="add-cli-search"
+                 placeholder="Digite o nome do cliente…"
+                 oninput="filterCliente()" autocomplete="off">
+        </div>
       </div>
 
       <div class="form-group">
@@ -844,7 +872,7 @@ $data_plano_js = json_encode($data_plano);
         <div class="search-wrap">
           <span class="si"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
           <input type="text" class="form-control" id="add-search"
-                 placeholder="Buscar por pedido, cliente ou produto…"
+                 placeholder="Buscar por pedido ou produto…"
                  oninput="filterPedidos()" autocomplete="off">
         </div>
         <div class="pedido-list" id="pedido-list"></div>
@@ -1023,9 +1051,18 @@ const DATA_PLANO   = <?= $data_plano_js ?>;
 const MAQUINAS     = <?= $maquinas_json ?>;
 
 let allPedidos     = [];
+let pedidosLoaded  = false;
 let pedidosFiltred = [];
 let selectedIv     = null;
 let regCtx = { pp_codigo:0, iv_codigo:0, maq_codigo:0, iv_qtde:0, total_prod:0, qtde_plan:0 };
+
+// ── Pré-carrega pedidos ao abrir a página ──────────────────────────────────
+(async () => {
+  try {
+    const res = await api({ acao: 'get_pedidos' });
+    if (res.ok) { allPedidos = res.pedidos; pedidosLoaded = true; }
+  } catch(_) {}
+})();
 
 // ── Navigation ─────────────────────────────────────────────────────────────
 function navDate(delta) {
@@ -1040,8 +1077,7 @@ function goDate(iso) {
 
 // ── Tab helpers ────────────────────────────────────────────────────────────
 function addBtnHTML() {
-  return `<button class="btn-amber" onclick="importarSugestoes()" id="btn-importar"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar do PCP</button>
-<button class="btn-new-plan" onclick="openAddModal(null)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Adicionar ao plano</button>`;
+  return `<button class="btn-new-plan" onclick="openAddModal(null)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Adicionar ao plano</button>`;
 }
 
 function switchTab(t) {
@@ -1081,17 +1117,40 @@ async function api(body) {
 // ══════════════════════════════════════════════════════════════════════════
 async function openAddModal(maqCod) {
   selectedIv = null;
+  selectedCliente = null;
   document.getElementById('add-search').value = '';
   document.getElementById('add-iv-codigo').value = '';
   document.getElementById('add-sel-info').style.display = 'none';
   document.getElementById('add-qtde').value = '';
-  if (maqCod) { document.getElementById('add-maq').value = maqCod; updateCapacity(); }
+  document.getElementById('add-cli-search').value = '';
+  if (maqCod) { document.getElementById('add-maq').value = maqCod; }
+  updateCapacity(); // atualiza badge de tipo e refiltra
   openModal('modal-add');
-  if (allPedidos.length === 0) {
-    const res = await api({acao:'get_pedidos'});
-    if (res.ok) allPedidos = res.pedidos;
+
+  if (!pedidosLoaded) {
+    // Ainda carregando — mostra spinner e aguarda
+    document.getElementById('pedido-list').innerHTML =
+      '<div style="padding:14px;text-align:center;color:var(--text-muted);font-size:12px;">Carregando pedidos…</div>';
+    try {
+      const res = await api({ acao: 'get_pedidos' });
+      if (res.ok) { allPedidos = res.pedidos; pedidosLoaded = true; }
+    } catch(_) {}
   }
+
   filterPedidos();
+}
+
+// ── Client filter (sem autocomplete) ──────────────────────────────────────
+function filterCliente() {
+  filterPedidos();
+}
+
+function getMaqTipo() {
+  const sel   = document.getElementById('add-maq');
+  const depto = (sel.options[sel.selectedIndex]?.dataset.depto || '').toUpperCase();
+  if (depto.includes('SACARIA')) return 'sacaria';
+  if (depto.includes('BAG'))     return 'bag';
+  return '';
 }
 
 function updateCapacity() {
@@ -1101,16 +1160,42 @@ function updateCapacity() {
     cap > 0 ? '(cap. estimada: ' + cap.toLocaleString('pt-BR') + ' un/dia)' : '';
   if (cap > 0 && !document.getElementById('add-qtde').value)
     document.getElementById('add-qtde').value = cap;
+
+  // Mostra badge e refiltra lista pelo tipo da máquina
+  const tipo  = getMaqTipo();
+  const badge = document.getElementById('add-maq-tipo-badge');
+  const txt   = document.getElementById('add-maq-tipo-txt');
+  if (tipo) {
+    const label = tipo === 'sacaria' ? 'Exibindo apenas pedidos de Sacaria' : 'Exibindo apenas pedidos de Bag';
+    txt.textContent = '⚙ ' + label;
+    badge.style.display = '';
+  } else {
+    badge.style.display = 'none';
+  }
+  filterPedidos();
 }
 
 function filterPedidos() {
-  const q = document.getElementById('add-search').value.toLowerCase().trim();
-  pedidosFiltred = q
-    ? allPedidos.filter(p =>
-        p.pedido.toLowerCase().includes(q) ||
-        p.cliente.toLowerCase().includes(q) ||
-        p.pro_descricao.toLowerCase().includes(q))
+  const q    = document.getElementById('add-search').value.toLowerCase().trim();
+  const cliQ = document.getElementById('add-cli-search').value.toLowerCase().trim();
+  const tipo = getMaqTipo(); // 'sacaria' | 'bag' | ''
+
+  let base = cliQ
+    ? allPedidos.filter(p => p.cliente && p.cliente.toLowerCase().includes(cliQ))
     : allPedidos;
+
+  // Filtra por categoria da máquina
+  if (tipo) {
+    base = base.filter(p =>
+      p.pro_categoria && p.pro_categoria.toLowerCase().includes(tipo)
+    );
+  }
+
+  pedidosFiltred = q
+    ? base.filter(p =>
+        p.pedido.toLowerCase().includes(q) ||
+        p.pro_descricao.toLowerCase().includes(q))
+    : base;
   renderPedidoList();
 }
 
@@ -1128,7 +1213,7 @@ function renderPedidoList() {
       <div class="pedido-opt-num">${p.pedido}</div>
       <div class="pedido-opt-desc">${p.pro_descricao}</div>
       <div class="pedido-opt-meta">
-        <span>${p.cliente}</span>
+        <span style="${!p.cliente?'color:var(--text-muted);font-style:italic;':''}">${p.cliente || '—'}</span>
         <span>Entrega: ${p.entrega}</span>
         <span style="color:${rest>0?'var(--amber)':'var(--teal)'}">
           ${p.total_produzido.toLocaleString('pt-BR',{maximumFractionDigits:0})} / ${p.iv_qtde.toLocaleString('pt-BR',{maximumFractionDigits:0})} un (${pct}%)
@@ -1277,31 +1362,6 @@ async function finalizarPedido() {
   else alert('Erro: ' + (res.msg || 'Falha.'));
 }
 
-// ══════════════════════════════════════════════════════════════════════════
-// IMPORT PCP SUGGESTIONS
-// ══════════════════════════════════════════════════════════════════════════
-async function importarSugestoes() {
-  const btn = document.getElementById('btn-importar');
-  if (btn) { btn.disabled = true; btn.textContent = 'Importando…'; }
-  try {
-    const res = await api({acao:'importar_sugestoes', data:DATA_PLANO});
-    if (res.ok) {
-      if (res.inseridos > 0) {
-        alert(res.msg);
-        location.reload();
-      } else {
-        alert(res.msg || 'Nenhuma sugestão nova para importar.');
-        if (btn) { btn.disabled = false; btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar do PCP`; }
-      }
-    } else {
-      alert('Erro: ' + (res.msg || 'Falha ao importar sugestões.'));
-      if (btn) { btn.disabled = false; btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar do PCP`; }
-    }
-  } catch (e) {
-    alert('Erro de comunicação: ' + e.message);
-    if (btn) { btn.disabled = false; btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Importar do PCP`; }
-  }
-}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function nextDay(iso) {

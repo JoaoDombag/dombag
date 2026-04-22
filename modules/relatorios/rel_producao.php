@@ -26,7 +26,7 @@ try {
 
     // ── 1. KPIs de hoje ─────────────────────────
     // total_und conta apenas máquinas com maq_conta_producao=1 (evita duplicidade)
-    $row = $pdo->query("
+    $stmt = $pdo->prepare("
         SELECT
             COALESCE(SUM(CASE WHEN COALESCE(m.maq_conta_producao,1)=1 THEN pd.pd_quantidade ELSE 0 END), 0) AS total_und,
             COUNT(*)                                  AS apontamentos,
@@ -34,14 +34,16 @@ try {
             COUNT(DISTINCT pd.pd_funcionario)         AS funcionarios
         FROM producao_diaria pd
         LEFT JOIN maquinas m ON m.maq_codigo = pd.maq_codigo
-        WHERE pd.pd_data = '$data_sel'
-    ")->fetch(PDO::FETCH_ASSOC);
+        WHERE pd.pd_data = :data
+    ");
+    $stmt->execute([':data' => $data_sel]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($row) {
         $kpis_hoje = $row;
     }
 
     // ── 2. Gráfico diário (global por hora/máquina) ──
-    $rows = $pdo->query("
+    $stmt = $pdo->prepare("
         SELECT
             DATE_FORMAT(pd_horario_ini, '%H:%i')  AS hora,
             pd.maq_codigo,
@@ -49,10 +51,12 @@ try {
             SUM(pd_quantidade)                    AS qtd
         FROM producao_diaria pd
         LEFT JOIN maquinas maq ON maq.maq_codigo = pd.maq_codigo
-        WHERE pd_data = '$data_sel'
+        WHERE pd_data = :data
         GROUP BY DATE_FORMAT(pd_horario_ini, '%H:%i'), pd.maq_codigo
         ORDER BY hora, pd.maq_codigo
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    ");
+    $stmt->execute([':data' => $data_sel]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     foreach ($rows as $r) {
         $horas_labels[$r['hora']] = true;
@@ -65,21 +69,23 @@ try {
     $maquinas_labels = array_keys($maquinas_labels);
 
     // ── 3. Gráfico mensal ────────────────────────
-    $rows = $pdo->query("
+    $stmt = $pdo->prepare("
         SELECT pd_data, SUM(CASE WHEN COALESCE(m.maq_conta_producao,1)=1 THEN pd.pd_quantidade ELSE 0 END) AS qtd
         FROM producao_diaria pd
         LEFT JOIN maquinas m ON m.maq_codigo = pd.maq_codigo
-        WHERE YEAR(pd_data) = YEAR('$data_sel')
-          AND MONTH(pd_data) = MONTH('$data_sel')
+        WHERE YEAR(pd_data) = YEAR(:data)
+          AND MONTH(pd_data) = MONTH(:data)
         GROUP BY pd_data
         ORDER BY pd_data
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    ");
+    $stmt->execute([':data' => $data_sel]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as $r) {
         $grafico_mensal[$r['pd_data']] = (float) $r['qtd'];
     }
 
     // ── 4. Relatório por máquina (hoje) ──────────
-    $relatorio_maq = $pdo->query("
+    $stmt = $pdo->prepare("
         SELECT
             pd.maq_codigo,
             m.maq_descricao,
@@ -109,11 +115,13 @@ try {
         FROM producao_diaria pd
         LEFT JOIN maquinas m ON m.maq_codigo = pd.maq_codigo
         LEFT JOIN departamentos d ON d.dp_codigo = m.dp_codigo
-        WHERE pd.pd_data = '$data_sel'
+        WHERE pd.pd_data = :data
         GROUP BY pd.maq_codigo, m.maq_descricao, d.dp_descricao,
                  m.maq_qtde, m.maq_horas_dia, m.maq_producao_min
         ORDER BY total_und DESC
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    ");
+    $stmt->execute([':data' => $data_sel]);
+    $relatorio_maq = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // Adiciona dados de horas por hora para cada máquina
     foreach ($relatorio_maq as &$maq) {
@@ -141,7 +149,7 @@ try {
     ')->fetchAll(PDO::FETCH_ASSOC);
 
     // ── 6. Pedidos finalizados no dia ─────────────
-    $pedidos_finalizados = $pdo->query("
+    $stmt = $pdo->prepare("
         SELECT
             v.ven_codigo_yzidro                                               AS pedido,
             COALESCE(v.ven_fantasia, v.ven_cliente)                           AS cliente,
@@ -149,20 +157,24 @@ try {
             GROUP_CONCAT(DISTINCT p.pro_descricao
                 ORDER BY p.pro_descricao SEPARATOR ' / ')                     AS produtos,
             SUM(iv.iv_qtde)                                                   AS total_qtde,
-            COUNT(iv.iv_codigo)                                               AS total_itens
+            COUNT(iv.iv_codigo)                                               AS total_itens,
+            CASE WHEN v.ven_codigo_yzidro IS NOT NULL AND TRIM(v.ven_codigo_yzidro) != ''
+                 THEN 'erp' ELSE 'web' END                                    AS origem
         FROM itens_vendas iv
         JOIN vendas v  ON v.ven_codigo  = iv.ven_codigo
         JOIN produtos p ON p.pro_codigo = iv.pro_codigo
         WHERE iv.iv_status = 'Finalizado'
-          AND DATE(iv.iv_atualizado_em) = '$data_sel'
+          AND DATE(iv.iv_atualizado_em) = :data
         GROUP BY v.ven_codigo, v.ven_codigo_yzidro, v.ven_cliente, v.ven_fantasia, v.ven_entrega
         ORDER BY v.ven_codigo_yzidro
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    ");
+    $stmt->execute([':data' => $data_sel]);
+    $pedidos_finalizados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $total_finalizados = array_sum(array_column($pedidos_finalizados, 'total_qtde'));
 
     // ── 7. Pedidos finalizados no mês ─────────────
-    $pedidos_finalizados_mes = $pdo->query("
+    $stmt = $pdo->prepare("
         SELECT
             v.ven_codigo_yzidro                                               AS pedido,
             COALESCE(v.ven_fantasia, v.ven_cliente)                           AS cliente,
@@ -171,17 +183,21 @@ try {
             GROUP_CONCAT(DISTINCT p.pro_descricao
                 ORDER BY p.pro_descricao SEPARATOR ' / ')                     AS produtos,
             SUM(iv.iv_qtde)                                                   AS total_qtde,
-            COUNT(iv.iv_codigo)                                               AS total_itens
+            COUNT(iv.iv_codigo)                                               AS total_itens,
+            CASE WHEN v.ven_codigo_yzidro IS NOT NULL AND TRIM(v.ven_codigo_yzidro) != ''
+                 THEN 'erp' ELSE 'web' END                                    AS origem
         FROM itens_vendas iv
         JOIN vendas v  ON v.ven_codigo  = iv.ven_codigo
         JOIN produtos p ON p.pro_codigo = iv.pro_codigo
         WHERE iv.iv_status = 'Finalizado'
-          AND YEAR(iv.iv_atualizado_em)  = YEAR('$data_sel')
-          AND MONTH(iv.iv_atualizado_em) = MONTH('$data_sel')
+          AND YEAR(iv.iv_atualizado_em)  = YEAR(:data)
+          AND MONTH(iv.iv_atualizado_em) = MONTH(:data)
         GROUP BY v.ven_codigo, v.ven_codigo_yzidro, v.ven_cliente, v.ven_fantasia,
                  v.ven_entrega, DATE(iv.iv_atualizado_em)
         ORDER BY data_finalizacao DESC, v.ven_codigo_yzidro
-    ")->fetchAll(PDO::FETCH_ASSOC);
+    ");
+    $stmt->execute([':data' => $data_sel]);
+    $pedidos_finalizados_mes = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $total_finalizados_mes = array_sum(array_column($pedidos_finalizados_mes, 'total_qtde'));
 
@@ -445,13 +461,21 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
         <div class="report-panel" id="finalizadosPanel">
           <div class="report-head">
             <h2>Pedidos Finalizados</h2>
-            <div style="display:flex;align-items:center;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
               <span style="font-size:11.5px;color:var(--text-muted);" id="finalizadosDate"></span>
+              <!-- Filtro origem -->
               <div style="display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;">
-                <button id="fin-btn-dia" onclick="renderFinalizados('dia')"
+                <button id="fin-orig-erp" onclick="setOrigem('erp')"
+                  style="padding:5px 12px;font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:var(--text-muted);transition:all .15s;">ERP</button>
+                <button id="fin-orig-web" onclick="setOrigem('web')"
+                  style="padding:5px 12px;font-size:12px;font-weight:600;font-family:inherit;border:none;border-left:1px solid var(--border);cursor:pointer;background:transparent;color:var(--text-muted);transition:all .15s;">Sistema Web</button>
+              </div>
+              <!-- Filtro período -->
+              <div style="display:flex;border:1px solid var(--border);border-radius:7px;overflow:hidden;">
+                <button id="fin-btn-dia" onclick="setPeriodo('dia')"
                   style="padding:5px 14px;font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:var(--blue-accent);color:#fff;transition:all .15s;">Dia</button>
-                <button id="fin-btn-mes" onclick="renderFinalizados('mes')"
-                  style="padding:5px 14px;font-size:12px;font-weight:600;font-family:inherit;border:none;cursor:pointer;background:transparent;color:var(--text-muted);transition:all .15s;">Mês</button>
+                <button id="fin-btn-mes" onclick="setPeriodo('mes')"
+                  style="padding:5px 14px;font-size:12px;font-weight:600;font-family:inherit;border:none;border-left:1px solid var(--border);cursor:pointer;background:transparent;color:var(--text-muted);transition:all .15s;">Mês</button>
               </div>
             </div>
           </div>
@@ -879,35 +903,64 @@ function initGraficosGlobais() {
 })();
 
 // ── Pedidos Finalizados ───────────────────────────
-function renderFinalizados(modo) {
-  // Toggle visual dos botões
+let _finPeriodo = 'dia';
+let _finOrigem  = 'todos';
+
+function setPeriodo(modo) {
+  _finPeriodo = modo;
   const btnDia = document.getElementById('fin-btn-dia');
   const btnMes = document.getElementById('fin-btn-mes');
-  if (modo === 'dia') {
-    btnDia.style.background = 'var(--blue-accent)'; btnDia.style.color = '#fff';
-    btnMes.style.background = 'transparent';         btnMes.style.color = 'var(--text-muted)';
-  } else {
-    btnMes.style.background = 'var(--blue-accent)'; btnMes.style.color = '#fff';
-    btnDia.style.background = 'transparent';         btnDia.style.color = 'var(--text-muted)';
-  }
+  btnDia.style.background = modo === 'dia' ? 'var(--blue-accent)' : 'transparent';
+  btnDia.style.color       = modo === 'dia' ? '#fff' : 'var(--text-muted)';
+  btnMes.style.background  = modo === 'mes' ? 'var(--blue-accent)' : 'transparent';
+  btnMes.style.color        = modo === 'mes' ? '#fff' : 'var(--text-muted)';
+  renderFinalizados();
+}
 
-  const dados  = modo === 'dia' ? PED_FIN     : PED_FIN_MES;
-  const total  = modo === 'dia' ? TOTAL_FIN   : TOTAL_FIN_MES;
-  const label  = modo === 'dia' ? DATA_HOJE   : MES_LABEL;
+function setOrigem(origem) {
+  // clicar no ativo desmarca (volta a mostrar todos)
+  _finOrigem = _finOrigem === origem ? 'todos' : origem;
+  ['erp','web'].forEach(o => {
+    const btn = document.getElementById('fin-orig-' + o);
+    btn.style.background = o === _finOrigem ? 'var(--blue-accent)' : 'transparent';
+    btn.style.color       = o === _finOrigem ? '#fff' : 'var(--text-muted)';
+  });
+  renderFinalizados();
+}
+
+function renderFinalizados() {
+  const modo   = _finPeriodo;
+  const origem = _finOrigem;
+  let dados    = modo === 'dia' ? PED_FIN : PED_FIN_MES;
+  const label  = modo === 'dia' ? DATA_HOJE : MES_LABEL;
   const el     = document.getElementById('finalizadosBody');
 
   document.getElementById('finalizadosDate').textContent = label;
 
+  // Filtra por origem
+  if (origem !== 'todos') {
+    dados = dados.filter(r => r.origem === origem);
+  }
+
   if (!dados.length) {
-    el.innerHTML = '<div class="empty-report">Nenhum pedido finalizado em ' + label + '.</div>';
+    const origemLabel = origem === 'erp' ? 'ERP' : origem === 'web' ? 'Sistema Web' : '';
+    el.innerHTML = '<div class="empty-report">Nenhum pedido ' + (origemLabel ? origemLabel + ' ' : '') + 'finalizado em ' + label + '.</div>';
     return;
   }
 
   const comDataFin = modo === 'mes';
+  const total = dados.reduce((s, r) => s + Number(r.total_qtde), 0);
+
+  // Badge de origem
+  function origemBadge(o) {
+    if (o === 'erp') return '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;background:rgba(45,106,255,.15);color:#7db3ff;">ERP</span>';
+    return '<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;background:rgba(0,201,167,.12);color:var(--teal);">Web</span>';
+  }
 
   let html = `<div class="table-wrap"><table class="report-table"><thead><tr>
     ${comDataFin ? '<th>Finalizado em</th>' : ''}
     <th>Pedido</th>
+    <th>Origem</th>
     <th>Cliente</th>
     <th>Entrega</th>
     <th>Produtos</th>
@@ -916,24 +969,21 @@ function renderFinalizados(modo) {
   </tr></thead><tbody>`;
 
   dados.forEach(r => {
-    const entrega  = r.ven_entrega
-      ? r.ven_entrega.split('-').reverse().join('/')
-      : '—';
-    const dataFin  = r.data_finalizacao
-      ? r.data_finalizacao.split('-').reverse().join('/')
-      : '—';
+    const entrega = r.ven_entrega ? r.ven_entrega.split('-').reverse().join('/') : '—';
+    const dataFin = r.data_finalizacao ? r.data_finalizacao.split('-').reverse().join('/') : '—';
     html += `<tr>
       ${comDataFin ? `<td class="td-muted">${dataFin}</td>` : ''}
       <td><strong>${r.pedido || '—'}</strong></td>
+      <td>${origemBadge(r.origem)}</td>
       <td>${r.cliente || '—'}</td>
       <td class="td-muted">${entrega}</td>
-      <td class="td-muted" style="max-width:280px;overflow:hidden;text-overflow:ellipsis;" title="${r.produtos||''}">${r.produtos || '—'}</td>
+      <td class="td-muted" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;" title="${r.produtos||''}">${r.produtos || '—'}</td>
       <td style="text-align:right;" class="td-muted">${r.total_itens}</td>
       <td style="text-align:right;"><span class="num-big" style="color:var(--teal);">${Number(r.total_qtde).toLocaleString('pt-BR')}</span></td>
     </tr>`;
   });
 
-  const colspan = comDataFin ? 6 : 5;
+  const colspan = comDataFin ? 7 : 6;
   html += `</tbody><tfoot><tr>
     <td colspan="${colspan}" style="padding:11px 16px;font-size:12px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;">Total</td>
     <td style="text-align:right;padding:11px 16px;"><span class="num-big" style="font-size:18px;color:var(--teal);">${Number(total).toLocaleString('pt-BR')}</span></td>
@@ -943,7 +993,7 @@ function renderFinalizados(modo) {
 }
 
 // Inicializa na visão diária
-renderFinalizados('dia');
+renderFinalizados();
 
 // ── Exportar canvas individual ────────────────────
 function exportarCanvas(canvasId, nome) {

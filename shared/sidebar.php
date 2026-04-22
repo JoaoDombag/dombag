@@ -32,9 +32,13 @@ if (!empty($_SESSION['usu_codigo'])) {
     } catch (Throwable) {}
 }
 
+// Páginas sempre visíveis na sidebar para qualquer usuário autenticado
+$__sb_always_visible = ['/dashboard', '/dashboard/widgets', '/minha-senha'];
+
 function sb_can(string $href): bool {
-    global $_sb_admin, $_sb_perms;
+    global $_sb_admin, $_sb_perms, $__sb_always_visible;
     if ($_sb_admin) return true;
+    if (in_array($href, $__sb_always_visible, true)) return true;
     return in_array($href, $_sb_perms, true);
 }
 
@@ -163,12 +167,13 @@ $grupos = [
     ],
   ],
   'usuarios' => [
-    'label' => 'Usuários',
-    'tooltip' => 'Usuários',
-    'icon' => '<path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/>',
-    'itens' => [
-      ['label' => 'Cadastro de Usuários',  'href' => '/usuarios'],
-      ['label' => 'Grupos de Usuários',    'href' => '/modules/usuarios/cad_grupos.php'],
+    'label'      => 'Usuários',
+    'tooltip'    => 'Usuários',
+    'icon'       => '<path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/>',
+    'itens'      => [
+      ['label' => 'Minha Senha',           'href' => '/minha-senha'],
+      ['label' => 'Cadastro de Usuários',  'href' => '/usuarios',                          'admin_only' => true],
+      ['label' => 'Grupos de Usuários',    'href' => '/modules/usuarios/cad_grupos.php',   'admin_only' => true],
     ],
   ],
   'parametros' => [
@@ -180,17 +185,17 @@ $grupos = [
       ['label' => 'Widgets do Dashboard',  'href' => '/dashboard/widgets'],
     ],
   ],
-];
-
-// Grupo Administrador — visível só para admins, nunca filtrado por menus_desativados
-$grupoAdmin = [
-  'label'   => 'Administrador',
-  'tooltip' => 'Administrador',
-  'icon'    => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
-  'itens'   => [
-    ['label' => 'Atualiza BD',           'href' => '/admin/atualiza-bd'],
-    ['label' => 'Menus Ativos',          'href' => '/admin/menus-ativos'],
-    ['label' => 'Permissões por Grupo',  'href' => '/modules/usuarios/permissoes.php'],
+  'administrador' => [
+    'label'      => 'Administrador',
+    'tooltip'    => 'Administrador',
+    'admin_only' => true,
+    'icon'       => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    'itens'      => [
+      ['label' => 'Migrations BD',        'href' => '/admin/migrations'],
+      ['label' => 'Console SQL',          'href' => '/admin/atualiza-bd'],
+      ['label' => 'Menus Ativos',         'href' => '/admin/menus-ativos'],
+      ['label' => 'Permissões por Grupo', 'href' => '/modules/usuarios/permissoes.php'],
+    ],
   ],
 ];
 ?>
@@ -588,8 +593,12 @@ $grupoAdmin = [
     <?php endif; ?>
     
     <?php foreach ($grupos as $id => $grupo):
+        if (!empty($grupo['admin_only']) && !$_sb_admin) continue;
         if (!sb_ativo('grupo:' . $id)) continue;
-        $itens_vis = array_filter($grupo['itens'], fn($i) => sb_can($i['href']) && sb_ativo($i['href']));
+        $itens_vis = array_filter($grupo['itens'], fn($i) =>
+            (empty($i['admin_only']) || $_sb_admin) && sb_can($i['href']) && sb_ativo($i['href'])
+        );
+        if (empty($itens_vis) && empty($grupo['admin_only'])) continue;
         if (empty($itens_vis)) continue;
         $hrefs = array_column($itens_vis, 'href');
         $openCls = group_open($hrefs);
@@ -626,41 +635,6 @@ $grupoAdmin = [
     <?php endforeach; ?>
 
   </nav>
-
-  <?php if ($_sb_admin):
-    $adminHrefs = array_column($grupoAdmin['itens'], 'href');
-    $adminOpen  = group_open($adminHrefs);
-    $adminActive = $adminOpen ? 'has-active' : '';
-    ?>
-    <div style="padding:0 10px 8px;border-top:1px solid var(--border);padding-top:8px;">
-      <div class="nav-group <?= $adminOpen ?> <?= $adminActive ?>" id="grp-admin">
-        <button class="nav-group-btn"
-                type="button"
-                data-tooltip="<?= htmlspecialchars($grupoAdmin['tooltip']) ?>"
-                onclick="sidebarToggleGroup('admin')"
-                style="color:rgba(252,165,165,.75);">
-          <span class="nav-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <?= $grupoAdmin['icon'] ?>
-            </svg>
-          </span>
-          <span class="nav-text"><?= htmlspecialchars($grupoAdmin['label']) ?></span>
-          <svg class="nav-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-        </button>
-        <div class="nav-sub">
-          <?php foreach ($grupoAdmin['itens'] as $item): ?>
-          <a class="nav-sub-item <?= nav_active($item['href']) ?>"
-             href="<?= htmlspecialchars($item['href']) ?>">
-            <span class="nav-dot"></span>
-            <span class="nav-sub-text"><?= htmlspecialchars($item['label']) ?></span>
-          </a>
-          <?php endforeach; ?>
-        </div>
-      </div>
-    </div>
-  <?php endif; ?>
 
   <div class="sidebar-footer">
     <a href="/logout" class="sidebar-logout" title="Sair">

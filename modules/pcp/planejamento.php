@@ -96,16 +96,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
 }
 
 // ── Filtro de status ──────────────────────────────────────────────────────────
-// Padrão: apenas "Produção" (itens marcados no kanban para a reunião de planejamento)
-// Passe ?status= (vazio) para ver todos exceto Finalizado
-$f_status      = $_GET['status'] ?? 'Produção';
+// Padrão: 'ativos' = Pendente de produção + Produção
+// Passe ?status=<valor> para filtrar por status específico
+// Passe ?status=todos para ver todos exceto Finalizado
+$f_status      = $_GET['status'] ?? 'ativos';
 $f_cat         = $_GET['cat'] ?? '';
 $show_amostras = isset($_GET['amostras']);
 
 // ── Busca itens do MySQL com join de vendas + produtos ────────────────────────
 $where = 'WHERE 1=1';
 $params = [];
-if ($f_status && in_array($f_status, STATUS_PROD)) {
+if ($f_status === 'ativos') {
+    $where .= " AND iv.iv_status IN ('Pendente de produção','Produção')";
+} elseif ($f_status === 'todos') {
+    $where .= " AND iv.iv_status <> 'Finalizado'";
+} elseif ($f_status && in_array($f_status, STATUS_PROD)) {
     $where .= ' AND iv.iv_status = :status';
     $params[':status'] = $f_status;
 }
@@ -115,10 +120,6 @@ if ($f_cat && in_array($f_cat, CATEGORIAS)) {
 }
 if (!$show_amostras) {
     $where .= ' AND iv.iv_qtde >= 20';
-}
-// Quando status vazio (usuário clicou "Todos"): não mostra finalizados
-if (!$f_status) {
-    $where .= " AND iv.iv_status <> 'Finalizado'";
 }
 
 $stmt = $pdo->prepare("
@@ -351,10 +352,11 @@ foreach ($kpiDefs as $kd):
             <div class="field">
               <label>Filtrar por Status</label>
               <select name="status" class="filter-select" onchange="this.form.submit()">
-                <option value="" <?= $f_status === '' ? 'selected' : '' ?>>Todos (exceto Finalizados)</option>
+                <option value="ativos" <?= $f_status === 'ativos' ? 'selected' : '' ?>>Pendente + Em Produção</option>
                 <?php foreach (STATUS_PROD as $s): ?>
                 <option value="<?= htmlspecialchars($s) ?>" <?= $f_status === $s ? 'selected' : '' ?>><?= $s ?></option>
                 <?php endforeach; ?>
+                <option value="todos" <?= $f_status === 'todos' ? 'selected' : '' ?>>Todos (exceto Finalizados)</option>
               </select>
             </div>
             <div class="field">
@@ -390,7 +392,7 @@ foreach ($kpiDefs as $kd):
         <?php if (empty($board)): ?>
         <div class="empty-state">
           <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/></svg>
-          <p><?php if ($f_status === 'Produção'): ?>Nenhum pedido com status <strong>Em Produção</strong>.<br>No kanban, mova os pedidos para a coluna "Produção" antes da reunião.<?php else: ?>Nenhum item encontrado com os filtros selecionados.<?php endif; ?></p>
+          <p><?php if ($f_status === 'ativos'): ?>Nenhum pedido com status <strong>Pendente de produção</strong> ou <strong>Em Produção</strong>.<?php else: ?>Nenhum item encontrado com os filtros selecionados.<?php endif; ?></p>
         </div>
         <?php else: ?>
         <?php

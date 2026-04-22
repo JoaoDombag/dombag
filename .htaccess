@@ -1,6 +1,19 @@
 Options -Indexes
 RewriteEngine On
 
+# ── Segurança ────────────────────────────────────────────────────────────────
+
+# Bloqueia arquivos SQL expostos na raiz
+<FilesMatch "\.sql$">
+    Require all denied
+</FilesMatch>
+
+# Bloqueia scripts avulsos de manutenção
+RewriteRule ^(debug_widgets|migrate_iv_status)\.php$ - [F,L]
+
+# Bloqueia acesso direto a diretórios internos
+RewriteRule ^(config|shared|migrations)(/|$) - [F,L]
+
 # Base do projeto (raiz do domínio em produção)
 RewriteBase /
 
@@ -63,6 +76,7 @@ RewriteRule ^produtos$                 modules/produtos/cadastro_produtos.php  [
 
 # Usuários
 RewriteRule ^usuarios$                 modules/usuarios/usuarios.php           [L,QSA]
+RewriteRule ^minha-senha$              modules/usuarios/minha_senha.php        [L,QSA]
 
 # Trello
 RewriteRule ^trello$                   modules/trello/trello.php               [L,QSA]
@@ -70,6 +84,7 @@ RewriteRule ^trello$                   modules/trello/trello.php               [
 # Admin
 RewriteRule ^admin/atualiza-bd$        modules/admin/atualiza_bd.php           [L,QSA]
 RewriteRule ^admin/menus-ativos$       modules/admin/menus_ativos.php          [L,QSA]
+RewriteRule ^admin/migrations$         modules/admin/migrations.php            [L,QSA]
 
 # CRM
 RewriteRule ^crm/leads$                modules/crm/qualificacao_leads.php      [L,QSA]

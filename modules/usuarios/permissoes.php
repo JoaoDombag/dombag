@@ -26,7 +26,6 @@ try {
 // ── Páginas disponíveis no sistema (espelha o sidebar) ────────────────────────
 $modulos = [
     'Geral' => [
-        ['path' => '/dashboard',                              'label' => 'Dashboard'],
         ['path' => '/modules/produtos/cadastro_produtos.php', 'label' => 'Produtos'],
     ],
     'Vendas' => [
@@ -38,6 +37,7 @@ $modulos = [
         ['path' => '/yzidro/consulta', 'label' => 'Consulta Vendas'],
     ],
     'Produção' => [
+        ['path' => '/pcp/reuniao',      'label' => 'Reunião de Planejamento'],
         ['path' => '/pcp/kanban',       'label' => 'Kanban de Pedidos'],
         ['path' => '/pcp/planejamento', 'label' => 'Planejamento'],
         ['path' => '/pcp/ordens',       'label' => 'Ordens de Produção'],
@@ -48,19 +48,32 @@ $modulos = [
         ['path' => '/maquinas',  'label' => 'Cadastro de Máquinas'],
         ['path' => '/pcp/fila',  'label' => 'Fila de Máquinas'],
     ],
+    'Financeiro' => [
+        ['path' => '/financeiro',               'label' => 'Dashboard Financeiro'],
+        ['path' => '/financeiro/receber',       'label' => 'Contas a Receber'],
+        ['path' => '/financeiro/pagar',         'label' => 'Contas a Pagar'],
+        ['path' => '/financeiro/baixas-pagar',  'label' => 'Baixas a Pagar'],
+    ],
     'CRM' => [
-        ['path' => '/modules/crm/teste.php',              'label' => 'Pesquisa de Leads'],
-        ['path' => '/modules/crm/leads_resultados.php',   'label' => 'Resultados de Leads'],
-        ['path' => '/modules/crm/teste_lead.php',         'label' => 'Captura de Leads'],
-        ['path' => '/modules/crm/qualificacao_leads.php', 'label' => 'Qualificação de Leads'],
+        ['path' => '/modules/crm/qualificacao_leads.php', 'label' => 'Leads do Webhook'],
+        ['path' => '/modules/crm/leads_resultados.php',   'label' => 'Prospecção com IA'],
+    ],
+    'Trello' => [
+        ['path' => '/trello', 'label' => 'Pedidos Trello'],
     ],
     'Relatórios' => [
-        ['path' => '/relatorios/producao', 'label' => 'Relatório de Produção'],
+        ['path' => '/relatorios/producao',         'label' => 'Relatório de Produção'],
+        ['path' => '/relatorios/estoque-futuro',   'label' => 'Estoque Futuro'],
+        ['path' => '/relatorios/posicao-estoque',  'label' => 'Posição de Estoque'],
+        ['path' => '/relatorios/controle-estoque', 'label' => 'Controle de Estoque'],
     ],
     'Usuários' => [
-        ['path' => '/usuarios',                             'label' => 'Cadastro de Usuários'],
-        ['path' => '/modules/usuarios/cad_grupos.php',     'label' => 'Grupos de Usuários'],
-        ['path' => '/modules/usuarios/permissoes.php',     'label' => 'Permissões por Grupo'],
+        ['path' => '/usuarios',                         'label' => 'Cadastro de Usuários'],
+        ['path' => '/modules/usuarios/cad_grupos.php',  'label' => 'Grupos de Usuários'],
+        ['path' => '/modules/usuarios/permissoes.php',  'label' => 'Permissões por Grupo'],
+    ],
+    'Parâmetros' => [
+        ['path' => '/modules/parametros/parametros.php', 'label' => 'Parâmetros do Sistema'],
     ],
 ];
 
@@ -164,7 +177,8 @@ $total_paginas = count($paths_validos);
 .perm-item:hover{background:rgba(255,255,255,.02);}
 .perm-item label{display:flex;align-items:center;gap:10px;cursor:pointer;flex:1;font-size:13px;}
 .perm-item input[type=checkbox]{width:15px;height:15px;accent-color:var(--teal);cursor:pointer;flex-shrink:0;}
-.perm-item .page-path{font-size:10px;color:var(--text-muted);margin-left:8px;font-family:monospace;}
+.perm-item-text{display:flex;flex-direction:column;gap:2px;}
+.perm-item .page-path{font-size:10px;color:var(--text-muted);font-family:monospace;line-height:1;}
 
 /* Barra de ações fixa */
 .save-bar{position:sticky;bottom:16px;background:#152845;border:1px solid rgba(45,106,255,.25);border-radius:12px;padding:12px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,.45);margin-top:12px;}
@@ -337,9 +351,11 @@ $total_paginas = count($paths_validos);
                              class="perm-cb"
                              <?= $checked ? 'checked' : '' ?>
                              onchange="onCbChange()">
-                      <?= htmlspecialchars($item['label']) ?>
+                      <div class="perm-item-text">
+                        <span><?= htmlspecialchars($item['label']) ?></span>
+                        <span class="page-path"><?= htmlspecialchars($item['path']) ?></span>
+                      </div>
                     </label>
-                    <span class="page-path"><?= htmlspecialchars($item['path']) ?></span>
                   </div>
                   <?php endforeach; ?>
                 </div>

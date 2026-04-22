@@ -46,8 +46,8 @@ $todosMenus = [
         'grupo_key' => 'grupo:producao',
         'grupo_label' => 'Produção',
         'itens' => [
+            ['key' => '/pcp/reuniao',       'label' => 'Reunião de Planejamento'],
             ['key' => '/pcp/kanban',        'label' => 'Kanban de Pedidos'],
-            ['key' => '/pcp/reuniao',       'label' => 'Reunião de Produção'], 
             ['key' => '/pcp/planejamento',  'label' => 'Planejamento'],
             ['key' => '/pcp/ordens',        'label' => 'Ordens de Produção'],
             ['key' => '/pcp/programacao',   'label' => 'Programação Diária'],
@@ -66,10 +66,10 @@ $todosMenus = [
         'grupo_key' => 'grupo:financeiro',
         'grupo_label' => 'Financeiro',
         'itens' => [
-            ['key' => '/financeiro',             'label' => 'Dashboard'],
-            ['key' => '/financeiro/receber',     'label' => 'Contas a Receber'],
-            ['key' => '/financeiro/pagar',       'label' => 'Contas a Pagar'],
-            ['key' => '/financeiro/baixas-pagar','label' => 'Baixas a Pagar'],
+            ['key' => '/financeiro',              'label' => 'Dashboard'],
+            ['key' => '/financeiro/receber',      'label' => 'Contas a Receber'],
+            ['key' => '/financeiro/pagar',        'label' => 'Contas a Pagar'],
+            ['key' => '/financeiro/baixas-pagar', 'label' => 'Baixas a Pagar'],
         ],
     ],
     [
@@ -81,20 +81,28 @@ $todosMenus = [
         ],
     ],
     [
+        'grupo_key' => 'grupo:trello',
+        'grupo_label' => 'Trello',
+        'itens' => [
+            ['key' => '/trello', 'label' => 'Pedidos'],
+        ],
+    ],
+    [
         'grupo_key' => 'grupo:relatorios',
         'grupo_label' => 'Relatórios',
         'itens' => [
-            ['key' => '/relatorios/producao',        'label' => 'Relatório de Produção'],
-            ['key' => '/relatorios/estoque-futuro',  'label' => 'Estoque Futuro'],
-            ['key' => '/relatorios/posicao-estoque', 'label' => 'Posição de Estoque'],
+            ['key' => '/relatorios/producao',          'label' => 'Relatório de Produção'],
+            ['key' => '/relatorios/estoque-futuro',    'label' => 'Estoque Futuro'],
+            ['key' => '/relatorios/posicao-estoque',   'label' => 'Posição de Estoque'],
+            ['key' => '/relatorios/controle-estoque',  'label' => 'Controle de Estoque'],
         ],
     ],
     [
         'grupo_key' => 'grupo:usuarios',
         'grupo_label' => 'Usuários',
         'itens' => [
-            ['key' => '/usuarios',                              'label' => 'Cadastro de Usuários'],
-            ['key' => '/modules/usuarios/cad_grupos.php',       'label' => 'Grupos de Usuários'],
+            ['key' => '/usuarios',                         'label' => 'Cadastro de Usuários'],
+            ['key' => '/modules/usuarios/cad_grupos.php',  'label' => 'Grupos de Usuários'],
         ],
     ],
     [
@@ -102,6 +110,7 @@ $todosMenus = [
         'grupo_label' => 'Parâmetros',
         'itens' => [
             ['key' => '/modules/parametros/parametros.php', 'label' => 'Parâmetros do Sistema'],
+            ['key' => '/dashboard/widgets',                 'label' => 'Widgets do Dashboard'],
         ],
     ],
 ];

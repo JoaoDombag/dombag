@@ -5,23 +5,28 @@
 //  Inclua com: require_once $_SERVER['DOCUMENT_ROOT'].'/config/config.php';
 // ══════════════════════════════════════════════════
 
-// ── MySQL (banco local do site) ───────────────────
-// Em produção (InfinityFree): altere para as credenciais do painel
-// Painel → MySQL Databases → copie host, nome do banco, usuário e senha
-define('DB_HOST',    'localhost');
-define('DB_NAME',    'dombag');      // ex: epiz_12345678_dombag
-define('DB_USER',    'root');        // ex: epiz_12345678
-define('DB_PASS',    'Dombag@12345');
-define('DB_CHARSET', 'utf8mb4');
-
-// ── PostgreSQL (ERP Yzidro — somente leitura) ─────
-// InfinityFree não suporta PostgreSQL. dbPG() retorna null
-// e os módulos de ERP ficam desativados silenciosamente.
-define('PG_HOST',   'pg-yzidro-004.yzidro.com');
-define('PG_PORT',   '44551');
-define('PG_DBNAME', '004703_dom_bag_ltda');
-define('PG_USER',   '004703consulta');
-define('PG_PASS',   'Yz#2025Consulta');
+// ── Credenciais: variáveis de ambiente (produção) ou secrets.php (local) ──
+if (getenv('DB_PASS') !== false) {
+    // Produção: lê das variáveis de ambiente configuradas no Railway
+    define('DB_HOST',    getenv('DB_HOST')    ?: 'localhost');
+    define('DB_NAME',    getenv('DB_NAME')    ?: 'dombag');
+    define('DB_USER',    getenv('DB_USER')    ?: 'root');
+    define('DB_PASS',    getenv('DB_PASS'));
+    define('DB_CHARSET', 'utf8mb4');
+    define('PG_HOST',   getenv('PG_HOST')   ?: '');
+    define('PG_PORT',   getenv('PG_PORT')   ?: '5432');
+    define('PG_DBNAME', getenv('PG_DBNAME') ?: '');
+    define('PG_USER',   getenv('PG_USER')   ?: '');
+    define('PG_PASS',   getenv('PG_PASS')   ?: '');
+} else {
+    // Desenvolvimento local: lê do arquivo secrets.php
+    $_secrets_file = __DIR__ . '/secrets.php';
+    if (!file_exists($_secrets_file)) {
+        die('Arquivo config/secrets.php não encontrado. Copie secrets.example.php e preencha as credenciais.');
+    }
+    require_once $_secrets_file;
+    unset($_secrets_file);
+}
 
 // ── Helpers de conexão ────────────────────────────
 if (!function_exists('dbPDO')) {

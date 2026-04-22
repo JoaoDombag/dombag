@@ -62,12 +62,12 @@ try {
 
 // Mapa: widget → [página_requerida, grupo_de_menu]
 $_widget_perm_map = [
-    'kpi_erp'          => ['/vendas',      'vendas'],
+    'kpi_erp'          => ['/financeiro',  'financeiro'],
     'kpi_local'        => ['/pcp/kanban',  'producao'],
-    'kpi_faturamento'  => ['/vendas',      'vendas'],
-    'ultimas_vendas'   => ['/vendas',      'vendas'],
+    'kpi_faturamento'  => ['/financeiro',  'financeiro'],
+    'ultimas_vendas'   => ['/financeiro',  'financeiro'],
     'maquinas_hoje'    => ['/pcp/producao','producao'],
-    'vendas_grupo'     => ['/vendas',      'vendas'],
+    'vendas_grupo'     => ['/financeiro',  'financeiro'],
     'prod_7dias'       => ['/pcp/producao','producao'],
     'trello_geral'     => ['/trello',      'trello'],
     'trello_atividade' => ['/trello',      'trello'],

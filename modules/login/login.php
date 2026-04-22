@@ -296,9 +296,8 @@ input.has-error{border-bottom-color:#ef4444!important;}
     DOM<span class="accent">BAG</span>
   </a>
   <nav class="topbar-nav">
-    <a href="#">Início</a>
-    <a href="#">Módulos</a>
-    <a href="#">Suporte</a>
+    <a href="https://dombag.com.br">Sobre</a>
+    <a href="https://dombag.com.br/fale-com-um-especialista">Contato</a>
   </nav>
   <span class="topbar-badge">Sistema de Gestão Industrial</span>
 </header>
