@@ -1,0 +1,2 @@
+# Força LF em scripts shell (evita CRLF no Windows quebrando o container)
+*.sh text eol=lf

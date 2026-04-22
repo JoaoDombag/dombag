@@ -12,8 +12,11 @@ RUN docker-php-ext-install pdo pdo_mysql pgsql
 # Composer
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-# Garante somente um MPM ativo (mpm_prefork é compatível com mod_php)
-RUN a2dismod mpm_event mpm_worker 2>/dev/null || true \
+# Remove fisicamente os módulos MPM conflitantes e garante só o mpm_prefork
+RUN rm -f /etc/apache2/mods-enabled/mpm_event.conf \
+          /etc/apache2/mods-enabled/mpm_event.load \
+          /etc/apache2/mods-enabled/mpm_worker.conf \
+          /etc/apache2/mods-enabled/mpm_worker.load \
     && a2enmod mpm_prefork rewrite
 
 # Permite que o .htaccess funcione
@@ -34,10 +37,8 @@ RUN chown -R www-data:www-data /var/www/html \
     && find /var/www/html -type d -exec chmod 755 {} \; \
     && find /var/www/html -type f -exec chmod 644 {} \;
 
-# Railway define a variável PORT dinamicamente — Apache precisa ouvir nela.
-# O mkdir garante que os subdiretórios de uploads existam mesmo com volume vazio.
-CMD mkdir -p /var/www/html/uploads/imagens /var/www/html/uploads/pedidos \
-    && chown -R www-data:www-data /var/www/html/uploads \
-    && sed -i "s/80/${PORT:-80}/g" /etc/apache2/ports.conf \
-                                   /etc/apache2/sites-available/000-default.conf \
-    && apache2-foreground
+# Script de inicialização
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.sh && chmod +x /docker-entrypoint.sh
+
+CMD ["/docker-entrypoint.sh"]
