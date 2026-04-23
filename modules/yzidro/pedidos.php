@@ -384,7 +384,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                 'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
             );
-            $chkCol->execute(['vendas', 'ven_prazo_dias']);
+            $chkCol->execute(['VENDAS', 'VEN_PRAZO_DIAS']);
             if (!(int) $chkCol->fetchColumn()) {
                 $pdo->exec('ALTER TABLE VENDAS ADD COLUMN ven_prazo_dias INT NULL AFTER ven_status');
             }

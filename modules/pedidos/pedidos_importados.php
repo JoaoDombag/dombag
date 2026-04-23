@@ -18,7 +18,7 @@ $pdo = dbPDO();
             'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
         );
-        $chk->execute(['vendas', 'ven_prazo_dias']);
+        $chk->execute(['VENDAS', 'VEN_PRAZO_DIAS']);
         if (!(int) $chk->fetchColumn()) {
             $pdo->exec('ALTER TABLE VENDAS ADD COLUMN ven_prazo_dias INT NULL AFTER ven_status');
         }
@@ -75,7 +75,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'set_prazo') {
             'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
         );
-        $chkCol->execute(['vendas', 'ven_prazo_dias']);
+        $chkCol->execute(['VENDAS', 'VEN_PRAZO_DIAS']);
         if (!(int) $chkCol->fetchColumn()) {
             $pdo->exec('ALTER TABLE VENDAS ADD COLUMN ven_prazo_dias INT NULL AFTER ven_status');
         }

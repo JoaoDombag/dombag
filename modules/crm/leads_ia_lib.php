@@ -464,12 +464,12 @@ function iaProspEnsureSchema(PDO $pdo): void
          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
     );
 
-    $col->execute(['leads_prospectados', 'cnpj']);
+    $col->execute(['LEADS_PROSPECTADOS', 'CNPJ']);
     if (!(int) $col->fetchColumn()) {
         $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN cnpj VARCHAR(18) NOT NULL DEFAULT '' AFTER id");
     }
 
-    $col->execute(['leads_prospectados', 'usuario_id']);
+    $col->execute(['LEADS_PROSPECTADOS', 'USUARIO_ID']);
     if (!(int) $col->fetchColumn()) {
         $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN usuario_id INT UNSIGNED NULL DEFAULT NULL AFTER status_prosp");
     }

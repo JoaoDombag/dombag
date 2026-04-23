@@ -21,10 +21,10 @@ try {
 } catch (Throwable) {
 }
 
-// ── Garante tabela grupo_usuario e coluna GRU_CODIGO em USUARIOS ──────────────
+// ── Garante tabela GRUPO_USUARIO e coluna GRU_CODIGO em USUARIOS ──────────────
 try {
     $pdo->exec("
-        CREATE TABLE IF NOT EXISTS grupo_usuario (
+        CREATE TABLE IF NOT EXISTS GRUPO_USUARIO (
             GRU_CODIGO    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             GRU_NOME      VARCHAR(50)  NOT NULL,
             GRU_DESCRICAO VARCHAR(200) NULL
@@ -187,7 +187,7 @@ $usuarios = $pdo->query(
     'SELECT u.USU_CODIGO, u.USU_LOGIN, u.USU_NOME, u.USU_PERFIL, u.USU_ATIVO,
             u.GRU_CODIGO, g.GRU_NOME
      FROM USUARIOS u
-     LEFT JOIN grupo_usuario g ON g.GRU_CODIGO = u.GRU_CODIGO
+     LEFT JOIN GRUPO_USUARIO g ON g.GRU_CODIGO = u.GRU_CODIGO
      ORDER BY u.USU_NOME'
 )->fetchAll(PDO::FETCH_ASSOC);
 
@@ -195,7 +195,7 @@ $total = count($usuarios);
 $admins = count(array_filter($usuarios, fn ($u) => ($u['USU_PERFIL'] ?? '') === 'admin'));
 
 // ── Lista de grupos para o formulário ────────────────────────────────────────
-$grupos_select = $pdo->query('SELECT GRU_CODIGO, GRU_NOME FROM grupo_usuario ORDER BY GRU_NOME')
+$grupos_select = $pdo->query('SELECT GRU_CODIGO, GRU_NOME FROM GRUPO_USUARIO ORDER BY GRU_NOME')
                      ->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>

@@ -141,7 +141,7 @@ function pcpEnsureMaqGrupo(PDO $db): void
         'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
     );
-    $exists->execute(['maquinas', 'maq_grupo']);
+    $exists->execute(['MAQUINAS', 'MAQ_GRUPO']);
     if (!(int) $exists->fetchColumn()) {
         $db->exec('ALTER TABLE MAQUINAS ADD COLUMN maq_grupo VARCHAR(80) NULL DEFAULT NULL');
     }
@@ -172,7 +172,7 @@ function pcpEnsurePrioridade(PDO $db): void
         'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
     );
-    $exists->execute(['itens_vendas', 'iv_prioridade']);
+    $exists->execute(['ITENS_VENDAS', 'IV_PRIORIDADE']);
     if (!(int) $exists->fetchColumn()) {
         $db->exec('ALTER TABLE ITENS_VENDAS ADD COLUMN iv_prioridade INT NULL');
     }

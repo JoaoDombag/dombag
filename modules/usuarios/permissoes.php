@@ -90,7 +90,7 @@ try {
     $grupos_db = $pdo->query('
         SELECT g.GRU_CODIGO, g.GRU_NOME, g.GRU_DESCRICAO,
                COUNT(u.USU_CODIGO) AS QTD_USUARIOS
-        FROM grupo_usuario g
+        FROM GRUPO_USUARIO g
         LEFT JOIN USUARIOS u ON u.GRU_CODIGO = g.GRU_CODIGO
         GROUP BY g.GRU_CODIGO, g.GRU_NOME, g.GRU_DESCRICAO
         ORDER BY g.GRU_NOME

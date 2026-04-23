@@ -32,7 +32,7 @@ try {
             pd_comentario  TEXT,
             pd_criado_em   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT fk_pd_maquina
-                FOREIGN KEY (maq_codigo) REFERENCES maquinas(maq_codigo)
+                FOREIGN KEY (maq_codigo) REFERENCES MAQUINAS(MAQ_CODIGO)
                 ON UPDATE CASCADE ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");

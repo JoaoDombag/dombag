@@ -68,7 +68,7 @@ $trello_default_board = getParam($pdo, 'trello_default_board');
 $tema                 = getParam($pdo, 'tema_sistema', 'claro');
 $gru_leads  = (int)getParam($pdo, 'crm_gru_leads', '0');
 
-$grupos_usuario = $pdo->query('SELECT GRU_CODIGO, GRU_NOME FROM grupo_usuario ORDER BY GRU_NOME')
+$grupos_usuario = $pdo->query('SELECT GRU_CODIGO, GRU_NOME FROM GRUPO_USUARIO ORDER BY GRU_NOME')
                       ->fetchAll(PDO::FETCH_ASSOC);
 
 $aba_ativa  = $_POST['aba'] ?? ($_GET['aba'] ?? 'integracoes');

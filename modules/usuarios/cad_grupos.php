@@ -11,10 +11,10 @@ $pdo = dbPDO();
 $msg = '';
 $msg_tipo = '';
 
-// ── Schema: cria tabela grupo_usuario se não existir ──────────────────────────
+// ── Schema: cria tabela GRUPO_USUARIO se não existir ──────────────────────────
 try {
     $pdo->exec("
-        CREATE TABLE IF NOT EXISTS grupo_usuario (
+        CREATE TABLE IF NOT EXISTS GRUPO_USUARIO (
             GRU_CODIGO    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             GRU_NOME      VARCHAR(50)  NOT NULL,
             GRU_DESCRICAO VARCHAR(200) NULL
@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msg_tipo = 'err';
         } else {
             try {
-                $pdo->prepare('INSERT INTO grupo_usuario (GRU_NOME, GRU_DESCRICAO) VALUES (:n, :d)')
+                $pdo->prepare('INSERT INTO GRUPO_USUARIO (GRU_NOME, GRU_DESCRICAO) VALUES (:n, :d)')
                     ->execute([':n' => $nome, ':d' => $desc ?: null]);
                 $msg = 'Grupo <strong>' . htmlspecialchars($nome) . '</strong> criado com sucesso.';
                 $msg_tipo = 'ok';
@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $msg = 'Preencha o nome do grupo.';
             $msg_tipo = 'err';
         } else {
-            $pdo->prepare('UPDATE grupo_usuario SET GRU_NOME=:n, GRU_DESCRICAO=:d WHERE GRU_CODIGO=:c')
+            $pdo->prepare('UPDATE GRUPO_USUARIO SET GRU_NOME=:n, GRU_DESCRICAO=:d WHERE GRU_CODIGO=:c')
                 ->execute([':n' => $nome, ':d' => $desc ?: null, ':c' => $cod]);
             $msg = 'Grupo atualizado.';
             $msg_tipo = 'ok';
@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $msg = "Não é possível excluir: este grupo possui {$count} usuário(s) vinculado(s).";
                 $msg_tipo = 'err';
             } else {
-                $pdo->prepare('DELETE FROM grupo_usuario WHERE GRU_CODIGO = :c')->execute([':c' => $cod]);
+                $pdo->prepare('DELETE FROM GRUPO_USUARIO WHERE GRU_CODIGO = :c')->execute([':c' => $cod]);
                 try {
                     $pdo->prepare('DELETE FROM PERMISSAO_ACESSO WHERE PAC_GRU_CODIGO = :c')->execute([':c' => $cod]);
                 } catch (Throwable) {}
@@ -91,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ── Dados para edição ─────────────────────────────────────────────────────────
 $editando = null;
 if (isset($_GET['editar'])) {
-    $s = $pdo->prepare('SELECT * FROM grupo_usuario WHERE GRU_CODIGO = :c');
+    $s = $pdo->prepare('SELECT * FROM GRUPO_USUARIO WHERE GRU_CODIGO = :c');
     $s->execute([':c' => (int)$_GET['editar']]);
     $editando = $s->fetch(PDO::FETCH_ASSOC);
 }
@@ -101,13 +101,13 @@ try {
     $grupos_db = $pdo->query('
         SELECT g.GRU_CODIGO, g.GRU_NOME, g.GRU_DESCRICAO,
                COUNT(u.USU_CODIGO) AS QTD_USUARIOS
-        FROM grupo_usuario g
+        FROM GRUPO_USUARIO g
         LEFT JOIN USUARIOS u ON u.GRU_CODIGO = g.GRU_CODIGO
         GROUP BY g.GRU_CODIGO, g.GRU_NOME, g.GRU_DESCRICAO
         ORDER BY g.GRU_NOME
     ')->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable) {
-    $grupos_db = $pdo->query('SELECT *, 0 AS QTD_USUARIOS FROM grupo_usuario ORDER BY GRU_NOME')
+    $grupos_db = $pdo->query('SELECT *, 0 AS QTD_USUARIOS FROM GRUPO_USUARIO ORDER BY GRU_NOME')
                   ->fetchAll(PDO::FETCH_ASSOC);
 }
 

@@ -41,7 +41,7 @@ try {
                              COMMENT '1=conta no total; 0=processo intermediário',
             CONSTRAINT fk_maq_depto
                 FOREIGN KEY (dp_codigo)
-                REFERENCES departamentos (dp_codigo)
+                REFERENCES DEPARTAMENTOS (DP_CODIGO)
                 ON UPDATE CASCADE
                 ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
