@@ -220,8 +220,9 @@ function rodarMigrations(): void
                     ON DUPLICATE KEY UPDATE mig_sql = VALUES(mig_sql), mig_atualizado_em = NOW()
                 ')->execute([$id, json_encode($log, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)]);
 
-            } catch (Throwable) {
-                // Não marca como aplicada — tentará novamente na próxima sessão
+            } catch (Throwable $e) {
+                error_log('[MIG] Falha em ' . $id . ': ' . $e->getMessage());
+                echo '<script>console.error(' . json_encode('[MIG] ' . $id . ': ' . $e->getMessage()) . ')</script>';
                 $hasError = true;
                 break;
             }
@@ -231,7 +232,8 @@ function rodarMigrations(): void
             $_SESSION['mig_ok'] = true;
         }
 
-    } catch (Throwable) {
-        // Banco indisponível ou tabelas ainda não existem — não bloqueia o login
+    } catch (Throwable $e) {
+        error_log('[MIG] Erro crítico: ' . $e->getMessage());
+        echo '<script>console.error(' . json_encode('[MIG] Erro crítico: ' . $e->getMessage()) . ')</script>';
     }
 }
