@@ -67,6 +67,7 @@ RewriteRule ^relatorios/producao$          modules/relatorios/rel_producao.php  
 RewriteRule ^relatorios/estoque-futuro$        modules/relatorios/rel_estoque_futuro.php      [L,QSA]
 RewriteRule ^relatorios/posicao-estoque$       modules/relatorios/rel_posicao_estoque.php     [L,QSA]
 RewriteRule ^relatorios/estoque-futuro/pdf$    modules/relatorios/rel_estoque_futuro_pdf.php  [L,QSA]
+RewriteRule ^relatorios/posicao-estoque/pdf$   modules/relatorios/rel_posicao_estoque_pdf.php [L,QSA]
 RewriteRule ^relatorios/controle-estoque$  modules/relatorios/rel_controle_estoque.php [L,QSA]
 
 # Máquinas
