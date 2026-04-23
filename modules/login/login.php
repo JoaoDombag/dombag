@@ -1,7 +1,11 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/config/migrations.php';
 
 session_start();
+
+// Garante que o schema existe antes de qualquer query
+rodarMigrations();
 
 // Já logado? Redireciona
 if (!empty($_SESSION['usu_codigo'])) {
