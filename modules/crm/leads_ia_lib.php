@@ -431,7 +431,7 @@ function iaComparar(array $lead, array $clientesYzidro): array
 function iaProspEnsureSchema(PDO $pdo): void
 {
     $pdo->exec(<<<SQL
-        CREATE TABLE IF NOT EXISTS leads_prospectados (
+        CREATE TABLE IF NOT EXISTS LEADS_PROSPECTADOS (
             id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             cnpj              VARCHAR(18)      NOT NULL DEFAULT '',
             nome_empresa      VARCHAR(255)     NOT NULL,
@@ -466,12 +466,12 @@ function iaProspEnsureSchema(PDO $pdo): void
 
     $col->execute(['leads_prospectados', 'cnpj']);
     if (!(int) $col->fetchColumn()) {
-        $pdo->exec("ALTER TABLE leads_prospectados ADD COLUMN cnpj VARCHAR(18) NOT NULL DEFAULT '' AFTER id");
+        $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN cnpj VARCHAR(18) NOT NULL DEFAULT '' AFTER id");
     }
 
     $col->execute(['leads_prospectados', 'usuario_id']);
     if (!(int) $col->fetchColumn()) {
-        $pdo->exec("ALTER TABLE leads_prospectados ADD COLUMN usuario_id INT UNSIGNED NULL DEFAULT NULL AFTER status_prosp");
+        $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN usuario_id INT UNSIGNED NULL DEFAULT NULL AFTER status_prosp");
     }
 }
 
@@ -483,7 +483,7 @@ function iaProspEnsureSchema(PDO $pdo): void
 function iaGetUsuarios(PDO $pdo): array
 {
     try {
-        $st = $pdo->prepare('SELECT PAR_VALOR FROM parametros WHERE PAR_CHAVE = ?');
+        $st = $pdo->prepare('SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = ?');
         $st->execute(['crm_gru_leads']);
         $gruLeads = (int) ($st->fetchColumn() ?: 0);
 
@@ -544,7 +544,7 @@ function iaProspSaveAll(PDO $pdo, array $leads, string $segmentoBusca): array
     iaProspEnsureSchema($pdo);
     $novos = 0;
     $duplicados = 0;
-    $sql = 'INSERT IGNORE INTO leads_prospectados
+    $sql = 'INSERT IGNORE INTO LEADS_PROSPECTADOS
         (cnpj, nome_empresa, site, telefone, email, cidade, uf, segmento, fonte, motivo_relevancia, score, segmento_busca, dedupe_key)
         VALUES (:cnpj, :nome_empresa, :site, :telefone, :email, :cidade, :uf, :segmento, :fonte, :motivo_relevancia, :score, :segmento_busca, :dedupe_key)';
     $stmt = $pdo->prepare($sql);
@@ -576,7 +576,7 @@ function iaProspFilterSaved(PDO $pdo, array $leads): array
     if (empty($leads)) return $leads;
     $keys         = array_map('iaProspDedupeKey', $leads);
     $placeholders = implode(',', array_fill(0, count($keys), '?'));
-    $stmt         = $pdo->prepare("SELECT dedupe_key FROM leads_prospectados WHERE dedupe_key IN ($placeholders)");
+    $stmt         = $pdo->prepare("SELECT dedupe_key FROM LEADS_PROSPECTADOS WHERE dedupe_key IN ($placeholders)");
     $stmt->execute($keys);
     $saved        = array_flip($stmt->fetchAll(PDO::FETCH_COLUMN));
     return array_values(array_filter($leads, static fn($l) => !isset($saved[iaProspDedupeKey($l)])));

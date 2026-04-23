@@ -39,14 +39,14 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
             }
 
             if ($id > 0) {
-                $st = $db->prepare('UPDATE produtos SET
+                $st = $db->prepare('UPDATE PRODUTOS SET
                     pro_descricao=?, pro_fluxo=?, pro_tipo=?, pro_impressao=?,
                     pro_valvulado=?, pro_comprimento=?, pro_maq_impressao=?, pro_codigo_yz=?
                     WHERE pro_codigo=?');
                 $st->execute([$descricao, $fluxo, $tipo, $impressao, $valvulado, $comprimento ?: null, $maq, $cod_yz, $id]);
                 echo json_encode(['success' => true, 'msg' => 'Produto atualizado com sucesso.', 'id' => $id]);
             } else {
-                $st = $db->prepare('INSERT INTO produtos
+                $st = $db->prepare('INSERT INTO PRODUTOS
                     (pro_descricao, pro_fluxo, pro_tipo, pro_impressao, pro_valvulado, pro_comprimento, pro_maq_impressao, pro_codigo_yz)
                     VALUES (?,?,?,?,?,?,?,?)');
                 $st->execute([$descricao, $fluxo, $tipo, $impressao, $valvulado, $comprimento ?: null, $maq, $cod_yz]);
@@ -62,12 +62,12 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
                 throw new Exception('ID inválido.');
             }
             // Verifica se há itens de venda vinculados
-            $check = $db->prepare('SELECT COUNT(*) FROM itens_vendas WHERE pro_codigo=?');
+            $check = $db->prepare('SELECT COUNT(*) FROM ITENS_VENDAS WHERE pro_codigo=?');
             $check->execute([$id]);
             if ($check->fetchColumn() > 0) {
                 throw new Exception('Produto possui itens de venda vinculados e não pode ser excluído.');
             }
-            $db->prepare('DELETE FROM produtos WHERE pro_codigo=?')->execute([$id]);
+            $db->prepare('DELETE FROM PRODUTOS WHERE pro_codigo=?')->execute([$id]);
             echo json_encode(['success' => true, 'msg' => 'Produto excluído.']);
             exit;
         }
@@ -96,7 +96,7 @@ try {
     foreach ($cols_extra as $col_def) {
         $col_name = explode(' ', $col_def)[0];
         try {
-            $db->exec("ALTER TABLE produtos ADD COLUMN $col_def");
+            $db->exec("ALTER TABLE PRODUTOS ADD COLUMN $col_def");
         } catch (Exception $e) { /* já existe */
         }
     }
@@ -112,8 +112,8 @@ try {
             COALESCE(pro_valvulado, 'NAO')   AS pro_valvulado,
             COALESCE(pro_comprimento, 0)     AS pro_comprimento,
             COALESCE(pro_maq_impressao, '')  AS pro_maq_impressao,
-            (SELECT COUNT(*) FROM itens_vendas iv WHERE iv.pro_codigo = p.pro_codigo) AS total_itens
-        FROM produtos p
+            (SELECT COUNT(*) FROM ITENS_VENDAS iv WHERE iv.pro_codigo = p.pro_codigo) AS total_itens
+        FROM PRODUTOS p
         ORDER BY pro_descricao
     ");
     $produtos = $st->fetchAll(PDO::FETCH_ASSOC);

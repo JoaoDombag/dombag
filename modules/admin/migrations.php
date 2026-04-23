@@ -21,8 +21,8 @@ $registros = [];
 try {
     $st = $pdo->query('
         SELECT m.mig_id, m.mig_executado_em, s.mig_sql
-        FROM db_migrations m
-        LEFT JOIN db_migrations_sql s ON s.mig_id = m.mig_id
+        FROM DB_MIGRATIONS m
+        LEFT JOIN DB_MIGRATIONS_SQL s ON s.mig_id = m.mig_id
         ORDER BY m.mig_executado_em
     ');
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {

@@ -7,7 +7,7 @@ $_script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
 $_sb_trello_board = '';
 try {
     $__pdo_ntf = dbPDO();
-    $__st_ntf  = $__pdo_ntf->query("SELECT PAR_VALOR FROM parametros WHERE PAR_CHAVE = 'trello_default_board'");
+    $__st_ntf  = $__pdo_ntf->query("SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = 'trello_default_board'");
     $_sb_trello_board = (string)($__st_ntf->fetchColumn() ?: '');
 } catch (Throwable) {}
 
@@ -46,7 +46,7 @@ function sb_can(string $href): bool {
 $_sb_desativados = [];
 try {
     $__cfg = (isset($__pdo) ? $__pdo : dbPDO())->prepare(
-        "SELECT PAR_VALOR FROM parametros WHERE PAR_CHAVE = 'sidebar_menus_desativados'"
+        "SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = 'sidebar_menus_desativados'"
     );
     $__cfg->execute();
     $__val = $__cfg->fetchColumn();

@@ -28,7 +28,7 @@ function leadsPdo(): PDO
 function leadsEnsureSchema(PDO $pdo): void
 {
     $pdo->exec(<<<SQL
-        CREATE TABLE IF NOT EXISTS leads_ads (
+        CREATE TABLE IF NOT EXISTS LEADS_ADS (
             id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             lead_id             VARCHAR(120)   NULL,
             data_criacao        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -226,7 +226,7 @@ function leadsInsert(PDO $pdo, array $p): array
     $p['dedupe_hash'] = leadsDedupeHash($p);
     $p['payload_json'] = json_encode($p, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
-    $sql = 'INSERT INTO leads_ads (
+    $sql = 'INSERT INTO LEADS_ADS (
         lead_id,data_criacao,nome,telefone,email,empresa,produto_interesse,origem_botao,origem_lp,
         gclid,gbraid,wbraid,utm_source,utm_medium,utm_campaign,status_atual,data_qualificacao,
         data_venda_fechada,data_perda,motivo_perda,valor_venda,vendedor,referer_url,landing_url,
@@ -243,7 +243,7 @@ function leadsInsert(PDO $pdo, array $p): array
         return ['ok' => true, 'id' => (int) $pdo->lastInsertId(), 'duplicado' => false];
     } catch (PDOException $e) {
         if ((int) $e->getCode() === 23000) {
-            $s = $pdo->prepare('SELECT id FROM leads_ads WHERE lead_id = :lead_id OR dedupe_hash = :dedupe_hash ORDER BY id DESC LIMIT 1');
+            $s = $pdo->prepare('SELECT id FROM LEADS_ADS WHERE lead_id = :lead_id OR dedupe_hash = :dedupe_hash ORDER BY id DESC LIMIT 1');
             $s->execute(['lead_id' => $p['lead_id'], 'dedupe_hash' => $p['dedupe_hash']]);
             return ['ok' => true, 'id' => (int) ($s->fetchColumn() ?: 0), 'duplicado' => true];
         }
@@ -253,7 +253,7 @@ function leadsInsert(PDO $pdo, array $p): array
 
 function leadsCountByStatus(PDO $pdo): array
 {
-    $rows = $pdo->query('SELECT status_atual, COUNT(*) qtd FROM leads_ads GROUP BY status_atual')->fetchAll();
+    $rows = $pdo->query('SELECT status_atual, COUNT(*) qtd FROM LEADS_ADS GROUP BY status_atual')->fetchAll();
     $out = array_fill_keys(array_keys(LEADS_STATUS_OPTIONS), 0);
     foreach ($rows as $r) {
         $out[$r['status_atual']] = (int) $r['qtd'];

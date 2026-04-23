@@ -32,8 +32,8 @@ try {
             COUNT(*)                                  AS apontamentos,
             COUNT(DISTINCT pd.maq_codigo)             AS maquinas_ativas,
             COUNT(DISTINCT pd.pd_funcionario)         AS funcionarios
-        FROM producao_diaria pd
-        LEFT JOIN maquinas m ON m.maq_codigo = pd.maq_codigo
+        FROM PRODUCAO_DIARIA pd
+        LEFT JOIN MAQUINAS m ON m.maq_codigo = pd.maq_codigo
         WHERE pd.pd_data = :data
     ");
     $stmt->execute([':data' => $data_sel]);
@@ -49,8 +49,8 @@ try {
             pd.maq_codigo,
             maq.maq_descricao,
             SUM(pd_quantidade)                    AS qtd
-        FROM producao_diaria pd
-        LEFT JOIN maquinas maq ON maq.maq_codigo = pd.maq_codigo
+        FROM PRODUCAO_DIARIA pd
+        LEFT JOIN MAQUINAS maq ON maq.maq_codigo = pd.maq_codigo
         WHERE pd_data = :data
         GROUP BY DATE_FORMAT(pd_horario_ini, '%H:%i'), pd.maq_codigo
         ORDER BY hora, pd.maq_codigo
@@ -71,8 +71,8 @@ try {
     // ── 3. Gráfico mensal ────────────────────────
     $stmt = $pdo->prepare("
         SELECT pd_data, SUM(CASE WHEN COALESCE(m.maq_conta_producao,1)=1 THEN pd.pd_quantidade ELSE 0 END) AS qtd
-        FROM producao_diaria pd
-        LEFT JOIN maquinas m ON m.maq_codigo = pd.maq_codigo
+        FROM PRODUCAO_DIARIA pd
+        LEFT JOIN MAQUINAS m ON m.maq_codigo = pd.maq_codigo
         WHERE YEAR(pd_data) = YEAR(:data)
           AND MONTH(pd_data) = MONTH(:data)
         GROUP BY pd_data
@@ -112,9 +112,9 @@ try {
                 CONCAT('2000-01-01 ', pd.pd_horario_ini),
                 CONCAT(IF(pd.pd_horario_fim < pd.pd_horario_ini, '2000-01-02', '2000-01-01'), ' ', pd.pd_horario_fim)
             ))                                                               AS minutos_trabalhados
-        FROM producao_diaria pd
-        LEFT JOIN maquinas m ON m.maq_codigo = pd.maq_codigo
-        LEFT JOIN departamentos d ON d.dp_codigo = m.dp_codigo
+        FROM PRODUCAO_DIARIA pd
+        LEFT JOIN MAQUINAS m ON m.maq_codigo = pd.maq_codigo
+        LEFT JOIN DEPARTAMENTOS d ON d.dp_codigo = m.dp_codigo
         WHERE pd.pd_data = :data
         GROUP BY pd.maq_codigo, m.maq_descricao, d.dp_descricao,
                  m.maq_qtde, m.maq_horas_dia, m.maq_producao_min
@@ -145,7 +145,7 @@ try {
     $todas_maquinas = $pdo->query('
         SELECT maq_descricao, maq_qtde, maq_producao_min, maq_horas_dia,
                ROUND(maq_qtde * maq_producao_min * 60 * maq_horas_dia, 0) AS cap_dia
-        FROM maquinas ORDER BY maq_descricao
+        FROM MAQUINAS ORDER BY maq_descricao
     ')->fetchAll(PDO::FETCH_ASSOC);
 
     // ── 6. Pedidos finalizados no dia ─────────────
@@ -160,9 +160,9 @@ try {
             COUNT(iv.iv_codigo)                                               AS total_itens,
             CASE WHEN v.ven_codigo_yzidro IS NOT NULL AND TRIM(v.ven_codigo_yzidro) != ''
                  THEN 'erp' ELSE 'web' END                                    AS origem
-        FROM itens_vendas iv
-        JOIN vendas v  ON v.ven_codigo  = iv.ven_codigo
-        JOIN produtos p ON p.pro_codigo = iv.pro_codigo
+        FROM ITENS_VENDAS iv
+        JOIN VENDAS v  ON v.ven_codigo  = iv.ven_codigo
+        JOIN PRODUTOS p ON p.pro_codigo = iv.pro_codigo
         WHERE iv.iv_status = 'Finalizado'
           AND DATE(iv.iv_atualizado_em) = :data
         GROUP BY v.ven_codigo, v.ven_codigo_yzidro, v.ven_cliente, v.ven_fantasia, v.ven_entrega
@@ -186,9 +186,9 @@ try {
             COUNT(iv.iv_codigo)                                               AS total_itens,
             CASE WHEN v.ven_codigo_yzidro IS NOT NULL AND TRIM(v.ven_codigo_yzidro) != ''
                  THEN 'erp' ELSE 'web' END                                    AS origem
-        FROM itens_vendas iv
-        JOIN vendas v  ON v.ven_codigo  = iv.ven_codigo
-        JOIN produtos p ON p.pro_codigo = iv.pro_codigo
+        FROM ITENS_VENDAS iv
+        JOIN VENDAS v  ON v.ven_codigo  = iv.ven_codigo
+        JOIN PRODUTOS p ON p.pro_codigo = iv.pro_codigo
         WHERE iv.iv_status = 'Finalizado'
           AND YEAR(iv.iv_atualizado_em)  = YEAR(:data)
           AND MONTH(iv.iv_atualizado_em) = MONTH(:data)

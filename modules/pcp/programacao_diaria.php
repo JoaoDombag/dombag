@@ -167,7 +167,7 @@ try {
         SELECT DATE_FORMAT(pd_data,'%d/%m/%Y') AS data,
                pd_pedido,
                SUM(pd_quantidade) AS qtd
-        FROM producao_diaria
+        FROM PRODUCAO_DIARIA
         WHERE pd_pedido IS NOT NULL AND TRIM(pd_pedido) <> ''
         GROUP BY pd_data, pd_pedido
     ")->fetchAll(PDO::FETCH_ASSOC);
@@ -185,8 +185,8 @@ try {
                v.ven_codigo_yzidro AS pedido,
                MAX(CASE WHEN pp.pp_status='Registrado' THEN 'Registrado' ELSE 'Planejado' END) AS status
         FROM pcp_planejamento pp
-        INNER JOIN itens_vendas iv ON iv.iv_codigo = pp.iv_codigo
-        INNER JOIN vendas v ON v.ven_codigo = iv.ven_codigo
+        INNER JOIN ITENS_VENDAS iv ON iv.iv_codigo = pp.iv_codigo
+        INNER JOIN VENDAS v ON v.ven_codigo = iv.ven_codigo
         GROUP BY pp.pp_data, v.ven_codigo_yzidro
     ")->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rowsP as $rp) {

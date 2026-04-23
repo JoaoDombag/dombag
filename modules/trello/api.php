@@ -12,7 +12,7 @@ header('Content-Type: application/json; charset=utf-8');
 $key = $token = '';
 try {
     $pdo = dbPDO();
-    $st  = $pdo->prepare("SELECT PAR_CHAVE, PAR_VALOR FROM parametros WHERE PAR_CHAVE IN ('trello_api_key','trello_token')");
+    $st  = $pdo->prepare("SELECT PAR_CHAVE, PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE IN ('trello_api_key','trello_token')");
     $st->execute();
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
         if ($r['PAR_CHAVE'] === 'trello_api_key') $key   = trim($r['PAR_VALOR']);

@@ -28,7 +28,7 @@ function pcpGetMaquinas(): array
                 COALESCE(maq_grupo, maq_descricao)                     AS grupo,
                 COALESCE(maq_qtde, 1) * COALESCE(maq_producao_min, 0) AS velocidade,
                 COALESCE(maq_horas_dia, 8)                             AS horas_dia
-             FROM maquinas
+             FROM MAQUINAS
              WHERE maq_grupo IS NOT NULL AND maq_grupo <> ''
              ORDER BY maq_grupo, maq_descricao"
         )->fetchAll(PDO::FETCH_ASSOC);
@@ -143,11 +143,11 @@ function pcpEnsureMaqGrupo(PDO $db): void
     );
     $exists->execute(['maquinas', 'maq_grupo']);
     if (!(int) $exists->fetchColumn()) {
-        $db->exec('ALTER TABLE maquinas ADD COLUMN maq_grupo VARCHAR(80) NULL DEFAULT NULL');
+        $db->exec('ALTER TABLE MAQUINAS ADD COLUMN maq_grupo VARCHAR(80) NULL DEFAULT NULL');
     }
     // Preenche apenas linhas ainda sem grupo
     $db->exec("
-        UPDATE maquinas SET maq_grupo = CASE
+        UPDATE MAQUINAS SET maq_grupo = CASE
             WHEN maq_descricao LIKE 'Corte Bag%'              THEN 'Corte Bag'
             WHEN maq_descricao LIKE 'Costura Bag%'            THEN 'Costura Bag'
             WHEN maq_descricao LIKE 'Analise Bag%'
@@ -174,7 +174,7 @@ function pcpEnsurePrioridade(PDO $db): void
     );
     $exists->execute(['itens_vendas', 'iv_prioridade']);
     if (!(int) $exists->fetchColumn()) {
-        $db->exec('ALTER TABLE itens_vendas ADD COLUMN iv_prioridade INT NULL');
+        $db->exec('ALTER TABLE ITENS_VENDAS ADD COLUMN iv_prioridade INT NULL');
     }
 }
 
@@ -199,9 +199,9 @@ function pcpGetPedidosMySQL(): array
                 iv.iv_total                                              AS total_ped,
                 COALESCE(iv.iv_prioridade, 0)                           AS iv_prioridade,
                 COALESCE(iv.iv_obs, '')                                  AS obs
-            FROM itens_vendas iv
-            JOIN vendas   v ON v.ven_codigo = iv.ven_codigo
-            JOIN produtos p ON p.pro_codigo = iv.pro_codigo
+            FROM ITENS_VENDAS iv
+            JOIN VENDAS   v ON v.ven_codigo = iv.ven_codigo
+            JOIN PRODUTOS p ON p.pro_codigo = iv.pro_codigo
             WHERE iv.iv_status IN ('Pendente de produção','Produção')
             ORDER BY v.ven_entrega, v.ven_codigo_yzidro, p.pro_descricao
         ");

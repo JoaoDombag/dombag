@@ -12,7 +12,7 @@ $msg_tipo = '';
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 $pdo->exec("
-    CREATE TABLE IF NOT EXISTS parametros (
+    CREATE TABLE IF NOT EXISTS PARAMETROS (
         PAR_CHAVE   VARCHAR(100) NOT NULL PRIMARY KEY,
         PAR_VALOR   TEXT         NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -21,7 +21,7 @@ $pdo->exec("
 // ── Helper ────────────────────────────────────────────────────────────────────
 function getParam(PDO $pdo, string $chave, string $default = ''): string
 {
-    $st = $pdo->prepare('SELECT PAR_VALOR FROM parametros WHERE PAR_CHAVE = :k');
+    $st = $pdo->prepare('SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = :k');
     $st->execute([':k' => $chave]);
     $v = $st->fetchColumn();
     return $v !== false ? (string)$v : $default;
@@ -30,7 +30,7 @@ function getParam(PDO $pdo, string $chave, string $default = ''): string
 function setParam(PDO $pdo, string $chave, string $valor): void
 {
     $pdo->prepare('
-        INSERT INTO parametros (PAR_CHAVE, PAR_VALOR) VALUES (:k, :v)
+        INSERT INTO PARAMETROS (PAR_CHAVE, PAR_VALOR) VALUES (:k, :v)
         ON DUPLICATE KEY UPDATE PAR_VALOR = :v2
     ')->execute([':k' => $chave, ':v' => $valor, ':v2' => $valor]);
 }

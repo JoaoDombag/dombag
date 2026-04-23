@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                 exit;
             }
             $pdo->prepare(
-                'UPDATE itens_vendas SET iv_status=:s, iv_atualizado_em=NOW() WHERE iv_codigo=:id'
+                'UPDATE ITENS_VENDAS SET iv_status=:s, iv_atualizado_em=NOW() WHERE iv_codigo=:id'
             )->execute([':s' => $status, ':id' => $id]);
             echo json_encode(['ok' => true, 'status' => $status]);
 
@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             $ids = array_map('intval', $body['ids'] ?? []);
             $pdo->beginTransaction();
             foreach ($ids as $pos => $id) {
-                $pdo->prepare('UPDATE itens_vendas SET iv_prioridade=:p WHERE iv_codigo=:id')
+                $pdo->prepare('UPDATE ITENS_VENDAS SET iv_prioridade=:p WHERE iv_codigo=:id')
                     ->execute([':p' => $pos + 1, ':id' => $id]);
             }
             $pdo->commit();
@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                 echo json_encode(['ok' => false, 'msg' => 'ID inválido.']);
                 exit;
             }
-            $pdo->prepare('UPDATE itens_vendas SET iv_obs=:o, iv_atualizado_em=NOW() WHERE iv_codigo=:id')
+            $pdo->prepare('UPDATE ITENS_VENDAS SET iv_obs=:o, iv_atualizado_em=NOW() WHERE iv_codigo=:id')
                 ->execute([':o' => $obs, ':id' => $id]);
             echo json_encode(['ok' => true]);
 
@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                 echo json_encode(['ok' => false, 'msg' => 'Dados inválidos.']);
                 exit;
             }
-            $pdo->prepare('UPDATE vendas SET ven_entrega=:d WHERE ven_codigo=:id')
+            $pdo->prepare('UPDATE VENDAS SET ven_entrega=:d WHERE ven_codigo=:id')
                 ->execute([':d' => $data, ':id' => $ven_codigo]);
             echo json_encode(['ok' => true]);
 
@@ -148,9 +148,9 @@ $stmt = $pdo->prepare("
         p.pro_travado,
         p.pro_impressao,
         p.pro_categoria
-    FROM itens_vendas iv
-    INNER JOIN vendas   v ON v.ven_codigo = iv.ven_codigo
-    INNER JOIN produtos p ON p.pro_codigo = iv.pro_codigo
+    FROM ITENS_VENDAS iv
+    INNER JOIN VENDAS   v ON v.ven_codigo = iv.ven_codigo
+    INNER JOIN PRODUTOS p ON p.pro_codigo = iv.pro_codigo
     $where
     ORDER BY
         p.pro_categoria,
@@ -164,7 +164,7 @@ $todos_itens = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // ── KPIs por status ───────────────────────────────────────────────────────────
 $kpiStmt = $pdo->query(
-    'SELECT iv_status, COUNT(*) qtd, SUM(iv_qtde) und FROM itens_vendas GROUP BY iv_status'
+    'SELECT iv_status, COUNT(*) qtd, SUM(iv_qtde) und FROM ITENS_VENDAS GROUP BY iv_status'
 );
 $kpis = [];
 foreach ($kpiStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
@@ -176,7 +176,7 @@ $prodProgress = [];
 try {
     $stmtPp = $pdo->query("
         SELECT pd_pedido, SUM(pd_quantidade) AS produzido
-        FROM producao_diaria
+        FROM PRODUCAO_DIARIA
         WHERE pd_pedido IS NOT NULL AND TRIM(pd_pedido) <> ''
         GROUP BY pd_pedido
     ");

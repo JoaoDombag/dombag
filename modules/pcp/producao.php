@@ -20,7 +20,7 @@ try {
 
     // ── Garante tabela ────────────────────────────────────────────────────────
     $pdo->exec("
-        CREATE TABLE IF NOT EXISTS producao_diaria (
+        CREATE TABLE IF NOT EXISTS PRODUCAO_DIARIA (
             pd_codigo      INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
             pd_data        DATE          NOT NULL,
             maq_codigo     INT UNSIGNED  NOT NULL,
@@ -54,7 +54,7 @@ try {
             if ($maqCod <= 0 || $horas <= 0 || $horas > 24) {
                 echo json_encode(['success' => false, 'msg' => 'Dados inválidos.']);
             } else {
-                $st = $pdo->prepare('UPDATE maquinas SET maq_horas_dia = :h WHERE maq_codigo = :c');
+                $st = $pdo->prepare('UPDATE MAQUINAS SET maq_horas_dia = :h WHERE maq_codigo = :c');
                 $st->execute([':h' => $horas, ':c' => $maqCod]);
                 echo json_encode(['success' => true]);
             }
@@ -67,7 +67,7 @@ try {
         $erros = [];
 
         $stmt = $pdo->prepare('
-            INSERT INTO producao_diaria
+            INSERT INTO PRODUCAO_DIARIA
                 (pd_data,maq_codigo,pd_funcionario,pd_horario_ini,pd_horario_fim,pd_quantidade,pd_pedido,pd_comentario)
             VALUES (:data,:maq,:func,:h_ini,:h_fim,:qtd,:ped,:com)
         ');
@@ -132,8 +132,8 @@ try {
             if ($pedidosLancados) {
                 $in = implode(',', array_fill(0, count($pedidosLancados), '?'));
                 $stmtProg = $pdo->prepare("
-                    UPDATE itens_vendas iv
-                    JOIN vendas v ON v.ven_codigo = iv.ven_codigo
+                    UPDATE ITENS_VENDAS iv
+                    JOIN VENDAS v ON v.ven_codigo = iv.ven_codigo
                     SET iv.iv_status = 'Produção', iv.iv_atualizado_em = NOW()
                     WHERE v.ven_codigo_yzidro IN ($in)
                       AND iv.iv_status = 'Pendente de produção'
@@ -175,7 +175,7 @@ try {
                 $db_error = 'Horário de fim deve ser posterior ao horário de início.';
             } elseif ($cod > 0) {
                 $pdo->prepare('
-                    UPDATE producao_diaria SET
+                    UPDATE PRODUCAO_DIARIA SET
                         pd_data=:data,maq_codigo=:maq,pd_funcionario=:func,
                         pd_horario_ini=:h_ini,pd_horario_fim=:h_fim,
                         pd_quantidade=:qtd,pd_pedido=:ped,pd_comentario=:com
@@ -186,7 +186,7 @@ try {
                 $db_ok_msg = 'Registro atualizado com sucesso.';
             } else {
                 $pdo->prepare('
-                    INSERT INTO producao_diaria
+                    INSERT INTO PRODUCAO_DIARIA
                         (pd_data,maq_codigo,pd_funcionario,pd_horario_ini,pd_horario_fim,pd_quantidade,pd_pedido,pd_comentario)
                     VALUES (:data,:maq,:func,:h_ini,:h_fim,:qtd,:ped,:com)
                 ')->execute([':data' => $data, ':maq' => $maq_cod, ':func' => $func,
@@ -196,8 +196,8 @@ try {
                 // Auto-progressão: Pendente de produção → Produção
                 if ($ped !== '') {
                     $stmtProg = $pdo->prepare("
-                        UPDATE itens_vendas iv
-                        JOIN vendas v ON v.ven_codigo = iv.ven_codigo
+                        UPDATE ITENS_VENDAS iv
+                        JOIN VENDAS v ON v.ven_codigo = iv.ven_codigo
                         SET iv.iv_status = 'Produção', iv.iv_atualizado_em = NOW()
                         WHERE v.ven_codigo_yzidro = :ped
                           AND iv.iv_status = 'Pendente de produção'
@@ -213,7 +213,7 @@ try {
         if ($acao === 'excluir') {
             $cod = intval($_POST['pd_codigo'] ?? 0);
             if ($cod > 0) {
-                $pdo->prepare('DELETE FROM producao_diaria WHERE pd_codigo=:cod')->execute([':cod' => $cod]);
+                $pdo->prepare('DELETE FROM PRODUCAO_DIARIA WHERE pd_codigo=:cod')->execute([':cod' => $cod]);
                 $db_ok_msg = 'Registro excluído.';
             }
         }
@@ -233,7 +233,7 @@ try {
                         TIMESTAMPDIFF(MINUTE,
                             MIN(pd_horario_ini),
                             MAX(pd_horario_fim)) AS minutos_span_dia
-                    FROM producao_diaria
+                    FROM PRODUCAO_DIARIA
                     WHERE pd_quantidade > 0
                     GROUP BY maq_codigo, pd_data
                 ) sub
@@ -245,7 +245,7 @@ try {
                 if ($min > 0) {
                     $prod_min  = round($r['total_qtd'] / $min, 4);
                     $horas_dia = round((float) $r['media_minutos_dia'] / 60, 1);
-                    $upd = $pdo->prepare('UPDATE maquinas SET maq_producao_min=:p, maq_horas_dia=:h WHERE maq_codigo=:c');
+                    $upd = $pdo->prepare('UPDATE MAQUINAS SET maq_producao_min=:p, maq_horas_dia=:h WHERE maq_codigo=:c');
                     $upd->execute([':p' => $prod_min, ':h' => $horas_dia, ':c' => $r['maq_codigo']]);
                     if ($upd->rowCount() > 0) {
                         $atualizadas++;
@@ -258,7 +258,7 @@ try {
 
     // ── Edição ────────────────────────────────────────────────────────────────
     if (isset($_GET['editar'])) {
-        $s = $pdo->prepare('SELECT * FROM producao_diaria WHERE pd_codigo=:cod');
+        $s = $pdo->prepare('SELECT * FROM PRODUCAO_DIARIA WHERE pd_codigo=:cod');
         $s->execute([':cod' => intval($_GET['editar'])]);
         $editando = $s->fetch(PDO::FETCH_ASSOC);
     }
@@ -266,8 +266,8 @@ try {
     // ── Lista de máquinas ─────────────────────────────────────────────────────
     $maquinas = $pdo->query('
         SELECT m.maq_codigo, m.maq_descricao, d.dp_descricao
-        FROM maquinas m
-        INNER JOIN departamentos d ON d.dp_codigo = m.dp_codigo
+        FROM MAQUINAS m
+        INNER JOIN DEPARTAMENTOS d ON d.dp_codigo = m.dp_codigo
         ORDER BY d.dp_descricao, m.maq_descricao
     ')->fetchAll(PDO::FETCH_ASSOC);
 
@@ -288,9 +288,9 @@ try {
                TIMESTAMPDIFF(MINUTE,
                    CONCAT('2000-01-01 ',pd.pd_horario_ini),
                    CONCAT(IF(pd.pd_horario_fim < pd.pd_horario_ini,'2000-01-02','2000-01-01'),' ',pd.pd_horario_fim)) AS minutos_trabalhados
-        FROM producao_diaria pd
-        INNER JOIN maquinas m ON m.maq_codigo=pd.maq_codigo
-        INNER JOIN departamentos d ON d.dp_codigo=m.dp_codigo
+        FROM PRODUCAO_DIARIA pd
+        INNER JOIN MAQUINAS m ON m.maq_codigo=pd.maq_codigo
+        INNER JOIN DEPARTAMENTOS d ON d.dp_codigo=m.dp_codigo
         $where
         ORDER BY pd.pd_data DESC, pd.pd_horario_ini DESC
     ");
@@ -319,9 +319,9 @@ try {
             SUM(TIMESTAMPDIFF(MINUTE,
                 CONCAT(pd.pd_data, ' ', pd.pd_horario_ini),
                 CONCAT(IF(pd.pd_horario_fim < pd.pd_horario_ini, DATE_ADD(pd.pd_data, INTERVAL 1 DAY), pd.pd_data), ' ', pd.pd_horario_fim))) AS minutos_trabalhados
-        FROM producao_diaria pd
-        LEFT JOIN maquinas m ON m.maq_codigo=pd.maq_codigo
-        LEFT JOIN departamentos d ON d.dp_codigo=m.dp_codigo
+        FROM PRODUCAO_DIARIA pd
+        LEFT JOIN MAQUINAS m ON m.maq_codigo=pd.maq_codigo
+        LEFT JOIN DEPARTAMENTOS d ON d.dp_codigo=m.dp_codigo
         WHERE pd.pd_data = :data_bi
         GROUP BY pd.maq_codigo,m.maq_descricao,d.dp_descricao,m.maq_qtde,m.maq_horas_dia,m.maq_producao_min
         ORDER BY total_und DESC
@@ -341,7 +341,7 @@ try {
         SELECT pd.maq_codigo,
                DATE_FORMAT(pd.pd_horario_ini,'%H:%i') AS hora,
                SUM(pd.pd_quantidade) AS qtd
-        FROM producao_diaria pd
+        FROM PRODUCAO_DIARIA pd
         WHERE pd.pd_data = :data_bi
         GROUP BY pd.maq_codigo, DATE_FORMAT(pd.pd_horario_ini,'%H:%i')
         ORDER BY pd.maq_codigo, hora

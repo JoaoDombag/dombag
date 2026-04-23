@@ -30,7 +30,7 @@ $fin_receber_vencido  = 0.0;
 $_dash_uid = (int)($_SESSION['usu_codigo'] ?? 0);
 try {
     $_dash_pdo_w = dbPDO();
-    $_dash_val   = $_dash_pdo_w->prepare("SELECT PAR_VALOR FROM parametros WHERE PAR_CHAVE = :k");
+    $_dash_val   = $_dash_pdo_w->prepare("SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = :k");
     $_dash_val->execute([':k' => 'dashboard_widgets_' . $_dash_uid]);
     $_dash_raw   = $_dash_val->fetchColumn();
     $dashWidgets = $_dash_raw !== false ? (json_decode($_dash_raw, true) ?? []) : [];
@@ -55,7 +55,7 @@ try {
             $_dash_perms = array_column($_st_p->fetchAll(PDO::FETCH_ASSOC), 'PAC_PAGINA');
         }
     }
-    if ($v = $_pdo_p->query("SELECT PAR_VALOR FROM parametros WHERE PAR_CHAVE = 'sidebar_menus_desativados'")->fetchColumn()) {
+    if ($v = $_pdo_p->query("SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = 'sidebar_menus_desativados'")->fetchColumn()) {
         $_dash_desativados = json_decode($v, true) ?? [];
     }
 } catch (Throwable) {}
@@ -92,7 +92,7 @@ $trello_default_board = '';
 try {
     $pdo_tmp = dbPDO();
     $st_tk   = $pdo_tmp->prepare(
-        "SELECT PAR_CHAVE, PAR_VALOR FROM parametros
+        "SELECT PAR_CHAVE, PAR_VALOR FROM PARAMETROS
          WHERE PAR_CHAVE IN ('trello_api_key','trello_token','trello_default_board')"
     );
     $st_tk->execute();
@@ -123,18 +123,18 @@ try {
     $pdo = dbPDO();
 
     $kpi_finalizados = (int)$pdo->query(
-        "SELECT COALESCE(SUM(iv_qtde),0) FROM itens_vendas WHERE iv_status='Finalizado'"
+        "SELECT COALESCE(SUM(iv_qtde),0) FROM ITENS_VENDAS WHERE iv_status='Finalizado'"
     )->fetchColumn();
 
     $kpi_a_produzir = (int)$pdo->query(
-        "SELECT COALESCE(SUM(iv_qtde),0) FROM itens_vendas WHERE iv_status='Pendente de produção'"
+        "SELECT COALESCE(SUM(iv_qtde),0) FROM ITENS_VENDAS WHERE iv_status='Pendente de produção'"
     )->fetchColumn();
 
     $rows = $pdo->query('
         SELECT pd.pd_data,
                SUM(CASE WHEN COALESCE(m.maq_conta_producao,1)=1 THEN pd.pd_quantidade ELSE 0 END) AS qtd
-        FROM producao_diaria pd
-        LEFT JOIN maquinas m ON m.maq_codigo = pd.maq_codigo
+        FROM PRODUCAO_DIARIA pd
+        LEFT JOIN MAQUINAS m ON m.maq_codigo = pd.maq_codigo
         WHERE pd.pd_data >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
         GROUP BY pd.pd_data
         ORDER BY pd.pd_data ASC
@@ -145,8 +145,8 @@ try {
 
     $top_maquinas = $pdo->query('
         SELECT m.maq_descricao, SUM(pd.pd_quantidade) AS total
-        FROM producao_diaria pd
-        INNER JOIN maquinas m ON m.maq_codigo = pd.maq_codigo
+        FROM PRODUCAO_DIARIA pd
+        INNER JOIN MAQUINAS m ON m.maq_codigo = pd.maq_codigo
         WHERE pd.pd_data = CURDATE()
         GROUP BY pd.maq_codigo, m.maq_descricao
         ORDER BY total DESC
@@ -301,7 +301,7 @@ if ($pg) {
         $pedidos_erp_lista = pg_fetch_all_columns($res, 0) ?: [];
         if (!empty($pedidos_erp_lista) && isset($pdo)) {
             $ph  = implode(',', array_fill(0, count($pedidos_erp_lista), '?'));
-            $st  = $pdo->prepare("SELECT COUNT(DISTINCT ven_codigo_yzidro) FROM vendas WHERE ven_codigo_yzidro IN ($ph)");
+            $st  = $pdo->prepare("SELECT COUNT(DISTINCT ven_codigo_yzidro) FROM VENDAS WHERE ven_codigo_yzidro IN ($ph)");
             $st->execute($pedidos_erp_lista);
             $kpi_pendentes_importar = max(0, count($pedidos_erp_lista) - (int)$st->fetchColumn());
         }

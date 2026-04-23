@@ -9,7 +9,7 @@ leadsEnsureSchema($pdo);
 
 // ── Export CSV ────────────────────────────────────────────────────────────────
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
-    $rows = $pdo->query('SELECT nome,telefone,email,empresa,produto_interesse,origem_lp,origem_botao,utm_source,utm_medium,utm_campaign,status_atual,vendedor,valor_venda,motivo_perda,data_criacao FROM leads_ads ORDER BY data_criacao DESC')->fetchAll(PDO::FETCH_ASSOC);
+    $rows = $pdo->query('SELECT nome,telefone,email,empresa,produto_interesse,origem_lp,origem_botao,utm_source,utm_medium,utm_campaign,status_atual,vendedor,valor_venda,motivo_perda,data_criacao FROM LEADS_ADS ORDER BY data_criacao DESC')->fetchAll(PDO::FETCH_ASSOC);
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="leads_webhook_' . date('Y-m-d') . '.csv"');
     $out = fopen('php://output', 'w');
@@ -39,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             exit;
         }
 
-        $sql = 'UPDATE leads_ads SET status_atual=:s, motivo_perda=:m, vendedor=:v, valor_venda=:vv, data_qualificacao=NOW()';
+        $sql = 'UPDATE LEADS_ADS SET status_atual=:s, motivo_perda=:m, vendedor=:v, valor_venda=:vv, data_qualificacao=NOW()';
         if ($status === 'VENDA')    $sql .= ', data_venda_fechada = NOW()';
         if (in_array($status, ['PERDIDO','DESQUALIFICADO'], true)) $sql .= ', data_perda = NOW()';
         $sql .= ' WHERE id=:id';
@@ -74,7 +74,7 @@ if ($f['busca'] !== '') {
     $params['b'] = '%' . $f['busca'] . '%';
 }
 
-$sql = 'SELECT * FROM leads_ads';
+$sql = 'SELECT * FROM LEADS_ADS';
 if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
 $sql .= ' ORDER BY data_criacao DESC, id DESC LIMIT 300';
 $stmt = $pdo->prepare($sql);
@@ -83,7 +83,7 @@ $rows = $stmt->fetchAll();
 
 $stats = leadsCountByStatus($pdo);
 $total = array_sum($stats);
-$lps   = $pdo->query('SELECT origem_lp, COUNT(*) qtd FROM leads_ads GROUP BY origem_lp ORDER BY qtd DESC, origem_lp ASC')->fetchAll();
+$lps   = $pdo->query('SELECT origem_lp, COUNT(*) qtd FROM LEADS_ADS GROUP BY origem_lp ORDER BY qtd DESC, origem_lp ASC')->fetchAll();
 
 $statusMap = [
     'NOVO'              => ['class' => 'sl-novo',   'label' => 'Novo'],

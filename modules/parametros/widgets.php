@@ -22,7 +22,7 @@ try {
             $_w_perms = array_column($_st_wp->fetchAll(PDO::FETCH_ASSOC), 'PAC_PAGINA');
         }
     }
-    if ($v = $pdo->query("SELECT PAR_VALOR FROM parametros WHERE PAR_CHAVE = 'sidebar_menus_desativados'")->fetchColumn()) {
+    if ($v = $pdo->query("SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = 'sidebar_menus_desativados'")->fetchColumn()) {
         $_w_desativados = json_decode($v, true) ?? [];
     }
 } catch (Throwable) {}
@@ -123,7 +123,7 @@ $paramKey = 'dashboard_widgets_' . $uid;
 // ── Carrega preferências atuais do usuário ───────────────────────────────────
 function loadWidgets(PDO $pdo, string $key): array
 {
-    $st = $pdo->prepare('SELECT PAR_VALOR FROM parametros WHERE PAR_CHAVE = :k');
+    $st = $pdo->prepare('SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = :k');
     $st->execute([':k' => $key]);
     $val = $st->fetchColumn();
     if ($val !== false) return json_decode($val, true) ?? [];
@@ -150,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         $pdo->prepare("
-            INSERT INTO parametros (PAR_CHAVE, PAR_VALOR) VALUES (:k, :v)
+            INSERT INTO PARAMETROS (PAR_CHAVE, PAR_VALOR) VALUES (:k, :v)
             ON DUPLICATE KEY UPDATE PAR_VALOR = VALUES(PAR_VALOR)
         ")->execute([':k' => $paramKey, ':v' => json_encode($novosActivos, JSON_UNESCAPED_UNICODE)]);
         $activos = $novosActivos;

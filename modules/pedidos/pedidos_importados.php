@@ -20,7 +20,7 @@ $pdo = dbPDO();
         );
         $chk->execute(['vendas', 'ven_prazo_dias']);
         if (!(int) $chk->fetchColumn()) {
-            $pdo->exec('ALTER TABLE vendas ADD COLUMN ven_prazo_dias INT NULL AFTER ven_status');
+            $pdo->exec('ALTER TABLE VENDAS ADD COLUMN ven_prazo_dias INT NULL AFTER ven_status');
         }
     } catch (Throwable) {}
 })();
@@ -77,10 +77,10 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'set_prazo') {
         );
         $chkCol->execute(['vendas', 'ven_prazo_dias']);
         if (!(int) $chkCol->fetchColumn()) {
-            $pdo->exec('ALTER TABLE vendas ADD COLUMN ven_prazo_dias INT NULL AFTER ven_status');
+            $pdo->exec('ALTER TABLE VENDAS ADD COLUMN ven_prazo_dias INT NULL AFTER ven_status');
         }
         $prazoVal = $prazo === '' ? null : max(1, (int) $prazo);
-        $st = $pdo->prepare('UPDATE vendas SET ven_prazo_dias = ? WHERE ven_codigo = ?');
+        $st = $pdo->prepare('UPDATE VENDAS SET ven_prazo_dias = ? WHERE ven_codigo = ?');
         $st->execute([$prazoVal, $venCod]);
         echo json_encode(['ok' => true, 'prazo' => $prazoVal]);
     } catch (Throwable $e) {
@@ -109,8 +109,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'itens') {
                 iv.iv_total      AS total_produto,
                 iv.iv_status     AS status,
                 iv.iv_obs        AS obs
-            FROM itens_vendas iv
-            JOIN produtos p ON p.pro_codigo = iv.pro_codigo
+            FROM ITENS_VENDAS iv
+            JOIN PRODUTOS p ON p.pro_codigo = iv.pro_codigo
             WHERE iv.ven_codigo = :id
             ORDER BY p.pro_descricao
         ');
@@ -207,8 +207,8 @@ $stmt = $pdo->prepare("
         SUM(CASE WHEN iv.iv_status = 'Pendente de produção' THEN 1 ELSE 0 END)  AS qtd_pend,
         MIN(iv.iv_qtde) AS min_qtde,
         MAX(iv.iv_qtde) AS max_qtde
-    FROM vendas v
-    LEFT JOIN itens_vendas iv ON iv.ven_codigo = v.ven_codigo
+    FROM VENDAS v
+    LEFT JOIN ITENS_VENDAS iv ON iv.ven_codigo = v.ven_codigo
     WHERE {$whereStr}
     GROUP BY v.ven_codigo
     {$having}

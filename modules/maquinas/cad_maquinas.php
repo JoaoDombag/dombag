@@ -16,7 +16,7 @@ try {
 
     // ── Garante tabelas ──────────────────────────
     $pdo->exec('
-        CREATE TABLE IF NOT EXISTS departamentos (
+        CREATE TABLE IF NOT EXISTS DEPARTAMENTOS (
             dp_codigo    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             dp_descricao VARCHAR(25) NOT NULL UNIQUE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -24,11 +24,11 @@ try {
 
     // Insere departamentos padrão se a tabela estiver vazia
     $pdo->exec("
-        INSERT IGNORE INTO departamentos (dp_descricao) VALUES ('BAG'), ('SACARIA')
+        INSERT IGNORE INTO DEPARTAMENTOS (dp_descricao) VALUES ('BAG'), ('SACARIA')
     ");
 
     $pdo->exec("
-        CREATE TABLE IF NOT EXISTS maquinas (
+        CREATE TABLE IF NOT EXISTS MAQUINAS (
             maq_codigo       INT UNSIGNED   AUTO_INCREMENT PRIMARY KEY,
             maq_descricao    VARCHAR(120)   NOT NULL UNIQUE,
             maq_qtde         NUMERIC(6,2)   NOT NULL DEFAULT 1,
@@ -48,9 +48,9 @@ try {
     ");
 
     // Garante coluna em tabelas já existentes (compatível com MySQL 5.7+)
-    $col = $pdo->query("SHOW COLUMNS FROM maquinas LIKE 'maq_conta_producao'")->fetch();
+    $col = $pdo->query("SHOW COLUMNS FROM MAQUINAS LIKE 'maq_conta_producao'")->fetch();
     if (!$col) {
-        $pdo->exec("ALTER TABLE maquinas ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=conta no total; 0=processo intermediario'");
+        $pdo->exec("ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=conta no total; 0=processo intermediario'");
     }
 
     // ── Ações POST ───────────────────────────────
@@ -73,7 +73,7 @@ try {
             } elseif ($cod > 0) {
                 // UPDATE
                 $stmt = $pdo->prepare('
-                    UPDATE maquinas SET
+                    UPDATE MAQUINAS SET
                         maq_descricao      = :desc,
                         maq_qtde           = :qtde,
                         maq_producao_min   = :prod,
@@ -92,7 +92,7 @@ try {
             } else {
                 // INSERT
                 $stmt = $pdo->prepare('
-                    INSERT INTO maquinas
+                    INSERT INTO MAQUINAS
                         (maq_descricao, maq_qtde, maq_producao_min, maq_horas_dia, dp_codigo, maq_conta_producao)
                     VALUES (:desc, :qtde, :prod, :horas, :depto, :conta)
                 ');
@@ -109,7 +109,7 @@ try {
             $cod = intval($_POST['maq_codigo'] ?? 0);
             if ($cod > 0) {
                 try {
-                    $pdo->prepare('DELETE FROM maquinas WHERE maq_codigo = :cod')
+                    $pdo->prepare('DELETE FROM MAQUINAS WHERE maq_codigo = :cod')
                         ->execute([':cod' => $cod]);
                     $db_ok_msg = 'Máquina excluída.';
                 } catch (PDOException $ex) {
@@ -122,14 +122,14 @@ try {
 
     // ── Busca departamentos para o select ────────
     $deptos = $pdo->query(
-        'SELECT dp_codigo, dp_descricao FROM departamentos ORDER BY dp_descricao'
+        'SELECT dp_codigo, dp_descricao FROM DEPARTAMENTOS ORDER BY dp_descricao'
     )->fetchAll(PDO::FETCH_ASSOC);
 
     // ── Busca máquinas com nome do departamento ──
     $maquinas = $pdo->query('
         SELECT m.*, d.dp_descricao
-        FROM maquinas m
-        INNER JOIN departamentos d ON d.dp_codigo = m.dp_codigo
+        FROM MAQUINAS m
+        INNER JOIN DEPARTAMENTOS d ON d.dp_codigo = m.dp_codigo
         ORDER BY m.maq_codigo
     ')->fetchAll(PDO::FETCH_ASSOC);
 

@@ -8,7 +8,7 @@ $pdo = dbPDO();
 // ── Garante tabela de imagens ─────────────────────────────────────────────────
 try {
     $pdo->exec("
-        CREATE TABLE IF NOT EXISTS itens_vendas_imagens (
+        CREATE TABLE IF NOT EXISTS ITENS_VENDAS_IMAGENS (
             img_codigo    INT AUTO_INCREMENT PRIMARY KEY,
             iv_codigo     INT          NOT NULL,
             img_arquivo   VARCHAR(255) NOT NULL,
@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             echo json_encode(['ok' => false, 'msg' => 'Dados inválidos.']);
             exit;
         }
-        $pdo->prepare('UPDATE itens_vendas SET iv_status=:s, iv_atualizado_em=NOW() WHERE iv_codigo=:id')
+        $pdo->prepare('UPDATE ITENS_VENDAS SET iv_status=:s, iv_atualizado_em=NOW() WHERE iv_codigo=:id')
             ->execute([':s' => $status, ':id' => $id]);
         echo json_encode(['ok' => true]);
     } catch (Throwable $e) {
@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get_ima
     $id = (int) ($_GET['id'] ?? 0);
     if (!$id) { echo json_encode(['ok' => false, 'images' => []]); exit; }
     try {
-        $st = $pdo->prepare('SELECT img_codigo, img_arquivo, img_nome_orig FROM itens_vendas_imagens WHERE iv_codigo=:id ORDER BY img_criado_em');
+        $st = $pdo->prepare('SELECT img_codigo, img_arquivo, img_nome_orig FROM ITENS_VENDAS_IMAGENS WHERE iv_codigo=:id ORDER BY img_criado_em');
         $st->execute([':id' => $id]);
         echo json_encode(['ok' => true, 'images' => $st->fetchAll(PDO::FETCH_ASSOC)]);
     } catch (Throwable $e) {
@@ -77,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             echo json_encode(['ok' => false, 'msg' => 'Erro ao salvar arquivo.']); exit;
         }
         try {
-            $pdo->prepare('INSERT INTO itens_vendas_imagens (iv_codigo, img_arquivo, img_nome_orig) VALUES (:iv,:arq,:orig)')
+            $pdo->prepare('INSERT INTO ITENS_VENDAS_IMAGENS (iv_codigo, img_arquivo, img_nome_orig) VALUES (:iv,:arq,:orig)')
                 ->execute([':iv' => $id, ':arq' => $nome, ':orig' => $f['name']]);
             echo json_encode(['ok' => true, 'img_codigo' => (int)$pdo->lastInsertId(), 'img_arquivo' => $nome, 'img_nome_orig' => $f['name']]);
         } catch (Throwable $e) {
@@ -91,12 +91,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $imgId = (int) ($_POST['img_codigo'] ?? 0);
         if (!$imgId) { echo json_encode(['ok' => false, 'msg' => 'ID inválido.']); exit; }
         try {
-            $st = $pdo->prepare('SELECT img_arquivo FROM itens_vendas_imagens WHERE img_codigo=:id');
+            $st = $pdo->prepare('SELECT img_arquivo FROM ITENS_VENDAS_IMAGENS WHERE img_codigo=:id');
             $st->execute([':id' => $imgId]);
             $row = $st->fetch(PDO::FETCH_ASSOC);
             if ($row) {
                 @unlink($uploadDir . $row['img_arquivo']);
-                $pdo->prepare('DELETE FROM itens_vendas_imagens WHERE img_codigo=:id')->execute([':id' => $imgId]);
+                $pdo->prepare('DELETE FROM ITENS_VENDAS_IMAGENS WHERE img_codigo=:id')->execute([':id' => $imgId]);
             }
             echo json_encode(['ok' => true]);
         } catch (Throwable $e) {
@@ -148,10 +148,10 @@ $stmt = $pdo->prepare("
         p.pro_categoria,
         p.pro_tipo,
         iv.iv_atualizado_em,
-        (SELECT COUNT(*) FROM itens_vendas_imagens img WHERE img.iv_codigo = iv.iv_codigo) AS img_count
-    FROM itens_vendas iv
-    INNER JOIN vendas   v ON v.ven_codigo  = iv.ven_codigo
-    INNER JOIN produtos p ON p.pro_codigo  = iv.pro_codigo
+        (SELECT COUNT(*) FROM ITENS_VENDAS_IMAGENS img WHERE img.iv_codigo = iv.iv_codigo) AS img_count
+    FROM ITENS_VENDAS iv
+    INNER JOIN VENDAS   v ON v.ven_codigo  = iv.ven_codigo
+    INNER JOIN PRODUTOS p ON p.pro_codigo  = iv.pro_codigo
     $where
     ORDER BY
         CASE WHEN COALESCE(iv.iv_prioridade,0) > 0 THEN 0 ELSE 1 END,
@@ -167,7 +167,7 @@ $prodProgress = [];
 try {
     $pp = $pdo->query("
         SELECT pd_pedido, SUM(pd_quantidade) AS produzido
-        FROM producao_diaria
+        FROM PRODUCAO_DIARIA
         WHERE pd_pedido IS NOT NULL AND TRIM(pd_pedido) <> ''
         GROUP BY pd_pedido
     ");
@@ -178,7 +178,7 @@ try {
 }
 
 // ── Categorias disponíveis para filtro ───────────────────────────────────────
-$cats = $pdo->query("SELECT DISTINCT pro_categoria FROM produtos WHERE pro_categoria IS NOT NULL AND pro_categoria <> '' ORDER BY pro_categoria")
+$cats = $pdo->query("SELECT DISTINCT pro_categoria FROM PRODUTOS WHERE pro_categoria IS NOT NULL AND pro_categoria <> '' ORDER BY pro_categoria")
             ->fetchAll(PDO::FETCH_COLUMN);
 
 // ── Colunas do Kanban ─────────────────────────────────────────────────────────

@@ -136,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               id="sqlInput"
               spellcheck="false"
               autocomplete="off"
-              placeholder="SELECT * FROM maquinas LIMIT 10;
+              placeholder="SELECT * FROM MAQUINAS LIMIT 10;
 -- ou --
 ALTER TABLE tabela ADD COLUMN coluna VARCHAR(100) NULL;"
             ><?= htmlspecialchars($sql_in) ?></textarea>

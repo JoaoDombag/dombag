@@ -29,7 +29,7 @@ try {
                 CONCAT(IF(pd.pd_horario_fim < pd.pd_horario_ini,'2000-01-02','2000-01-01'),' ',pd.pd_horario_fim)))  AS total_minutos,
             MIN(DATE_FORMAT(pd.pd_horario_ini,'%H:%i'))                          AS primeiro_turno,
             MAX(DATE_FORMAT(pd.pd_horario_fim,'%H:%i'))                          AS ultimo_turno
-        FROM producao_diaria pd
+        FROM PRODUCAO_DIARIA pd
         WHERE pd.pd_data = :data
     ");
     $stmt->execute([':data' => $data_sel]);
@@ -37,7 +37,7 @@ try {
 
     // 2. Comparativo dia anterior
     $data_ant = date('Y-m-d', strtotime($data_sel . ' -1 day'));
-    $stmt_ant = $pdo->prepare('SELECT COALESCE(SUM(pd_quantidade),0) FROM producao_diaria WHERE pd_data = :d');
+    $stmt_ant = $pdo->prepare('SELECT COALESCE(SUM(pd_quantidade),0) FROM PRODUCAO_DIARIA WHERE pd_data = :d');
     $stmt_ant->execute([':d' => $data_ant]);
     $total_ant = (float) $stmt_ant->fetchColumn();
 
@@ -45,7 +45,7 @@ try {
     $stmt_hora = $pdo->prepare("
         SELECT DATE_FORMAT(pd.pd_horario_ini,'%H:%i') AS hora,
                SUM(pd.pd_quantidade)                  AS qtd
-        FROM producao_diaria pd
+        FROM PRODUCAO_DIARIA pd
         WHERE pd.pd_data = :data
         GROUP BY DATE_FORMAT(pd.pd_horario_ini,'%H:%i')
         ORDER BY hora
@@ -77,9 +77,9 @@ try {
                 ORDER BY pd.pd_funcionario SEPARATOR ', ')           AS funcionarios,
             GROUP_CONCAT(DISTINCT pd.pd_pedido
                 ORDER BY pd.pd_pedido SEPARATOR ', ')                AS pedidos
-        FROM producao_diaria pd
-        LEFT JOIN maquinas m ON m.maq_codigo = pd.maq_codigo
-        LEFT JOIN departamentos d ON d.dp_codigo = m.dp_codigo
+        FROM PRODUCAO_DIARIA pd
+        LEFT JOIN MAQUINAS m ON m.maq_codigo = pd.maq_codigo
+        LEFT JOIN DEPARTAMENTOS d ON d.dp_codigo = m.dp_codigo
         WHERE pd.pd_data = :data
         GROUP BY pd.maq_codigo, m.maq_descricao, d.dp_descricao,
                  m.maq_qtde, m.maq_horas_dia, m.maq_producao_min
@@ -110,7 +110,7 @@ try {
             TIMESTAMPDIFF(MINUTE,
                 CONCAT('2000-01-01 ',pd.pd_horario_ini),
                 CONCAT(IF(pd.pd_horario_fim < pd.pd_horario_ini,'2000-01-02','2000-01-01'),' ',pd.pd_horario_fim))  AS minutos
-        FROM producao_diaria pd
+        FROM PRODUCAO_DIARIA pd
         WHERE pd.pd_data = :data
         ORDER BY pd.maq_codigo, pd.pd_horario_ini
     ");

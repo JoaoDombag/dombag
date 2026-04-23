@@ -10,7 +10,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
 $trello_key = $trello_token = '';
 try {
     $pdo = dbPDO();
-    $st  = $pdo->prepare("SELECT PAR_CHAVE, PAR_VALOR FROM parametros WHERE PAR_CHAVE IN ('trello_api_key','trello_token')");
+    $st  = $pdo->prepare("SELECT PAR_CHAVE, PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE IN ('trello_api_key','trello_token')");
     $st->execute();
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
         if ($r['PAR_CHAVE'] === 'trello_api_key') $trello_key   = trim($r['PAR_VALOR']);

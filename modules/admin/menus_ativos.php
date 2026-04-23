@@ -130,7 +130,7 @@ function allKeys(array $todosMenus): array {
 // ── Carrega desativados atuais ────────────────────────────────────────────────
 $desativados = [];
 try {
-    $st = $pdo->prepare("SELECT PAR_VALOR FROM parametros WHERE PAR_CHAVE = 'sidebar_menus_desativados'");
+    $st = $pdo->prepare("SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = 'sidebar_menus_desativados'");
     $st->execute();
     $val = $st->fetchColumn();
     if ($val) $desativados = json_decode($val, true) ?? [];
@@ -147,7 +147,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['salvar'])) {
 
     try {
         $upsert = $pdo->prepare("
-            INSERT INTO parametros (PAR_CHAVE, PAR_VALOR) VALUES ('sidebar_menus_desativados', :v)
+            INSERT INTO PARAMETROS (PAR_CHAVE, PAR_VALOR) VALUES ('sidebar_menus_desativados', :v)
             ON DUPLICATE KEY UPDATE PAR_VALOR = VALUES(PAR_VALOR)
         ");
         $upsert->execute([':v' => json_encode($novosDesativados, JSON_UNESCAPED_UNICODE)]);

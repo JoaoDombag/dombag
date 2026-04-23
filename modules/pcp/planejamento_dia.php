@@ -51,9 +51,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                     p.pro_descricao,
                     p.pro_categoria,
                     COALESCE(ps.total_produzido, 0) AS total_produzido
-                FROM itens_vendas iv
-                INNER JOIN vendas   v  ON v.ven_codigo  = iv.ven_codigo
-                INNER JOIN produtos p  ON p.pro_codigo  = iv.pro_codigo
+                FROM ITENS_VENDAS iv
+                INNER JOIN VENDAS   v  ON v.ven_codigo  = iv.ven_codigo
+                INNER JOIN PRODUTOS p  ON p.pro_codigo  = iv.pro_codigo
                 LEFT JOIN (
                     SELECT iv_codigo, SUM(pp_qtde_prod) AS total_produzido
                     FROM pcp_planejamento
@@ -129,7 +129,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                           AND pp2.pp_qtde_prod IS NOT NULL
                     ), 0) AS total_produzido
                 FROM pcp_planejamento pp
-                INNER JOIN itens_vendas iv ON iv.iv_codigo = pp.iv_codigo
+                INNER JOIN ITENS_VENDAS iv ON iv.iv_codigo = pp.iv_codigo
                 WHERE pp.pp_codigo = :id
             ");
             $stmt->execute([':id' => $pp_cod]);
@@ -209,7 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             $rmRows = $pdo->query("
                 SELECT maq_codigo, maq_descricao,
                        COALESCE(maq_producao_min,0) * COALESCE(maq_qtde,1) AS vel
-                FROM maquinas
+                FROM MAQUINAS
             ")->fetchAll(PDO::FETCH_ASSOC);
             foreach ($rmRows as $rm) {
                 $maqMap[$rm['maq_descricao']] = ['codigo' => (int)$rm['maq_codigo'], 'vel' => (float)$rm['vel']];
@@ -219,9 +219,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             $pulados   = 0;
             $stIv = $pdo->prepare("
                 SELECT iv.iv_codigo
-                FROM itens_vendas iv
-                INNER JOIN vendas   v ON v.ven_codigo  = iv.ven_codigo
-                INNER JOIN produtos p ON p.pro_codigo  = iv.pro_codigo
+                FROM ITENS_VENDAS iv
+                INNER JOIN VENDAS   v ON v.ven_codigo  = iv.ven_codigo
+                INNER JOIN PRODUTOS p ON p.pro_codigo  = iv.pro_codigo
                 WHERE v.ven_codigo_yzidro = :ped
                   AND p.pro_descricao     = :prod
                   AND iv.iv_status IN ('Pendente de produção','Produção')
@@ -286,9 +286,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                     p.pro_descricao,
                     p.pro_categoria,
                     COALESCE(ps.total_produzido, 0) AS total_produzido
-                FROM itens_vendas iv
-                INNER JOIN vendas   v  ON v.ven_codigo  = iv.ven_codigo
-                INNER JOIN produtos p  ON p.pro_codigo  = iv.pro_codigo
+                FROM ITENS_VENDAS iv
+                INNER JOIN VENDAS   v  ON v.ven_codigo  = iv.ven_codigo
+                INNER JOIN PRODUTOS p  ON p.pro_codigo  = iv.pro_codigo
                 LEFT JOIN (
                     SELECT iv_codigo, SUM(pp_qtde_prod) AS total_produzido
                     FROM pcp_planejamento
@@ -333,8 +333,8 @@ $maquinas = $pdo->query("
            COALESCE(m.maq_producao_min, 0) AS maq_producao_min,
            COALESCE(m.maq_horas_dia, 8)    AS maq_horas_dia,
            COALESCE(m.maq_qtde, 1)         AS maq_qtde
-    FROM maquinas m
-    INNER JOIN departamentos d ON d.dp_codigo = m.dp_codigo
+    FROM MAQUINAS m
+    INNER JOIN DEPARTAMENTOS d ON d.dp_codigo = m.dp_codigo
     ORDER BY d.dp_descricao, m.maq_descricao
 ")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -357,11 +357,11 @@ $stmt = $pdo->prepare("
               AND pp2.pp_qtde_prod IS NOT NULL
         ), 0) AS total_produzido
     FROM pcp_planejamento pp
-    INNER JOIN maquinas     m  ON m.maq_codigo  = pp.maq_codigo
-    INNER JOIN departamentos d  ON d.dp_codigo   = m.dp_codigo
-    INNER JOIN itens_vendas iv  ON iv.iv_codigo  = pp.iv_codigo
-    INNER JOIN vendas        v  ON v.ven_codigo  = iv.ven_codigo
-    INNER JOIN produtos      p  ON p.pro_codigo  = iv.pro_codigo
+    INNER JOIN MAQUINAS     m  ON m.maq_codigo  = pp.maq_codigo
+    INNER JOIN DEPARTAMENTOS d  ON d.dp_codigo   = m.dp_codigo
+    INNER JOIN ITENS_VENDAS iv  ON iv.iv_codigo  = pp.iv_codigo
+    INNER JOIN VENDAS        v  ON v.ven_codigo  = iv.ven_codigo
+    INNER JOIN PRODUTOS      p  ON p.pro_codigo  = iv.pro_codigo
     WHERE pp.pp_data = :data
     ORDER BY d.dp_descricao, m.maq_descricao, pp.pp_codigo
 ");
