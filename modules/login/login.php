@@ -63,6 +63,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 } catch (PDOException $e) {
                     $erro = 'Erro de conexão com o banco de dados.';
+                    error_log('[LOGIN] PDOException: ' . $e->getMessage());
+                    echo '<script>console.error(' . json_encode('[LOGIN] ' . $e->getMessage()) . ')</script>';
                 }
             }
         }
