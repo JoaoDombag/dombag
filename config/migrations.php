@@ -162,19 +162,19 @@ function rodarMigrations(): void
 
         // Bootstrap: garante que as tabelas de controle existam
         $pdo->exec("
-            CREATE TABLE IF NOT EXISTS db_migrations (
-                mig_id           VARCHAR(60)  NOT NULL,
-                mig_titulo       VARCHAR(200) NOT NULL DEFAULT '',
-                mig_executado_em DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (mig_id)
+            CREATE TABLE IF NOT EXISTS DB_MIGRATIONS (
+                MIG_ID           VARCHAR(60)  NOT NULL,
+                MIG_TITULO       VARCHAR(200) NOT NULL DEFAULT '',
+                MIG_EXECUTADO_EM DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (MIG_ID)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
         $pdo->exec("
-            CREATE TABLE IF NOT EXISTS db_migrations_sql (
-                mig_id            VARCHAR(60) NOT NULL,
-                mig_sql           TEXT        NOT NULL,
-                mig_atualizado_em DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                PRIMARY KEY (mig_id)
+            CREATE TABLE IF NOT EXISTS DB_MIGRATIONS_SQL (
+                MIG_ID            VARCHAR(60) NOT NULL,
+                MIG_SQL           TEXT        NOT NULL,
+                MIG_ATUALIZADO_EM DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (MIG_ID)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
 
@@ -187,7 +187,7 @@ function rodarMigrations(): void
         $files = glob($dir . '/*.php') ?: [];
         sort($files);
 
-        $applied = $pdo->query('SELECT mig_id FROM db_migrations')
+        $applied = $pdo->query('SELECT MIG_ID FROM DB_MIGRATIONS')
                        ->fetchAll(PDO::FETCH_COLUMN);
 
         $hasError = false;
@@ -211,13 +211,13 @@ function rodarMigrations(): void
                 $log = _migCtx('log');
 
                 // Registra como aplicada
-                $pdo->prepare('INSERT IGNORE INTO db_migrations (mig_id, mig_titulo) VALUES (?, ?)')
+                $pdo->prepare('INSERT IGNORE INTO DB_MIGRATIONS (MIG_ID, MIG_TITULO) VALUES (?, ?)')
                     ->execute([$id, $id]);
 
                 // Grava o log de SQL gerado
                 $pdo->prepare('
-                    INSERT INTO db_migrations_sql (mig_id, mig_sql) VALUES (?, ?)
-                    ON DUPLICATE KEY UPDATE mig_sql = VALUES(mig_sql), mig_atualizado_em = NOW()
+                    INSERT INTO DB_MIGRATIONS_SQL (MIG_ID, MIG_SQL) VALUES (?, ?)
+                    ON DUPLICATE KEY UPDATE MIG_SQL = VALUES(MIG_SQL), MIG_ATUALIZADO_EM = NOW()
                 ')->execute([$id, json_encode($log, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)]);
 
             } catch (Throwable $e) {
