@@ -12,7 +12,7 @@ define('DB_HOST',    getenv('MYSQLHOST')     ?: 'localhost');
 define('DB_PORT',    getenv('MYSQLPORT')     ?: '3306');
 define('DB_NAME',    getenv('MYSQLDATABASE') ?: 'dombag');
 define('DB_USER',    getenv('MYSQLUSER')     ?: 'root');
-define('DB_PASS',    getenv('MYSQLPASSWORD') ?: '');
+define('DB_PASS',    getenv('MYSQLPASSWORD') ?: getenv('MYSQL_ROOT_PASSWORD') ?: '');
 define('DB_CHARSET', 'utf8mb4');
 
 // ── PostgreSQL (ERP Yzidro — somente leitura) ─────
@@ -28,13 +28,16 @@ if (!function_exists('dbPDO')) {
     {
         static $pdo = null;
         if ($pdo === null) {
-            $pdo = new PDO(
-                'mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';charset=' . DB_CHARSET,
-                DB_USER,
-                DB_PASS,
-                [PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
+            $opts = [PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC];
+            // Conecta sem banco para criar se não existir
+            $base = new PDO(
+                'mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';charset=' . DB_CHARSET,
+                DB_USER, DB_PASS, $opts
             );
+            $base->exec('CREATE DATABASE IF NOT EXISTS `' . DB_NAME . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+            $base->exec('USE `' . DB_NAME . '`');
+            $pdo = $base;
         }
         return $pdo;
     }
