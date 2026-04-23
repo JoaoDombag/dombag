@@ -1,41 +1,20 @@
 <?php
 // TEMPORÁRIO — delete depois de diagnosticar
+require_once __DIR__ . '/config/config.php';
 
 echo "<pre>\n";
+echo "DB_HOST = " . DB_HOST . "\n";
+echo "DB_PORT = " . DB_PORT . "\n";
+echo "DB_NAME = " . DB_NAME . "\n";
+echo "DB_USER = " . DB_USER . "\n";
+echo "DB_PASS = " . (DB_PASS !== '' ? str_repeat('*', strlen(DB_PASS)) : '(vazio)') . "\n\n";
 
-// Lista todas as variáveis de ambiente que contêm MYSQL ou DATABASE
-echo "=== Variáveis de ambiente (MYSQL / DATABASE) ===\n";
-foreach ($_SERVER as $k => $v) {
-    if (stripos($k, 'mysql') !== false || stripos($k, 'database') !== false) {
-        $isPwd = stripos($k, 'pass') !== false || stripos($k, 'pwd') !== false;
-        echo "$k = " . ($isPwd ? str_repeat('*', strlen($v)) : $v) . "\n";
-    }
+try {
+    $pdo = dbPDO();
+    echo "✅ Conexão OK\n";
+    $r = $pdo->query("SHOW TABLES LIKE 'USUARIOS'")->fetchAll();
+    echo "Tabela USUARIOS: " . (count($r) ? "✅ existe" : "❌ não existe (migration vai criar no login)") . "\n";
+} catch (PDOException $e) {
+    echo "❌ Erro: " . $e->getMessage() . "\n";
 }
-
-echo "\n=== Tentativa de conexão ===\n";
-$host = getenv('MYSQLHOST')     ?: '(não definido)';
-$port = getenv('MYSQLPORT')     ?: '3306';
-$name = getenv('MYSQLDATABASE') ?: '(não definido)';
-$user = getenv('MYSQLUSER')     ?: '(não definido)';
-$pass = getenv('MYSQLPASSWORD') ?: '';
-
-// Tenta também com MYSQL_ROOT_PASSWORD se MYSQLPASSWORD falhar
-$passAlt = getenv('MYSQL_ROOT_PASSWORD') ?: '';
-
-echo "Usando: $user @ $host:$port / $name\n\n";
-
-foreach (['MYSQLPASSWORD' => $pass, 'MYSQL_ROOT_PASSWORD' => $passAlt] as $varName => $pwd) {
-    if ($pwd === '') { echo "$varName = (vazio) — pulando\n"; continue; }
-    try {
-        $dsn = "mysql:host=$host;port=$port;dbname=$name;charset=utf8mb4";
-        $pdo = new PDO($dsn, $user, $pwd, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-        echo "✅ Conectou com $varName\n";
-        $r = $pdo->query("SHOW TABLES LIKE 'USUARIOS'")->fetchAll();
-        echo "Tabela USUARIOS: " . (count($r) ? "✅ existe" : "❌ não existe") . "\n";
-        break;
-    } catch (PDOException $e) {
-        echo "❌ $varName falhou: " . $e->getMessage() . "\n";
-    }
-}
-
 echo "</pre>\n";
