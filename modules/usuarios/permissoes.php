@@ -11,10 +11,10 @@ $pdo = dbPDO();
 $msg = '';
 $msg_tipo = '';
 
-// ── Schema: cria tabela permissao_acesso se não existir ───────────────────────
+// ── Schema: cria tabela PERMISSAO_ACESSO se não existir ───────────────────────
 try {
     $pdo->exec("
-        CREATE TABLE IF NOT EXISTS permissao_acesso (
+        CREATE TABLE IF NOT EXISTS PERMISSAO_ACESSO (
             PAC_CODIGO     INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             PAC_GRU_CODIGO INT UNSIGNED NOT NULL,
             PAC_PAGINA     VARCHAR(150) NOT NULL,
@@ -115,10 +115,10 @@ if ($gru_cod > 0) {
 
 // ── Salvar permissões (POST) ──────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $grupo_sel) {
-    $pdo->prepare('DELETE FROM permissao_acesso WHERE PAC_GRU_CODIGO = :g')
+    $pdo->prepare('DELETE FROM PERMISSAO_ACESSO WHERE PAC_GRU_CODIGO = :g')
         ->execute([':g' => $gru_cod]);
 
-    $stmt = $pdo->prepare('INSERT INTO permissao_acesso (PAC_GRU_CODIGO, PAC_PAGINA) VALUES (:g, :p)');
+    $stmt = $pdo->prepare('INSERT INTO PERMISSAO_ACESSO (PAC_GRU_CODIGO, PAC_PAGINA) VALUES (:g, :p)');
     $count_saved = 0;
     foreach (($_POST['paginas'] ?? []) as $pagina) {
         if (in_array($pagina, $paths_validos, true)) {
@@ -134,7 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $grupo_sel) {
 // ── Carrega permissões atuais do grupo ────────────────────────────────────────
 if ($grupo_sel) {
     try {
-        $st = $pdo->prepare('SELECT PAC_PAGINA FROM permissao_acesso WHERE PAC_GRU_CODIGO = :g');
+        $st = $pdo->prepare('SELECT PAC_PAGINA FROM PERMISSAO_ACESSO WHERE PAC_GRU_CODIGO = :g');
         $st->execute([':g' => $gru_cod]);
         $permissoes_atuais = array_column($st->fetchAll(PDO::FETCH_ASSOC), 'PAC_PAGINA');
     } catch (Throwable) {}

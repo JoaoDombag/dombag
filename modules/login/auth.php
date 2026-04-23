@@ -80,7 +80,7 @@ try {
             $__perms_auth = [];
             if (!empty($__row_auth['GRU_CODIGO'])) {
                 $__sp_auth = $__pdo_auth->prepare(
-                    'SELECT PAC_PAGINA FROM permissao_acesso WHERE PAC_GRU_CODIGO = :g'
+                    'SELECT PAC_PAGINA FROM PERMISSAO_ACESSO WHERE PAC_GRU_CODIGO = :g'
                 );
                 $__sp_auth->execute([':g' => (int)$__row_auth['GRU_CODIGO']]);
                 $__perms_auth = array_column($__sp_auth->fetchAll(PDO::FETCH_ASSOC), 'PAC_PAGINA');

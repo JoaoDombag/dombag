@@ -24,7 +24,7 @@ if (!empty($_SESSION['usu_codigo'])) {
         if ($__row) {
             $_sb_admin = !empty($__row['USU_ADMIN']);
             if (!$_sb_admin && $__row['GRU_CODIGO']) {
-                $__p = $__pdo->prepare('SELECT PAC_PAGINA FROM permissao_acesso WHERE PAC_GRU_CODIGO = :g');
+                $__p = $__pdo->prepare('SELECT PAC_PAGINA FROM PERMISSAO_ACESSO WHERE PAC_GRU_CODIGO = :g');
                 $__p->execute([':g' => (int)$__row['GRU_CODIGO']]);
                 $_sb_perms = array_column($__p->fetchAll(PDO::FETCH_ASSOC), 'PAC_PAGINA');
             }

@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $pdo->prepare('DELETE FROM grupo_usuario WHERE GRU_CODIGO = :c')->execute([':c' => $cod]);
                 try {
-                    $pdo->prepare('DELETE FROM permissao_acesso WHERE PAC_GRU_CODIGO = :c')->execute([':c' => $cod]);
+                    $pdo->prepare('DELETE FROM PERMISSAO_ACESSO WHERE PAC_GRU_CODIGO = :c')->execute([':c' => $cod]);
                 } catch (Throwable) {}
                 $msg = 'Grupo excluído.';
                 $msg_tipo = 'ok';

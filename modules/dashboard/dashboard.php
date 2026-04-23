@@ -50,7 +50,7 @@ try {
     if ($_row_u) {
         $_dash_admin = !empty($_row_u['USU_ADMIN']);
         if (!$_dash_admin && !empty($_row_u['GRU_CODIGO'])) {
-            $_st_p = $_pdo_p->prepare('SELECT PAC_PAGINA FROM permissao_acesso WHERE PAC_GRU_CODIGO = :g');
+            $_st_p = $_pdo_p->prepare('SELECT PAC_PAGINA FROM PERMISSAO_ACESSO WHERE PAC_GRU_CODIGO = :g');
             $_st_p->execute([':g' => (int)$_row_u['GRU_CODIGO']]);
             $_dash_perms = array_column($_st_p->fetchAll(PDO::FETCH_ASSOC), 'PAC_PAGINA');
         }

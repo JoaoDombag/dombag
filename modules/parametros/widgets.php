@@ -17,7 +17,7 @@ try {
     if ($_row_wu) {
         $_w_admin = !empty($_row_wu['USU_ADMIN']);
         if (!$_w_admin && !empty($_row_wu['GRU_CODIGO'])) {
-            $_st_wp = $pdo->prepare('SELECT PAC_PAGINA FROM permissao_acesso WHERE PAC_GRU_CODIGO = :g');
+            $_st_wp = $pdo->prepare('SELECT PAC_PAGINA FROM PERMISSAO_ACESSO WHERE PAC_GRU_CODIGO = :g');
             $_st_wp->execute([':g' => (int)$_row_wu['GRU_CODIGO']]);
             $_w_perms = array_column($_st_wp->fetchAll(PDO::FETCH_ASSOC), 'PAC_PAGINA');
         }
