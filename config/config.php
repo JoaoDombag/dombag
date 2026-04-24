@@ -8,10 +8,10 @@
 // ── MySQL ─────────────────────────────────────────
 // Em produção (Railway) lê as variáveis do serviço MySQL.
 // Em desenvolvimento lê os valores locais abaixo.
-define('DB_HOST',    getenv('MYSQLHOST')     ?: 'localhost');
-define('DB_PORT',    getenv('MYSQLPORT')     ?: '3306');
-define('DB_NAME',    getenv('MYSQLDATABASE') ?: 'dombag');
-define('DB_USER',    getenv('MYSQLUSER')     ?: 'root');
+define('DB_HOST',    getenv('MYSQLHOST')     );
+define('DB_PORT',    getenv('MYSQLPORT')     );
+define('DB_NAME',    getenv('MYSQLDATABASE') );
+define('DB_USER',    getenv('MYSQLUSER')     );
 define('DB_PASS',    getenv('MYSQLPASSWORD') ?: getenv('MYSQL_ROOT_PASSWORD') ?: '');
 define('DB_CHARSET', 'utf8mb4');
 
