@@ -115,9 +115,6 @@ $todosWidgets = [
     ],
 ];
 
-// Filtra: só widgets que o utilizador tem permissão de ver
-$todosWidgets = array_values(array_filter($todosWidgets, fn($w) => widgetPermitido($w['key'])));
-
 $paramKey = 'dashboard_widgets_' . $uid;
 
 // ── Carrega preferências atuais do usuário ───────────────────────────────────
@@ -231,6 +228,9 @@ function esc($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-
 /* Drag handle */
 .drag-handle { display:flex; align-items:center; color:var(--text-muted); cursor:grab; padding:0 4px 0 0; flex-shrink:0; opacity:.45; transition:opacity .15s; }
 .widget-card:hover .drag-handle { opacity:.8; }
+.widget-card.bloqueado { opacity:.35; cursor:not-allowed; }
+.widget-card.bloqueado:hover { background: var(--card-bg); }
+.widget-card.bloqueado .drag-handle { display:none; }
 .widget-card.dragging { opacity:.4; border-style:dashed; }
 .widget-card.drag-over { border-color:rgba(45,106,255,.6); background:var(--card-hover); }
 
@@ -291,24 +291,34 @@ function esc($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-
               array_filter($todosWidgets, fn($w) => !in_array($w['key'], $activos, true))
           );
           foreach ($ordered as $w):
-            $on = in_array($w['key'], $activos, true);
+            $on      = in_array($w['key'], $activos, true);
+            $bloq    = !widgetPermitido($w['key']);
           ?>
-          <div class="widget-card <?= $on ? 'active' : 'inactive' ?>"
+          <div class="widget-card <?= $on && !$bloq ? 'active' : 'inactive' ?> <?= $bloq ? 'bloqueado' : '' ?>"
                data-key="<?= esc($w['key']) ?>"
-               draggable="true"
-               onclick="toggleWidget(this)">
+               draggable="<?= $bloq ? 'false' : 'true' ?>"
+               <?= $bloq ? '' : 'onclick="toggleWidget(this)"' ?>>
             <span class="drag-handle" onclick="event.stopPropagation()" title="Arrastar para reordenar">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="5" r="1" fill="currentColor"/><circle cx="15" cy="5" r="1" fill="currentColor"/><circle cx="9" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="9" cy="19" r="1" fill="currentColor"/><circle cx="15" cy="19" r="1" fill="currentColor"/></svg>
             </span>
             <div class="widget-icon">
+              <?php if ($bloq): ?>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <?php else: ?>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <?= $w['icon'] ?>
               </svg>
+              <?php endif; ?>
             </div>
             <div class="widget-info">
               <div class="widget-label"><?= esc($w['label']) ?></div>
-              <div class="widget-desc"><?= esc($w['desc']) ?></div>
+              <div class="widget-desc"><?= $bloq ? 'Sem permissão de acesso.' : esc($w['desc']) ?></div>
             </div>
+            <?php if ($bloq): ?>
+            <span style="font-size:10px;color:var(--text-muted);white-space:nowrap;flex-shrink:0;">Bloqueado</span>
+            <?php else: ?>
             <label class="widget-toggle" onclick="event.stopPropagation()">
               <input type="checkbox"
                      name="widget[<?= esc($w['key']) ?>]"
@@ -317,6 +327,7 @@ function esc($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-
                      onchange="syncCard(this)">
               <span class="toggle-track"><span class="toggle-thumb"></span></span>
             </label>
+            <?php endif; ?>
           </div>
           <?php endforeach; ?>
         </div>
