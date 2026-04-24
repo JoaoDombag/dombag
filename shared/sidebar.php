@@ -266,6 +266,20 @@ $grupos = [
   border-radius: 999px;
 }
 
+.nav-sem-permissao {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 12px 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.04);
+  color: var(--text-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.sidebar.collapsed .nav-sem-permissao { display: none; }
+
 .nav-label {
   padding: 0 12px;
   margin: 12px 0 8px;
@@ -633,6 +647,24 @@ $grupos = [
 
     </div>
     <?php endforeach; ?>
+
+    <?php
+    // Avisa usuários sem permissões atribuídas
+    $__sb_tem_itens = sb_can('/modules/produtos/cadastro_produtos.php');
+    if (!$__sb_tem_itens) {
+        foreach ($grupos as $__g) {
+            $__vis = array_filter($__g['itens'], fn($i) => sb_can($i['href']));
+            if (!empty($__vis)) { $__sb_tem_itens = true; break; }
+        }
+    }
+    if (!$_sb_admin && !$__sb_tem_itens): ?>
+    <div class="nav-sem-permissao">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span class="nav-text">Sem permissões atribuídas. Contacte o administrador.</span>
+    </div>
+    <?php endif; ?>
 
   </nav>
 

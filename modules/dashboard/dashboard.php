@@ -33,10 +33,17 @@ try {
     $_dash_val   = $_dash_pdo_w->prepare("SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = :k");
     $_dash_val->execute([':k' => 'dashboard_widgets_' . $_dash_uid]);
     $_dash_raw   = $_dash_val->fetchColumn();
-    $dashWidgets = $_dash_raw !== false ? (json_decode($_dash_raw, true) ?? []) : [];
+    $dashWidgets = $_dash_raw !== false ? (json_decode($_dash_raw, true) ?? []) : null;
 } catch (Throwable) {
-    $dashWidgets = [];
+    $dashWidgets = null;
 }
+// null = sem preferência salva; será preenchido com padrão após carregar permissões
+$_dash_widgets_default = [
+    'kpi_erp','kpi_local','kpi_faturamento',
+    'ultimas_vendas','maquinas_hoje',
+    'vendas_grupo','prod_7dias',
+    'financeiro','trello_geral','trello_atividade',
+];
 
 // ── Permissões e menus activos (para filtrar widgets) ─────────────────
 $_dash_admin       = false;
@@ -59,6 +66,11 @@ try {
         $_dash_desativados = json_decode($v, true) ?? [];
     }
 } catch (Throwable) {}
+
+// Se o usuário nunca personalizou, exibe todos os widgets que ele tem permissão
+if ($dashWidgets === null) {
+    $dashWidgets = $_dash_widgets_default;
+}
 
 // Mapa: widget → [página_requerida, grupo_de_menu]
 $_widget_perm_map = [
