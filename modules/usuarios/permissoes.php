@@ -23,59 +23,23 @@ try {
     ");
 } catch (Throwable) {}
 
-// ── Páginas disponíveis no sistema (espelha o sidebar) ────────────────────────
-$modulos = [
-    'Geral' => [
-        ['path' => '/modules/produtos/cadastro_produtos.php', 'label' => 'Produtos'],
-    ],
-    'Vendas' => [
-        ['path' => '/vendas',           'label' => 'Pedidos de Venda'],
-        ['path' => '/vendas/simulacao', 'label' => 'Simulação de Vendas'],
-    ],
-    'Yzidro' => [
-        ['path' => '/yzidro/pedidos',  'label' => 'Pedidos de Venda (Yzidro)'],
-        ['path' => '/yzidro/consulta', 'label' => 'Consulta Vendas'],
-    ],
-    'Produção' => [
-        ['path' => '/pcp/reuniao',      'label' => 'Reunião de Planejamento'],
-        ['path' => '/pcp/kanban',       'label' => 'Kanban de Pedidos'],
-        ['path' => '/pcp/planejamento', 'label' => 'Planejamento'],
-        ['path' => '/pcp/ordens',       'label' => 'Ordens de Produção'],
-        ['path' => '/pcp/programacao',  'label' => 'Programação Diária'],
-        ['path' => '/pcp/producao',     'label' => 'Produção'],
-    ],
-    'Máquinas' => [
-        ['path' => '/maquinas',  'label' => 'Cadastro de Máquinas'],
-        ['path' => '/pcp/fila',  'label' => 'Fila de Máquinas'],
-    ],
-    'Financeiro' => [
-        ['path' => '/financeiro',               'label' => 'Dashboard Financeiro'],
-        ['path' => '/financeiro/receber',       'label' => 'Contas a Receber'],
-        ['path' => '/financeiro/pagar',         'label' => 'Contas a Pagar'],
-        ['path' => '/financeiro/baixas-pagar',  'label' => 'Baixas a Pagar'],
-    ],
-    'CRM' => [
-        ['path' => '/modules/crm/qualificacao_leads.php', 'label' => 'Leads do Webhook'],
-        ['path' => '/modules/crm/leads_resultados.php',   'label' => 'Prospecção com IA'],
-    ],
-    'Trello' => [
-        ['path' => '/trello', 'label' => 'Pedidos Trello'],
-    ],
-    'Relatórios' => [
-        ['path' => '/relatorios/producao',         'label' => 'Relatório de Produção'],
-        ['path' => '/relatorios/estoque-futuro',   'label' => 'Estoque Futuro'],
-        ['path' => '/relatorios/posicao-estoque',  'label' => 'Posição de Estoque'],
-        ['path' => '/relatorios/controle-estoque', 'label' => 'Controle de Estoque'],
-    ],
-    'Usuários' => [
-        ['path' => '/usuarios',                         'label' => 'Cadastro de Usuários'],
-        ['path' => '/modules/usuarios/cad_grupos.php',  'label' => 'Grupos de Usuários'],
-        ['path' => '/modules/usuarios/permissoes.php',  'label' => 'Permissões por Grupo'],
-    ],
-    'Parâmetros' => [
-        ['path' => '/modules/parametros/parametros.php', 'label' => 'Parâmetros do Sistema'],
-    ],
-];
+// ── Monta $modulos a partir do registro central ───────────────────────────────
+// Inclui apenas páginas que requerem permissão (publico=false) e não são admin_only
+require_once $_SERVER['DOCUMENT_ROOT'] . '/config/pages.php';
+
+$modulos = [];
+foreach ($DOMBAG_PAGINAS as $_p) {
+    // Exclui páginas sempre públicas e páginas exclusivas de admin
+    if (!empty($_p['publico']))    continue;
+    if (!empty($_p['admin_only'])) continue;
+
+    $grupo_label = $_p['grupo'] !== null
+        ? ($DOMBAG_GRUPOS[$_p['grupo']]['label'] ?? ucfirst($_p['grupo']))
+        : 'Geral';
+
+    $modulos[$grupo_label][] = ['path' => $_p['href'], 'label' => $_p['label']];
+}
+unset($_p, $grupo_label);
 
 // Lista plana de caminhos válidos (para validação no save)
 $paths_validos = [];

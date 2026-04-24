@@ -47,8 +47,12 @@ if (!function_exists('usuNome')) {
 
 // ── Verificação de permissões de acesso ───────────────────────────────────────
 
-// Páginas sempre acessíveis para qualquer usuário autenticado
-$__always_allowed_paths = ['/dashboard', '/dashboard/widgets', '/minha-senha'];
+// Páginas sempre acessíveis: derivadas do registro central (publico=true)
+require_once $_SERVER['DOCUMENT_ROOT'] . '/config/pages.php';
+$__always_allowed_paths = array_column(
+    array_filter($DOMBAG_PAGINAS, fn($p) => !empty($p['publico'])),
+    'href'
+);
 
 try {
     $__pdo_auth = dbPDO();

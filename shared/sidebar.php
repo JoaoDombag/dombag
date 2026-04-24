@@ -86,119 +86,34 @@ function group_open(array $paths): string
     return '';
 }
 
-$grupos = [
-  'vendas' => [
-    'label' => 'Vendas',
-    'tooltip' => 'Vendas',
-    'icon' => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-shopping-cart-icon lucide-shopping-cart"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>',
-    'itens' => [
-      ['label' => 'Pedidos de Venda', 'href' => '/vendas'],
-      ['label' => 'Simulação'       , 'href' => '/vendas/simulacao'],
-    ],
-  ],
-  'yzidro' => [
-    'label' => 'Yzidro',
-    'tooltip' => 'Yzidro',
-    'icon' => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 15 21.84"/><path d="M21 5V8"/><path d="M21 12L18 17H22L19 22"/><path d="M3 12A9 3 0 0 0 14.59 14.87"/>',
-    'itens' => [
-      ['label' => 'Pedidos de Venda',       'href' => '/yzidro/pedidos'],
-      ['label' => 'Consulta Vendas',        'href' => '/yzidro/consulta'],
-      ['label' => 'Finalizados (Sac × Bag)', 'href' => '/yzidro/finalizados'],
-    ],
-  ],
-  'producao' => [
-    'label' => 'Produção',
-    'tooltip' => 'Produção',
-    'icon' => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-hard-hat-icon lucide-hard-hat"><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M14 6a6 6 0 0 1 6 6v3"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><rect x="2" y="15" width="20" height="4" rx="1"/></svg>',
-    'itens' => [
-      ['label' => 'Reunião de Planejamento', 'href' => '/pcp/reuniao'],
-      ['label' => 'Kanban de Pedidos',   'href' => '/pcp/kanban'],
-      ['label' => 'Planejamento',        'href' => '/pcp/planejamento'],
-      ['label' => 'Ordens de Produção',  'href' => '/pcp/ordens'],
-      ['label' => 'Programação Diária',  'href' => '/pcp/programacao'],
-      ['label' => 'Produção',            'href' => '/pcp/producao'],
-    ],
-  ],
-  'maquinas' => [
-    'label' => 'Máquinas',
-    'tooltip' => 'Máquinas',
-    'icon' => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-cog-icon lucide-cog"><path d="M11 10.27 7 3.34"/><path d="m11 13.73-4 6.93"/><path d="M12 22v-2"/><path d="M12 2v2"/><path d="M14 12h8"/><path d="m17 20.66-1-1.73"/><path d="m17 3.34-1 1.73"/><path d="M2 12h2"/><path d="m20.66 17-1.73-1"/><path d="m20.66 7-1.73 1"/><path d="m3.34 17 1.73-1"/><path d="m3.34 7 1.73 1"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="12" r="8"/></svg>',
-    'itens' => [
-      ['label' => 'Cadastro de Máquinas', 'href' => '/maquinas'],
-      ['label' => 'Fila de Máquinas',     'href' => '/pcp/fila'],
-    ],
-  ],
-  'financeiro' => [
-    'label'   => 'Financeiro',
-    'tooltip' => 'Financeiro',
-    'icon'    => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
-    'itens'   => [
-      ['label' => 'Dashboard',        'href' => '/financeiro'],
-      ['label' => 'Contas a Receber', 'href' => '/financeiro/receber'],
-      ['label' => 'Contas a Pagar',   'href' => '/financeiro/pagar'],
-      ['label' => 'Baixas a Pagar',   'href' => '/financeiro/baixas-pagar'],
-    ],
-  ],
-  'crm' => [
-    'label' => 'CRM',
-    'tooltip' => 'CRM',
-    'icon' => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-funnel-plus-icon lucide-funnel-plus"><path d="M13.354 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14v6a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341l1.218-1.348"/><path d="M16 6h6"/><path d="M19 3v6"/></svg>',
-    'itens' => [
-      ['label' => 'Leads do Webhook', 'href' => '/modules/crm/qualificacao_leads.php'],
-      ['label' => 'Prospecção com IA', 'href' => '/modules/crm/leads_resultados.php'],
-    ],
-  ],
-  'trello' => [
-    'label'   => 'Trello',
-    'tooltip' => 'Trello',
-    'icon'    => '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="3" width="7" height="11" rx="2"/></svg>',
-    'itens'   => [
-      ['label' => 'Pedidos', 'href' => '/trello'],
-    ],
-  ],
-  'relatorios' => [
-    'label' => 'Relatórios',
-    'tooltip' => 'Relatórios',
-    'icon' => '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>',
-    'itens' => [
-      ['label' => 'Relatório de Produção',    'href' => '/relatorios/producao'],
-      ['label' => 'Estoque Futuro',           'href' => '/relatorios/estoque-futuro'],
-      ['label' => 'Posição de Estoque',       'href' => '/relatorios/posicao-estoque'],
-      ['label' => 'Controle de Estoque',      'href' => '/relatorios/controle-estoque'],
-    ],
-  ],
-  'usuarios' => [
-    'label'      => 'Usuários',
-    'tooltip'    => 'Usuários',
-    'icon'       => '<path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/>',
-    'itens'      => [
-      ['label' => 'Minha Senha',           'href' => '/minha-senha'],
-      ['label' => 'Cadastro de Usuários',  'href' => '/usuarios',                          'admin_only' => true],
-      ['label' => 'Grupos de Usuários',    'href' => '/modules/usuarios/cad_grupos.php',   'admin_only' => true],
-    ],
-  ],
-  'parametros' => [
-    'label' => 'Parâmetros',
-    'tooltip' => 'Parâmetros',
-    'icon' => '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
-    'itens' => [
-      ['label' => 'Parâmetros do Sistema', 'href' => '/modules/parametros/parametros.php'],
-      ['label' => 'Widgets do Dashboard',  'href' => '/dashboard/widgets'],
-    ],
-  ],
-  'administrador' => [
-    'label'      => 'Administrador',
-    'tooltip'    => 'Administrador',
-    'admin_only' => true,
-    'icon'       => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
-    'itens'      => [
-      ['label' => 'Migrations BD',        'href' => '/admin/migrations'],
-      ['label' => 'Console SQL',          'href' => '/admin/atualiza-bd'],
-      ['label' => 'Menus Ativos',         'href' => '/admin/menus-ativos'],
-      ['label' => 'Permissões por Grupo', 'href' => '/modules/usuarios/permissoes.php'],
-    ],
-  ],
-];
+// ── Monta $grupos e $standalone_paginas a partir do registro central ──────────
+require_once $_SERVER['DOCUMENT_ROOT'] . '/config/pages.php';
+
+$grupos = [];
+foreach ($DOMBAG_GRUPOS as $gkey => $gdef) {
+    $grupos[$gkey] = [
+        'label'      => $gdef['label'],
+        'tooltip'    => $gdef['tooltip'],
+        'icon'       => $gdef['icon'],
+        'admin_only' => $gdef['admin_only'] ?? false,
+        'itens'      => [],
+    ];
+}
+foreach ($DOMBAG_PAGINAS as $_pag) {
+    if (!isset($_pag['grupo']) || $_pag['grupo'] === null) continue;
+    if (empty($_pag['menu'])) continue;
+    $gkey = $_pag['grupo'];
+    if (!isset($grupos[$gkey])) continue;
+    $item = ['label' => $_pag['label'], 'href' => $_pag['href']];
+    if (!empty($_pag['admin_only'])) $item['admin_only'] = true;
+    $grupos[$gkey]['itens'][] = $item;
+}
+
+// Itens standalone (topo do sidebar, grupo=null, menu=true)
+$standalone_paginas = array_values(
+    array_filter($DOMBAG_PAGINAS, fn($p) => $p['grupo'] === null && !empty($p['menu']))
+);
+unset($_pag, $gkey, $item);
 ?>
 
 <style>
@@ -576,36 +491,22 @@ $grupos = [
 
   <nav class="nav-section">
 
-    <?php if (sb_can('/dashboard') && sb_ativo('standalone:dashboard')): ?>
-    <a class="nav-item <?= nav_active('/dashboard') ?>"
-       href="/dashboard"
-       data-tooltip="Dashboard">
+    <?php foreach ($standalone_paginas as $_sp):
+        $_sp_key = 'standalone:' . ltrim(strtok($_sp['href'], '/'), '/');
+        if (!sb_can($_sp['href'])) continue;
+        if (!sb_ativo($_sp_key)) continue;
+    ?>
+    <a class="nav-item <?= nav_active($_sp['href']) ?>"
+       href="<?= htmlspecialchars($_sp['href']) ?>"
+       data-tooltip="<?= htmlspecialchars($_sp['label']) ?>">
       <span class="nav-icon">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3"  y="3"  width="7" height="7" rx="1"/>
-          <rect x="14" y="3"  width="7" height="7" rx="1"/>
-          <rect x="14" y="14" width="7" height="7" rx="1"/>
-          <rect x="3"  y="14" width="7" height="7" rx="1"/>
+          <?= $_sp['icon'] ?? '' ?>
         </svg>
       </span>
-      <span class="nav-text">Dashboard</span>
+      <span class="nav-text"><?= htmlspecialchars($_sp['label']) ?></span>
     </a>
-    <?php endif; ?>
-
-    <?php if (sb_can('/modules/produtos/cadastro_produtos.php') && sb_ativo('standalone:produtos')): ?>
-    <a class="nav-item <?= nav_active('/produtos') ?>"
-       href="/modules/produtos/cadastro_produtos.php"
-       data-tooltip="Produtos">
-      <span class="nav-icon">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
-          <path d="m3.3 7 8.7 5 8.7-5"/>
-          <path d="M12 22V12"/>
-        </svg>
-      </span>
-      <span class="nav-text">Produtos</span>
-    </a>
-    <?php endif; ?>
+    <?php endforeach; unset($_sp, $_sp_key); ?>
     
     <?php foreach ($grupos as $id => $grupo):
         if (!empty($grupo['admin_only']) && !$_sb_admin) continue;
@@ -651,7 +552,7 @@ $grupos = [
 
     <?php
     // Avisa usuários sem permissões atribuídas
-    $__sb_tem_itens = sb_can('/modules/produtos/cadastro_produtos.php');
+    $__sb_tem_itens = sb_can('/produtos');
     if (!$__sb_tem_itens) {
         foreach ($grupos as $__g) {
             $__vis = array_filter($__g['itens'], fn($i) => sb_can($i['href']));
@@ -685,26 +586,15 @@ $grupos = [
 
 <!-- ── Topbar mobile (visível apenas em telas pequenas) ─────────────────── -->
 <nav class="mobile-topbar" id="mobileTopbar">
-  <?php if (sb_can('/dashboard')): ?>
-  <a class="mob-item <?= nav_active('/dashboard') ?>" href="/modules/dashboard/dashboard.php" title="Dashboard">
+  <?php foreach ($standalone_paginas as $_spm):
+    if (!sb_can($_spm['href'])) continue; ?>
+  <a class="mob-item <?= nav_active($_spm['href']) ?>" href="<?= htmlspecialchars($_spm['href']) ?>" title="<?= htmlspecialchars($_spm['label']) ?>">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="3"  y="3"  width="7" height="7" rx="1"/>
-      <rect x="14" y="3"  width="7" height="7" rx="1"/>
-      <rect x="14" y="14" width="7" height="7" rx="1"/>
-      <rect x="3"  y="14" width="7" height="7" rx="1"/>
+      <?= $_spm['icon'] ?? '' ?>
     </svg>
-    <span>Dashboard</span>
+    <span><?= htmlspecialchars($_spm['label']) ?></span>
   </a>
-  <?php endif; ?>
-  <?php if (sb_can('/modules/produtos/cadastro_produtos.php')): ?>
-  <a class="mob-item <?= nav_active('/produtos') ?>" href="/modules/produtos/cadastro_produtos.php" title="Produtos">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
-      <path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>
-    </svg>
-    <span>Produtos</span>
-  </a>
-  <?php endif; ?>
+  <?php endforeach; unset($_spm); ?>
   <?php foreach ($grupos as $id => $grupo):
     $itens_mob = array_filter($grupo['itens'], fn($i) => sb_can($i['href']));
     if (empty($itens_mob)) continue;

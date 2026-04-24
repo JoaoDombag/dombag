@@ -13,107 +13,37 @@ if (empty($usu['USU_ADMIN'])) {
     exit('Acesso negado.');
 }
 
-// ── Definição de todos os itens configuráveis ─────────────────────────────────
-// Estrutura espelha exatamente o $grupos do sidebar.php + standalone items
-$todosMenus = [
-    [
-        'grupo_key' => 'standalone:dashboard',
-        'grupo_label' => 'Dashboard',
-        'itens' => [],
-    ],
-    [
-        'grupo_key' => 'standalone:produtos',
-        'grupo_label' => 'Produtos',
-        'itens' => [],
-    ],
-    [
-        'grupo_key' => 'grupo:vendas',
-        'grupo_label' => 'Vendas',
-        'itens' => [
-            ['key' => '/vendas',            'label' => 'Pedidos de Venda'],
-            ['key' => '/vendas/simulacao',  'label' => 'Simulação'],
-        ],
-    ],
-    [
-        'grupo_key' => 'grupo:yzidro',
-        'grupo_label' => 'Yzidro',
-        'itens' => [
-            ['key' => '/yzidro/pedidos',    'label' => 'Pedidos de Venda'],
-            ['key' => '/yzidro/consulta',   'label' => 'Consulta Vendas'],
-        ],
-    ],
-    [
-        'grupo_key' => 'grupo:producao',
-        'grupo_label' => 'Produção',
-        'itens' => [
-            ['key' => '/pcp/reuniao',       'label' => 'Reunião de Planejamento'],
-            ['key' => '/pcp/kanban',        'label' => 'Kanban de Pedidos'],
-            ['key' => '/pcp/planejamento',  'label' => 'Planejamento'],
-            ['key' => '/pcp/ordens',        'label' => 'Ordens de Produção'],
-            ['key' => '/pcp/programacao',   'label' => 'Programação Diária'],
-            ['key' => '/pcp/producao',      'label' => 'Produção'],
-        ],
-    ],
-    [
-        'grupo_key' => 'grupo:maquinas',
-        'grupo_label' => 'Máquinas',
-        'itens' => [
-            ['key' => '/maquinas',          'label' => 'Cadastro de Máquinas'],
-            ['key' => '/pcp/fila',          'label' => 'Fila de Máquinas'],
-        ],
-    ],
-    [
-        'grupo_key' => 'grupo:financeiro',
-        'grupo_label' => 'Financeiro',
-        'itens' => [
-            ['key' => '/financeiro',              'label' => 'Dashboard'],
-            ['key' => '/financeiro/receber',      'label' => 'Contas a Receber'],
-            ['key' => '/financeiro/pagar',        'label' => 'Contas a Pagar'],
-            ['key' => '/financeiro/baixas-pagar', 'label' => 'Baixas a Pagar'],
-        ],
-    ],
-    [
-        'grupo_key' => 'grupo:crm',
-        'grupo_label' => 'CRM',
-        'itens' => [
-            ['key' => '/modules/crm/qualificacao_leads.php', 'label' => 'Leads do Webhook'],
-            ['key' => '/modules/crm/leads_resultados.php',   'label' => 'Prospecção com IA'],
-        ],
-    ],
-    [
-        'grupo_key' => 'grupo:trello',
-        'grupo_label' => 'Trello',
-        'itens' => [
-            ['key' => '/trello', 'label' => 'Pedidos'],
-        ],
-    ],
-    [
-        'grupo_key' => 'grupo:relatorios',
-        'grupo_label' => 'Relatórios',
-        'itens' => [
-            ['key' => '/relatorios/producao',          'label' => 'Relatório de Produção'],
-            ['key' => '/relatorios/estoque-futuro',    'label' => 'Estoque Futuro'],
-            ['key' => '/relatorios/posicao-estoque',   'label' => 'Posição de Estoque'],
-            ['key' => '/relatorios/controle-estoque',  'label' => 'Controle de Estoque'],
-        ],
-    ],
-    [
-        'grupo_key' => 'grupo:usuarios',
-        'grupo_label' => 'Usuários',
-        'itens' => [
-            ['key' => '/usuarios',                         'label' => 'Cadastro de Usuários'],
-            ['key' => '/modules/usuarios/cad_grupos.php',  'label' => 'Grupos de Usuários'],
-        ],
-    ],
-    [
-        'grupo_key' => 'grupo:parametros',
-        'grupo_label' => 'Parâmetros',
-        'itens' => [
-            ['key' => '/modules/parametros/parametros.php', 'label' => 'Parâmetros do Sistema'],
-            ['key' => '/dashboard/widgets',                 'label' => 'Widgets do Dashboard'],
-        ],
-    ],
-];
+// ── Monta $todosMenus a partir do registro central ────────────────────────────
+require_once $_SERVER['DOCUMENT_ROOT'] . '/config/pages.php';
+
+$todosMenus = [];
+
+// Standalone items (grupo=null, menu=true)
+foreach ($DOMBAG_PAGINAS as $_p) {
+    if ($_p['grupo'] !== null || empty($_p['menu'])) continue;
+    $slug = ltrim(strtok($_p['href'], '/'), '/');
+    $todosMenus[] = [
+        'grupo_key'   => 'standalone:' . $slug,
+        'grupo_label' => $_p['label'],
+        'itens'       => [],
+    ];
+}
+
+// Grupos com seus itens de menu
+foreach ($DOMBAG_GRUPOS as $_gkey => $_gdef) {
+    $_itens = [];
+    foreach ($DOMBAG_PAGINAS as $_p) {
+        if ($_p['grupo'] !== $_gkey || empty($_p['menu'])) continue;
+        $_itens[] = ['key' => $_p['href'], 'label' => $_p['label']];
+    }
+    if (empty($_itens)) continue;
+    $todosMenus[] = [
+        'grupo_key'   => 'grupo:' . $_gkey,
+        'grupo_label' => $_gdef['label'],
+        'itens'       => $_itens,
+    ];
+}
+unset($_p, $_gkey, $_gdef, $_itens, $slug);
 
 // Coleta todas as keys possíveis
 function allKeys(array $todosMenus): array {
