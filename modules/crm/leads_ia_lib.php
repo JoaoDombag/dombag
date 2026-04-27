@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 if (!defined('OPENAI_API_URL')) {
     define('OPENAI_API_URL',    'https://api.openai.com/v1/responses');
-    define('OPENAI_MODEL',      'gpt-4.1-nano');
+    define('OPENAI_MODEL',      'gpt-5.4-mini');
     define('OPENAI_TOKEN_FIXO', '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');
     define('OPENAI_TIMEOUT',    150);
     define('MAX_RESULTADOS',    25);
