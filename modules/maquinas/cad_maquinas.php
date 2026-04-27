@@ -47,10 +47,17 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 
-    // Garante coluna em tabelas já existentes (compatível com MySQL 5.7+)
-    $col = $pdo->query("SHOW COLUMNS FROM MAQUINAS LIKE 'maq_conta_producao'")->fetch();
-    if (!$col) {
-        $pdo->exec("ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=conta no total; 0=processo intermediario'");
+    // Garante colunas em tabelas já existentes (compatível com MySQL 5.7+)
+    $missingCols = [
+        'maq_qtde'           => "ALTER TABLE MAQUINAS ADD COLUMN maq_qtde NUMERIC(6,2) NOT NULL DEFAULT 1",
+        'maq_producao_min'   => "ALTER TABLE MAQUINAS ADD COLUMN maq_producao_min NUMERIC(10,4) NOT NULL DEFAULT 0 COMMENT 'Unidades por minuto'",
+        'maq_horas_dia'      => "ALTER TABLE MAQUINAS ADD COLUMN maq_horas_dia NUMERIC(5,2) NOT NULL DEFAULT 8",
+        'maq_conta_producao' => "ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1 COMMENT '1=conta no total; 0=processo intermediario'",
+    ];
+    foreach ($missingCols as $col => $ddl) {
+        if (!$pdo->query("SHOW COLUMNS FROM MAQUINAS LIKE '$col'")->fetch()) {
+            $pdo->exec($ddl);
+        }
     }
 
     // ── Ações POST ───────────────────────────────
