@@ -11,11 +11,20 @@ if (basename($_SERVER['PHP_SELF']) === 'login.php') {
 }
 
 if (session_status() === PHP_SESSION_NONE) {
+    $__sess_lifetime = 30 * 24 * 60 * 60; // 30 dias
+    session_set_cookie_params([
+        'lifetime' => $__sess_lifetime,
+        'path'     => '/',
+        'secure'   => false,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+    ini_set('session.gc_maxlifetime', (string) $__sess_lifetime);
     session_start();
 }
 
 $_login_url = '/login';
-$_timeout = 8 * 60 * 60; // 8 horas
+$_timeout = 30 * 24 * 60 * 60; // 30 dias
 
 if (!empty($_SESSION['usu_codigo'])) {
     if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $_timeout) {

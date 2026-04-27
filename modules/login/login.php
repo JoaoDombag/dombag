@@ -2,6 +2,15 @@
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/migrations.php';
 
+$__sess_lifetime = 30 * 24 * 60 * 60;
+session_set_cookie_params([
+    'lifetime' => $__sess_lifetime,
+    'path'     => '/',
+    'secure'   => false,
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
+ini_set('session.gc_maxlifetime', (string) $__sess_lifetime);
 session_start();
 
 // Garante que o schema existe antes de qualquer query

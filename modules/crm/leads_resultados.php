@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+ob_start();
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
 require_once __DIR__ . '/leads_ia_lib.php';
@@ -7,6 +8,7 @@ require_once __DIR__ . '/leads_ia_lib.php';
 // ── Execução dos presets (?exec=1) ────────────────────────────────────────────
 if (isset($_GET['exec'])) {
     set_time_limit(600);
+    ob_clean();
     header('Content-Type: application/json; charset=utf-8');
     try {
         $pdo        = dbPDO();
