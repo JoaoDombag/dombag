@@ -556,7 +556,7 @@ async function executarPesquisa() {
   log.textContent = '⏳ Conectando à IA e pesquisando cada segmento…\n';
 
   try {
-    const res  = await fetch('leads_resultados.php?exec=1');
+    const res  = await fetch(window.location.pathname + '?exec=1');
     const raw  = await res.text();
 
     log.textContent += `HTTP ${res.status} ${res.statusText}\n`;
