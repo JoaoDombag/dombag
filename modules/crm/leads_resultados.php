@@ -456,27 +456,39 @@ function rUrl(array $extra = [], array $remove = []): string
           $rowUsuId = $row['usuario_id'] ? (int)$row['usuario_id'] : 0;
           $rowUsuNome = $usuMap[$rowUsuId] ?? '';
         ?>
+          <?php
+            $rNome   = (string) ($row['nome_empresa'] ?? '');
+            $rFonte  = (string) ($row['fonte'] ?? '');
+            $rMotivo = (string) ($row['motivo_relevancia'] ?? '');
+            $rCnpj   = (string) ($row['cnpj'] ?? '');
+            $rCidade = (string) ($row['cidade'] ?? '');
+            $rUf     = (string) ($row['uf'] ?? '');
+            $rTel    = (string) ($row['telefone'] ?? '');
+            $rEmail  = (string) ($row['email'] ?? '');
+            $rSite   = (string) ($row['site'] ?? '');
+            $rSeg    = (string) ($row['segmento_busca'] ?? '');
+          ?>
           <tr id="row-<?= $row['id'] ?>">
             <td class="cb-td"><input type="checkbox" class="row-cb" value="<?= $row['id'] ?>"></td>
             <td><div class="score-badge <?= iaScoreClass($score) ?>"><?= $score ?></div></td>
             <td>
-              <div style="font-weight:700;font-size:13px;"><?= iaH($row['nome_empresa']) ?></div>
-              <?php if ($row['fonte']): ?><div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;"><?= iaH($row['fonte']) ?></div><?php endif; ?>
-              <?php if ($row['motivo_relevancia']): ?><div style="font-size:11px;color:var(--text-secondary);margin-top:3px;font-style:italic;"><?= iaH($row['motivo_relevancia']) ?></div><?php endif; ?>
+              <div style="font-weight:700;font-size:13px;"><?= iaH($rNome) ?></div>
+              <?php if ($rFonte !== ''): ?><div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;"><?= iaH($rFonte) ?></div><?php endif; ?>
+              <?php if ($rMotivo !== ''): ?><div style="font-size:11px;color:var(--text-secondary);margin-top:3px;font-style:italic;"><?= iaH($rMotivo) ?></div><?php endif; ?>
             </td>
-            <td style="font-size:11px;color:var(--text-muted);"><?= iaH($row['cnpj'] ?? '') ?></td>
-            <td style="white-space:nowrap;"><?= iaH(trim(($row['cidade'] ?? '') . ' / ' . ($row['uf'] ?? ''), ' /')) ?></td>
+            <td style="font-size:11px;color:var(--text-muted);"><?= iaH($rCnpj) ?></td>
+            <td style="white-space:nowrap;"><?= iaH(trim($rCidade . ' / ' . $rUf, ' /')) ?></td>
             <td>
-              <?php if ($row['telefone']): ?><div><?= iaH($row['telefone']) ?></div><?php endif; ?>
-              <?php if ($row['email']): ?><div style="font-size:11px;color:var(--text-muted)"><?= iaH($row['email']) ?></div><?php endif; ?>
-              <?php if (!$row['telefone'] && !$row['email']): ?>—<?php endif; ?>
+              <?php if ($rTel !== ''): ?><div><?= iaH($rTel) ?></div><?php endif; ?>
+              <?php if ($rEmail !== ''): ?><div style="font-size:11px;color:var(--text-muted)"><?= iaH($rEmail) ?></div><?php endif; ?>
+              <?php if ($rTel === '' && $rEmail === ''): ?>—<?php endif; ?>
             </td>
             <td>
-              <?php if ($row['site']): ?>
-                <a href="<?= iaH($row['site']) ?>" target="_blank" rel="noopener" class="ext-link"><?= iaH(preg_replace('/^https?:\/\/(www\.)?/', '', $row['site'])) ?></a>
+              <?php if ($rSite !== ''): ?>
+                <a href="<?= iaH($rSite) ?>" target="_blank" rel="noopener" class="ext-link"><?= iaH((string) preg_replace('/^https?:\/\/(www\.)?/', '', $rSite)) ?></a>
               <?php else: ?>—<?php endif; ?>
             </td>
-            <td style="font-size:11px;"><?= iaH($row['segmento_busca'] ?? '') ?></td>
+            <td style="font-size:11px;"><?= iaH($rSeg) ?></td>
             <td>
               <select class="status-sel" onchange="mudarStatus(<?= $row['id'] ?>, this.value)">
                 <?php foreach (['NOVO'=>'Novo','EM_CONTATO'=>'Em contato','QUALIFICADO'=>'Qualificado','DESCARTADO'=>'Descartado'] as $val => $lbl): ?>
