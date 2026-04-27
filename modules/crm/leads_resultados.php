@@ -201,12 +201,18 @@ try {
     $stmtCt->execute($params);
     $total = (int) $stmtCt->fetchColumn();
 
-    $stmt = $pdo->prepare("SELECT * FROM LEADS_PROSPECTADOS WHERE $whereSql ORDER BY gravado_em DESC");
+    $stmt = $pdo->prepare("SELECT * FROM LEADS_PROSPECTADOS WHERE $whereSql ORDER BY gravado_em DESC, id DESC");
     $stmt->execute($params);
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $rows = array_map(
+        static fn($r) => array_change_key_case($r, CASE_LOWER),
+        $stmt->fetchAll(PDO::FETCH_ASSOC)
+    );
 
     $statsRows = $pdo->query('SELECT segmento_busca, COUNT(*) qtd FROM LEADS_PROSPECTADOS GROUP BY segmento_busca ORDER BY qtd DESC')->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($statsRows as $s) $stats[$s['segmento_busca']] = (int)$s['qtd'];
+    foreach ($statsRows as $s) {
+        $s = array_change_key_case($s, CASE_LOWER);
+        $stats[$s['segmento_busca']] = (int)$s['qtd'];
+    }
 
 } catch (Throwable $e) {
     $erroDb = $e->getMessage();
@@ -503,7 +509,7 @@ function rUrl(array $extra = [], array $remove = []): string
                 <span style="font-size:11px;color:var(--text-muted);">—</span>
               <?php endif; ?>
             </td>
-            <td style="font-size:11px;white-space:nowrap;color:var(--text-muted);"><?= date('d/m/y H:i', strtotime($row['gravado_em'])) ?></td>
+            <td style="font-size:11px;white-space:nowrap;color:var(--text-muted);"><?= ($row['gravado_em'] ? date('d/m/y H:i', strtotime((string)$row['gravado_em'])) : '—') ?></td>
             <td>
               <button class="btn-del" title="Remover lead" onclick="deletarLead(<?= $row['id'] ?>)">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
