@@ -106,9 +106,7 @@ $presets = LEADS_PRESETS;
 .run-title{font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:6px}
 .run-desc{font-size:12px;color:var(--text-secondary);margin-bottom:18px}
 .log-box{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;padding:16px;font-family:ui-monospace,monospace;font-size:12px;line-height:1.7;color:var(--text-muted);min-height:120px;max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin-top:18px;display:none}
-.badge-ok{color:var(--teal)}.badge-err{color:var(--red)}.badge-new{color:var(--amber)}
-.cron-box{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-family:ui-monospace,monospace;font-size:12px;color:var(--text-muted);margin-top:8px;word-break:break-all}
-@media(max-width:900px){.preset-grid{grid-template-columns:repeat(2,1fr)}.stat-row{grid-template-columns:1fr 1fr}}
+.badge-ok{color:var(--teal)}.badge-err{color:var(--red)}.badge-new{color:var(--amber)}@media(max-width:900px){.preset-grid{grid-template-columns:repeat(2,1fr)}.stat-row{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.preset-grid,.stat-row{grid-template-columns:1fr}}
 </style>
 </head>
@@ -188,14 +186,6 @@ $presets = LEADS_PRESETS;
     </div>
   </div>
 
-  <div class="panel">
-    <div class="panel-header"><span class="panel-title">Agendamento via cron (opcional)</span></div>
-    <div style="padding:20px;">
-      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;">Para rodar automaticamente todo dia às 7h, adicione no cron do servidor:</p>
-      <div class="cron-box">0 7 * * * curl -s "<?= iaH((isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'localhost') . '/modules/crm/leads_auto.php?exec=1') ?>" >> /tmp/leads_auto.log 2>&1</div>
-      <p style="font-size:11px;color:var(--text-muted);margin-top:8px;">O endpoint retorna JSON. Leads já existentes no banco são automaticamente ignorados.</p>
-    </div>
-  </div>
 
 </div>
 </div>

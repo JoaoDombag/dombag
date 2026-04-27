@@ -4,6 +4,61 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
 require_once __DIR__ . '/leads_ia_lib.php';
 
+// ── Execução dos presets (?exec=1) ────────────────────────────────────────────
+if (isset($_GET['exec'])) {
+    set_time_limit(600);
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $pdo        = dbPDO();
+        $clientesYz = iaCarregarClientesYzidro();
+    } catch (Throwable $e) {
+        echo json_encode(['ok' => false, 'message' => 'Erro de conexão: ' . $e->getMessage()], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $presets  = LEADS_PRESETS;
+    $executar = array_keys($presets);
+
+    if (!empty($_GET['presets'])) {
+        $solicitados = array_map('trim', explode(',', (string) $_GET['presets']));
+        $executar    = array_values(array_intersect($executar, $solicitados));
+    }
+
+    $resultados     = [];
+    $totalNovos     = 0;
+    $totalFiltrados = 0;
+    $erros          = 0;
+
+    foreach ($executar as $key) {
+        $res = iaRunPreset($key, $pdo, $clientesYz);
+        $resultados[] = [
+            'preset'    => $key,
+            'titulo'    => $res['titulo'] ?? $key,
+            'ok'        => $res['ok'],
+            'novos'     => $res['novos'] ?? 0,
+            'filtrados' => $res['filtrados'] ?? 0,
+            'message'   => $res['message'] ?? '',
+        ];
+        if ($res['ok']) {
+            $totalNovos     += $res['novos'] ?? 0;
+            $totalFiltrados += $res['filtrados'] ?? 0;
+        } else {
+            $erros++;
+        }
+    }
+
+    echo json_encode([
+        'ok'              => true,
+        'executado_em'    => date('Y-m-d H:i:s'),
+        'presets_rodados' => count($executar),
+        'total_novos'     => $totalNovos,
+        'total_filtrados' => $totalFiltrados,
+        'erros'           => $erros,
+        'detalhes'        => $resultados,
+    ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
+}
+
 // ── Ação AJAX ─────────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     header('Content-Type: application/json; charset=utf-8');
@@ -178,11 +233,24 @@ function rUrl(array $extra = [], array $remove = []): string
 <link rel="stylesheet" href="/public/css/unified_admin.css">
 <link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
-.nav-pills{display:flex;gap:8px;margin-bottom:20px}
-.nav-pill{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text-secondary);font-size:12px;font-weight:600;text-decoration:none}
-.nav-pill:hover{background:rgba(255,255,255,.07);color:var(--text-primary)}
-.nav-pill.active{background:rgba(45,106,255,.1);border-color:rgba(45,106,255,.35);color:#7db3ff}
 .filter-bar{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:20px}
+/* Painel de pesquisa */
+.search-panel{margin-bottom:20px}
+.search-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+.search-toggle-chevron{transition:transform .2s;color:var(--text-muted)}
+.search-panel.open .search-toggle-chevron{transform:rotate(180deg)}
+.search-body{display:none;padding:20px}
+.search-panel.open .search-body{display:block}
+.preset-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:18px}
+.preset-card{background:rgba(255,255,255,.025);border:1px solid var(--border);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.preset-title{font-size:12px;font-weight:800;color:var(--text-primary)}
+.preset-desc{font-size:10.5px;line-height:1.4;color:var(--text-secondary);flex:1}
+.preset-meta{display:flex;flex-wrap:wrap;gap:4px}
+.preset-pill{font-size:9.5px;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text-muted)}
+.run-row{display:flex;align-items:center;gap:12px}
+.log-box{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:8px;padding:14px;font-family:ui-monospace,monospace;font-size:11.5px;line-height:1.7;color:var(--text-muted);max-height:260px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;margin-top:14px;display:none}
+@media(max-width:1100px){.preset-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:700px){.preset-grid{grid-template-columns:repeat(2,1fr)}}
 .filter-bar .field{min-width:140px;max-width:220px}
 .filter-bar select,.filter-bar input{height:36px;font-size:12px}
 .filter-bar .field label{font-size:11px;margin-bottom:4px;display:block;color:var(--text-muted)}
@@ -243,20 +311,42 @@ function rUrl(array $extra = [], array $remove = []): string
 
 <div class="content">
 
-  <div class="nav-pills">
-    <a href="leads_resultados.php" class="nav-pill active">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-      Resultados
-    </a>
-    <a href="leads_auto.php" class="nav-pill">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-      Executar Automático
-    </a>
-  </div>
-
   <?php if ($erroDb): ?>
     <div class="alert alert-err"><?= iaH($erroDb) ?></div>
   <?php endif; ?>
+
+  <!-- Painel de pesquisa -->
+  <div class="panel search-panel <?= $total === 0 ? 'open' : '' ?>" id="searchPanel">
+    <div class="panel-header search-toggle" onclick="document.getElementById('searchPanel').classList.toggle('open')">
+      <span class="panel-title">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="margin-right:6px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Pesquisar leads com IA
+      </span>
+      <svg class="search-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="search-body">
+      <div class="preset-grid">
+        <?php foreach (LEADS_PRESETS as $key => $cfg): ?>
+          <div class="preset-card">
+            <div class="preset-title"><?= iaH($cfg['titulo']) ?></div>
+            <div class="preset-desc"><?= iaH($cfg['descricao']) ?></div>
+            <div class="preset-meta">
+              <span class="preset-pill"><?= implode(', ', $cfg['ufs']) ?></span>
+              <span class="preset-pill">até <?= $cfg['quantidade'] ?> leads</span>
+            </div>
+          </div>
+        <?php endforeach; ?>
+      </div>
+      <div class="run-row">
+        <button id="btnRun" class="btn-primary" onclick="executarPesquisa()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span id="btnRunTxt">Pesquisar nos <?= count(LEADS_PRESETS) ?> segmentos</span>
+        </button>
+        <span style="font-size:11.5px;color:var(--text-muted);">A IA pesquisa cada segmento, filtra os já salvos e grava os novos leads.</span>
+      </div>
+      <div class="log-box" id="logBox"></div>
+    </div>
+  </div>
 
   <!-- Stats por segmento -->
   <?php if (!empty($stats)): ?>
@@ -336,8 +426,7 @@ function rUrl(array $extra = [], array $remove = []): string
         <?php if ($erroDb): ?>
           Erro ao carregar dados do banco.
         <?php else: ?>
-          Nenhum lead encontrado<?= ($filtBusca || $filtUf || $filtSegmento || $filtStatus || $filtScore) ? ' com os filtros aplicados' : '. Rode uma pesquisa para começar.' ?><br>
-          <a href="leads_auto.php" class="btn-primary" style="margin-top:16px;display:inline-flex;">Executar pesquisa automática</a>
+          Nenhum lead encontrado<?= ($filtBusca || $filtUf || $filtSegmento || $filtStatus || $filtScore) ? ' com os filtros aplicados.' : '. Use o painel acima para pesquisar.' ?>
         <?php endif; ?>
       </div>
     <?php else: ?>
@@ -452,6 +541,41 @@ function rUrl(array $extra = [], array $remove = []): string
 </div>
 
 <script>
+// ── Pesquisa de leads ─────────────────────────────────────────────────────────
+async function executarPesquisa() {
+  const btn = document.getElementById('btnRun');
+  const txt = document.getElementById('btnRunTxt');
+  const log = document.getElementById('logBox');
+
+  btn.disabled = true;
+  txt.textContent = 'Pesquisando…';
+  btn.style.opacity = '.7';
+  log.style.display = 'block';
+  log.textContent = '⏳ Conectando à IA e pesquisando cada segmento…\n';
+
+  try {
+    const res  = await fetch('leads_resultados.php?exec=1');
+    const data = await res.json();
+
+    log.textContent = '';
+    log.textContent += `✅ Concluído em ${data.executado_em}\n`;
+    log.textContent += `🆕 Novos leads: ${data.total_novos}\n`;
+    log.textContent += `♻️  Já existiam: ${data.total_filtrados}\n`;
+    if (data.erros > 0) log.textContent += `❌ Erros: ${data.erros}\n`;
+    log.textContent += '\n── Por segmento ──\n';
+    for (const d of (data.detalhes || [])) {
+      log.textContent += `${d.ok ? '✅' : '❌'} ${d.titulo}: ${d.message}\n`;
+    }
+    if (data.total_novos > 0) setTimeout(() => location.reload(), 1500);
+  } catch (e) {
+    log.textContent += `\n❌ Erro: ${e.message}`;
+  }
+
+  txt.textContent = 'Pesquisar nos <?= count(LEADS_PRESETS) ?> segmentos';
+  btn.disabled = false;
+  btn.style.opacity = '1';
+}
+
 // ── Seleção ───────────────────────────────────────────────────────────────────
 const cbAll   = document.getElementById('cbAll');
 const bulkBar = document.getElementById('bulkBar');
