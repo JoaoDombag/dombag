@@ -452,7 +452,6 @@ function rUrl(array $extra = [], array $remove = []): string
             <th>Segmento</th>
             <th>Status</th>
             <th>Responsável</th>
-            <th>Gravado em</th>
             <th></th>
           </tr>
         </thead>
@@ -509,7 +508,6 @@ function rUrl(array $extra = [], array $remove = []): string
                 <span style="font-size:11px;color:var(--text-muted);">—</span>
               <?php endif; ?>
             </td>
-            <td style="font-size:11px;white-space:nowrap;color:var(--text-muted);"><?= ($row['gravado_em'] ? date('d/m/y H:i', strtotime((string)$row['gravado_em'])) : '—') ?></td>
             <td>
               <button class="btn-del" title="Remover lead" onclick="deletarLead(<?= $row['id'] ?>)">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
