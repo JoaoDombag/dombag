@@ -23,8 +23,34 @@ try {
 $pdo     = dbPDO();
 $result  = null;   // ['type' => 'rows'|'affected'|'error', ...]
 $sql_in  = '';
+$resetMsg = null;  // ['ok' => bool, 'msg' => string]
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+$action = $_POST['action'] ?? '';
+
+// ── Reset da base ─────────────────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'reset') {
+    $confirm = trim($_POST['confirm'] ?? '');
+    if ($confirm !== 'RESETAR') {
+        $resetMsg = ['ok' => false, 'msg' => 'Digite RESETAR para confirmar.'];
+    } else {
+        try {
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+            $tables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+            foreach ($tables as $t) {
+                $pdo->exec("DROP TABLE IF EXISTS `{$t}`");
+            }
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+            unset($_SESSION['mig_ok']);
+            $resetMsg = ['ok' => true, 'msg' => count($tables) . ' tabela(s) removida(s). Faça logout e login para re-rodar as migrations.'];
+        } catch (Throwable $e) {
+            $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+            $resetMsg = ['ok' => false, 'msg' => $e->getMessage()];
+        }
+    }
+}
+
+// ── Console SQL ───────────────────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === '') {
     $sql_in = trim($_POST['sql'] ?? '');
 
     if ($sql_in === '') {
@@ -95,6 +121,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 .file-hint{font-size:11.5px;color:var(--text-muted);display:flex;align-items:center;gap:6px;}
 .file-hint code{font-size:11px;background:rgba(255,255,255,.06);padding:2px 7px;border-radius:4px;color:var(--text-primary);}
+
+/* Zona de perigo */
+.danger-zone{border:1px solid rgba(239,68,68,.3);border-radius:10px;overflow:hidden;}
+.danger-zone .panel-header{background:rgba(239,68,68,.07);border-bottom:1px solid rgba(239,68,68,.2);}
+.danger-zone .panel-title{color:var(--red);}
+.danger-body{padding:20px;display:flex;flex-direction:column;gap:14px;}
+.danger-desc{font-size:12.5px;color:var(--text-muted);line-height:1.6;}
+.danger-desc strong{color:rgba(252,165,165,.9);}
+.danger-form{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.danger-input{background:rgba(0,0,0,.3);border:1px solid rgba(239,68,68,.3);border-radius:7px;padding:9px 14px;font-size:13px;font-family:'Cascadia Code','Fira Code',monospace;color:var(--text-primary);outline:none;width:180px;transition:border-color .15s;}
+.danger-input:focus{border-color:rgba(239,68,68,.7);}
+.danger-input::placeholder{color:var(--text-muted);font-family:inherit;}
+.btn-danger{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.35);border-radius:7px;color:var(--red);font-size:13px;font-weight:600;cursor:pointer;transition:background .15s,border-color .15s;}
+.btn-danger:hover{background:rgba(239,68,68,.25);border-color:rgba(239,68,68,.55);}
+.reset-msg{padding:10px 16px;border-radius:7px;font-size:12.5px;}
+.reset-msg.ok {background:rgba(0,201,167,.1);color:var(--teal);border:1px solid rgba(0,201,167,.2);}
+.reset-msg.err{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);}
   </style>
 </head>
 <body>
@@ -208,6 +251,44 @@ ALTER TABLE tabela ADD COLUMN coluna VARCHAR(100) NULL;"
       </div>
       <?php endif; ?>
 
+      <!-- Zona de perigo -->
+      <div class="danger-zone">
+        <div class="panel-header">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="color:var(--red)"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span class="panel-title">Zona de Perigo</span>
+        </div>
+        <div class="danger-body">
+          <p class="danger-desc">
+            <strong>Resetar a base apaga todas as tabelas permanentemente.</strong>
+            As migrations voltarão a rodar no próximo login, recriando a estrutura do zero.
+            Todos os dados serão perdidos.
+          </p>
+
+          <?php if ($resetMsg): ?>
+            <div class="reset-msg <?= $resetMsg['ok'] ? 'ok' : 'err' ?>">
+              <?= htmlspecialchars($resetMsg['msg']) ?>
+            </div>
+          <?php endif; ?>
+
+          <form method="POST" class="danger-form" onsubmit="return confirmReset(event)">
+            <input type="hidden" name="action" value="reset">
+            <input
+              type="text"
+              name="confirm"
+              class="danger-input"
+              placeholder="Digite RESETAR"
+              autocomplete="off"
+              spellcheck="false"
+              id="resetInput"
+            >
+            <button type="submit" class="btn-danger">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+              Resetar base
+            </button>
+          </form>
+        </div>
+      </div>
+
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /app-wrapper -->
@@ -223,9 +304,15 @@ document.getElementById('sqlInput').addEventListener('keydown', function(e) {
 
 // Foco automático no textarea
 document.getElementById('sqlInput').focus();
-// Move cursor para o fim
 const ta = document.getElementById('sqlInput');
 ta.selectionStart = ta.selectionEnd = ta.value.length;
+
+// Confirmação extra antes de resetar
+function confirmReset(e) {
+  const val = document.getElementById('resetInput').value.trim();
+  if (val !== 'RESETAR') return true; // servidor valida também
+  return confirm('Tem certeza? Esta ação apaga TODAS as tabelas e não pode ser desfeita.');
+}
 </script>
 </body>
 </html>

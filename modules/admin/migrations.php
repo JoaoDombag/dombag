@@ -1,5 +1,6 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/config/migrations.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
 
 // Apenas admins
@@ -47,10 +48,24 @@ foreach ($files as $f) {
     ];
 }
 
+// Migrations registradas inline via registrarmigration()
+foreach (_migRegistry() as $entry) {
+    $id  = $entry['id'];
+    $reg = $registros[$id] ?? null;
+    $log = $reg ? json_decode($reg['mig_sql'] ?? '[]', true) : null;
+    $migrations[] = [
+        'id'      => $id,
+        'applied' => $reg !== null,
+        'em'      => $reg['mig_executado_em'] ?? null,
+        'log'     => $log ?: [],
+        'inline'  => true,
+    ];
+}
+
 // Migrations registradas mas sem arquivo (removidas ou renomeadas)
-$idsArquivos = array_column($migrations, 'id');
+$idsConhecidos = array_column($migrations, 'id');
 foreach ($registros as $id => $reg) {
-    if (!in_array($id, $idsArquivos, true)) {
+    if (!in_array($id, $idsConhecidos, true)) {
         $log = json_decode($reg['mig_sql'] ?? '[]', true);
         $migrations[] = [
             'id'       => $id,
@@ -136,32 +151,29 @@ $pendingCount = count(array_filter($migrations, fn($m) => !$m['applied']));
       <div class="info-box">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;margin-top:2px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <span>
-          Crie arquivos <code>.php</code> em <code>/migrations/</code> com nome no formato
-          <code>AAAA_MM_DD_NN_descricao.php</code>. Use as funções
+          Use <code>registrarmigration('AAAA_MM_DD_NN_descricao', function() { ... })</code>
+          em qualquer arquivo carregado antes do login — por exemplo ao final de
+          <code>/config/migrations.php</code>. Dentro da função use
           <code>adicionartabela()</code>, <code>adicionarcampotb()</code>, <code>removercampotb()</code> e <code>executarsql()</code>.
-          As constantes de tipo disponíveis são: <code>TP_TINYINT</code>, <code>TP_INT</code>,
-          <code>TP_VARCHAR100</code>, <code>TP_TEXT</code>, <code>TP_DATETIME</code>, entre outras.
           Migrations pendentes rodam <strong>automaticamente no próximo login</strong>.
         </span>
       </div>
 
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">Arquivos em /migrations/</span>
+          <span class="panel-title">Migrations</span>
           <span style="font-size:11.5px;color:var(--text-muted)"><?= count($migrations) ?> total</span>
         </div>
 
         <?php if (empty($migrations)): ?>
-          <div class="empty-state">
-            Nenhum arquivo <code>.php</code> encontrado em <code>/migrations/</code>.
-          </div>
+          <div class="empty-state">Nenhuma migration encontrada.</div>
         <?php else: ?>
         <div class="mig-list">
           <?php foreach ($migrations as $m): ?>
           <div class="mig-row" id="row-<?= htmlspecialchars($m['id']) ?>">
 
             <div class="mig-header" onclick="toggleRow('<?= htmlspecialchars($m['id']) ?>')">
-              <span class="mig-name"><?= htmlspecialchars($m['id']) ?>.php</span>
+              <span class="mig-name"><?= htmlspecialchars($m['id']) ?></span>
 
               <?php if (!empty($m['sem_arquivo'])): ?>
                 <span class="badge badge-missing">sem arquivo</span>

@@ -36,6 +36,28 @@ function _migCtx(string $key, $val = null)
     return $ctx[$key];
 }
 
+// ── Registro inline de migrations ─────────────────────────────────────────────
+function _migRegistry(?array $entry = null): array
+{
+    static $registry = [];
+    if ($entry !== null) {
+        $registry[] = $entry;
+    }
+    return $registry;
+}
+
+/**
+ * Registra uma migration inline, sem precisar criar arquivo.
+ *
+ * registrarmigration('2026_04_27_01_nova_coluna', function() {
+ *     adicionarcampotb('MAQUINAS', 'MAQ_NOVA', TP_VARCHAR100);
+ * });
+ */
+function registrarmigration(string $id, callable $fn): void
+{
+    _migRegistry(['id' => $id, 'fn' => $fn]);
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 //  Funções helper — use dentro dos arquivos de migration
 // ══════════════════════════════════════════════════════════════════════════════
@@ -178,19 +200,15 @@ function rodarMigrations(): void
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
 
-        $dir = $_SERVER['DOCUMENT_ROOT'] . '/migrations';
-        if (!is_dir($dir)) {
-            $_SESSION['mig_ok'] = true;
-            return;
-        }
-
-        $files = glob($dir . '/*.php') ?: [];
-        sort($files);
-
         $applied = $pdo->query('SELECT MIG_ID FROM DB_MIGRATIONS')
                        ->fetchAll(PDO::FETCH_COLUMN);
 
         $hasError = false;
+
+        // ── Migrations por arquivo (legado) ───────────────────────────────────
+        $dir   = $_SERVER['DOCUMENT_ROOT'] . '/migrations';
+        $files = is_dir($dir) ? (glob($dir . '/*.php') ?: []) : [];
+        sort($files);
 
         foreach ($files as $file) {
             $id = basename($file, '.php');
@@ -198,23 +216,19 @@ function rodarMigrations(): void
                 continue;
             }
 
-            // Prepara contexto para os helpers
             _migCtx('pdo', $pdo);
             _migCtx('log', []);
 
             try {
-                // Executa o arquivo de migration em escopo isolado
                 (static function (string $_mig_file): void {
                     require $_mig_file;
                 })($file);
 
                 $log = _migCtx('log');
 
-                // Registra como aplicada
                 $pdo->prepare('INSERT IGNORE INTO DB_MIGRATIONS (MIG_ID, MIG_TITULO) VALUES (?, ?)')
                     ->execute([$id, $id]);
 
-                // Grava o log de SQL gerado
                 $pdo->prepare('
                     INSERT INTO DB_MIGRATIONS_SQL (MIG_ID, MIG_SQL) VALUES (?, ?)
                     ON DUPLICATE KEY UPDATE MIG_SQL = VALUES(MIG_SQL), MIG_ATUALIZADO_EM = NOW()
@@ -225,6 +239,39 @@ function rodarMigrations(): void
                 echo '<script>console.error(' . json_encode('[MIG] ' . $id . ': ' . $e->getMessage()) . ')</script>';
                 $hasError = true;
                 break;
+            }
+        }
+
+        // ── Migrations registradas inline via registrarmigration() ────────────
+        if (!$hasError) {
+            foreach (_migRegistry() as $entry) {
+                $id = $entry['id'];
+                if (in_array($id, $applied, true)) {
+                    continue;
+                }
+
+                _migCtx('pdo', $pdo);
+                _migCtx('log', []);
+
+                try {
+                    ($entry['fn'])();
+
+                    $log = _migCtx('log');
+
+                    $pdo->prepare('INSERT IGNORE INTO DB_MIGRATIONS (MIG_ID, MIG_TITULO) VALUES (?, ?)')
+                        ->execute([$id, $id]);
+
+                    $pdo->prepare('
+                        INSERT INTO DB_MIGRATIONS_SQL (MIG_ID, MIG_SQL) VALUES (?, ?)
+                        ON DUPLICATE KEY UPDATE MIG_SQL = VALUES(MIG_SQL), MIG_ATUALIZADO_EM = NOW()
+                    ')->execute([$id, json_encode($log, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)]);
+
+                } catch (Throwable $e) {
+                    error_log('[MIG] Falha em ' . $id . ': ' . $e->getMessage());
+                    echo '<script>console.error(' . json_encode('[MIG] ' . $id . ': ' . $e->getMessage()) . ')</script>';
+                    $hasError = true;
+                    break;
+                }
             }
         }
 
