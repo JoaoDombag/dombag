@@ -557,7 +557,21 @@ async function executarPesquisa() {
 
   try {
     const res  = await fetch('leads_resultados.php?exec=1');
-    const data = await res.json();
+    const raw  = await res.text();
+
+    log.textContent += `HTTP ${res.status} ${res.statusText}\n`;
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (_) {
+      log.textContent += `❌ Resposta não é JSON (HTTP ${res.status}):\n`;
+      log.textContent += raw.slice(0, 800);
+      txt.textContent = 'Pesquisar nos <?= count(LEADS_PRESETS) ?> segmentos';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      return;
+    }
 
     log.textContent = '';
     log.textContent += `✅ Concluído em ${data.executado_em}\n`;
@@ -570,7 +584,7 @@ async function executarPesquisa() {
     }
     if (data.total_novos > 0) setTimeout(() => location.reload(), 1500);
   } catch (e) {
-    log.textContent += `\n❌ Erro: ${e.message}`;
+    log.textContent += `\n❌ Erro de rede: ${e.message}`;
   }
 
   txt.textContent = 'Pesquisar nos <?= count(LEADS_PRESETS) ?> segmentos';
