@@ -47,8 +47,10 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 
-    // Diagnóstico: lista colunas reais da tabela
-    $actualCols = $pdo->query('SHOW COLUMNS FROM MAQUINAS')->fetchAll(PDO::FETCH_COLUMN);
+    // Colunas reais em minúsculo (MySQL pode retornar em maiúsculo dependendo do servidor)
+    $actualCols = array_map('strtolower',
+        $pdo->query('SHOW COLUMNS FROM MAQUINAS')->fetchAll(PDO::FETCH_COLUMN)
+    );
 
     // Garante colunas adicionadas após a criação inicial da tabela
     $missingCols = [
@@ -61,14 +63,11 @@ try {
     foreach ($missingCols as $col => $ddl) {
         if (!in_array($col, $actualCols)) {
             $pdo->exec($ddl);
-            $actualCols[] = $col;
         }
     }
 
-    // Se colunas essenciais ainda faltam, expõe o schema real para diagnóstico
-    if (!in_array('maq_descricao', $actualCols) || !in_array('maq_codigo', $actualCols)) {
-        $db_error = 'Schema da tabela MAQUINAS incompatível. Colunas encontradas: ' . implode(', ', $actualCols);
-    }
+    // Força chaves do fetch em minúsculo para compensar servidores com colunas em maiúsculo
+    $pdo->setAttribute(PDO::ATTR_CASE, PDO::CASE_LOWER);
 
     // ── Ações POST ───────────────────────────────
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
