@@ -186,7 +186,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .field input,.field select{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;padding:9px 13px;font-size:13.5px;font-family:'Segoe UI',sans-serif;color:var(--text-primary);outline:none;transition:border-color .15s,background .15s;width:100%;}
 .field input:focus,.field select:focus{border-color:rgba(45,106,255,.5);background:rgba(45,106,255,.05);}
 .field input::placeholder{color:var(--text-muted);}
-.field select option{background:#112240;color:var(--text-primary);}
+.field select{text-transform:uppercase;}
+.field select option{background:#112240;color:var(--text-primary);text-transform:uppercase;}
 .field-hint{font-size:11px;color:var(--text-muted);margin-top:2px;}
 .field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .calc-box{background:rgba(0,201,167,.07);border:1px solid rgba(0,201,167,.2);border-radius:8px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;}
