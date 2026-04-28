@@ -66,9 +66,6 @@ try {
         }
     }
 
-    // Força chaves do fetch em minúsculo para compensar servidores com colunas em maiúsculo
-    $pdo->setAttribute(PDO::ATTR_CASE, PDO::CASE_LOWER);
-
     // ── Ações POST ───────────────────────────────
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $acao = $_POST['acao'] ?? '';
@@ -140,17 +137,21 @@ try {
     }
 
     // ── Busca departamentos para o select ────────
-    $deptos = $pdo->query(
-        'SELECT dp_codigo, dp_descricao FROM DEPARTAMENTOS ORDER BY dp_descricao'
-    )->fetchAll(PDO::FETCH_ASSOC);
+    $deptos = array_map(
+        fn($r) => array_change_key_case($r, CASE_LOWER),
+        $pdo->query('SELECT dp_codigo, dp_descricao FROM DEPARTAMENTOS ORDER BY dp_descricao')->fetchAll(PDO::FETCH_ASSOC)
+    );
 
     // ── Busca máquinas com nome do departamento ──
-    $maquinas = $pdo->query('
-        SELECT m.*, d.dp_descricao
-        FROM MAQUINAS m
-        INNER JOIN DEPARTAMENTOS d ON d.dp_codigo = m.dp_codigo
-        ORDER BY m.maq_codigo
-    ')->fetchAll(PDO::FETCH_ASSOC);
+    $maquinas = array_map(
+        fn($r) => array_change_key_case($r, CASE_LOWER),
+        $pdo->query('
+            SELECT m.*, d.dp_descricao
+            FROM MAQUINAS m
+            INNER JOIN DEPARTAMENTOS d ON d.dp_codigo = m.dp_codigo
+            ORDER BY m.maq_codigo
+        ')->fetchAll(PDO::FETCH_ASSOC)
+    );
 
 } catch (PDOException $e) {
     $db_error = 'Erro no banco de dados: ' . $e->getMessage();
