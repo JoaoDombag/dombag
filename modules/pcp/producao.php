@@ -37,6 +37,16 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 
+    // Garante colunas adicionadas às MAQUINAS após a criação inicial da tabela
+    foreach ([
+        "ALTER TABLE MAQUINAS ADD COLUMN maq_qtde NUMERIC(6,2) NOT NULL DEFAULT 1",
+        "ALTER TABLE MAQUINAS ADD COLUMN maq_producao_min NUMERIC(10,4) NOT NULL DEFAULT 0",
+        "ALTER TABLE MAQUINAS ADD COLUMN maq_horas_dia NUMERIC(5,2) NOT NULL DEFAULT 8",
+        "ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1",
+    ] as $ddl) {
+        try { $pdo->exec($ddl); } catch (PDOException) {}
+    }
+
     $filtro_data = $_GET['data'] ?? '';
     $filtro_maq_cod = intval($_GET['maq_codigo'] ?? 0);
     $data_bi = $filtro_data ?: date('Y-m-d');

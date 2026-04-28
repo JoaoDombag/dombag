@@ -17,6 +17,16 @@ $dia_semana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sá
 try {
     $pdo = dbPDO();
 
+    // Garante colunas adicionadas às MAQUINAS após a criação inicial da tabela
+    foreach ([
+        "ALTER TABLE MAQUINAS ADD COLUMN maq_qtde NUMERIC(6,2) NOT NULL DEFAULT 1",
+        "ALTER TABLE MAQUINAS ADD COLUMN maq_producao_min NUMERIC(10,4) NOT NULL DEFAULT 0",
+        "ALTER TABLE MAQUINAS ADD COLUMN maq_horas_dia NUMERIC(5,2) NOT NULL DEFAULT 8",
+        "ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1",
+    ] as $ddl) {
+        try { $pdo->exec($ddl); } catch (PDOException) {}
+    }
+
     // 1. KPIs gerais do dia
     $stmt = $pdo->prepare("
         SELECT

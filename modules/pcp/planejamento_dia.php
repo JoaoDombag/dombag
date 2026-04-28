@@ -11,6 +11,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/pcp_engine.php';
 
 $pdo = dbPDO();
 
+// Garante colunas adicionadas às MAQUINAS após a criação inicial da tabela
+pcpEnsureMaquinasColumns($pdo);
+
 // ── Garante tabela ─────────────────────────────────────────────────────────
 $pdo->exec("
     CREATE TABLE IF NOT EXISTS pcp_planejamento (

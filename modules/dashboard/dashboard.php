@@ -134,6 +134,16 @@ try {
 try {
     $pdo = dbPDO();
 
+    // Garante colunas adicionadas às MAQUINAS após a criação inicial da tabela
+    foreach ([
+        "ALTER TABLE MAQUINAS ADD COLUMN maq_qtde NUMERIC(6,2) NOT NULL DEFAULT 1",
+        "ALTER TABLE MAQUINAS ADD COLUMN maq_producao_min NUMERIC(10,4) NOT NULL DEFAULT 0",
+        "ALTER TABLE MAQUINAS ADD COLUMN maq_horas_dia NUMERIC(5,2) NOT NULL DEFAULT 8",
+        "ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1",
+    ] as $ddl) {
+        try { $pdo->exec($ddl); } catch (Throwable) {}
+    }
+
     $kpi_finalizados = (int)$pdo->query(
         "SELECT COALESCE(SUM(iv_qtde),0) FROM ITENS_VENDAS WHERE iv_status='Finalizado'"
     )->fetchColumn();
