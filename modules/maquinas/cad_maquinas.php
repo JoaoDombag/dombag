@@ -53,6 +53,7 @@ try {
         "ALTER TABLE MAQUINAS ADD COLUMN maq_producao_min NUMERIC(10,4) NOT NULL DEFAULT 0",
         "ALTER TABLE MAQUINAS ADD COLUMN maq_horas_dia NUMERIC(5,2) NOT NULL DEFAULT 8",
         "ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1",
+        "ALTER TABLE MAQUINAS ADD COLUMN maq_grupo VARCHAR(80) NULL DEFAULT NULL",
     ] as $ddl) {
         try { $pdo->exec($ddl); } catch (PDOException) {}
     }
@@ -62,12 +63,13 @@ try {
         $acao = $_POST['acao'] ?? '';
 
         if ($acao === 'salvar') {
-            $desc = trim($_POST['maq_descricao'] ?? '');
-            $qtde = (float) str_replace(',', '.', $_POST['maq_qtde'] ?? 1);
-            $prod = (float) str_replace(',', '.', $_POST['maq_producao_min'] ?? 0);
+            $desc  = trim($_POST['maq_descricao'] ?? '');
+            $grupo = trim($_POST['maq_grupo'] ?? '') ?: null;
+            $qtde  = (float) str_replace(',', '.', $_POST['maq_qtde'] ?? 1);
+            $prod  = (float) str_replace(',', '.', $_POST['maq_producao_min'] ?? 0);
             $horas = (float) str_replace(',', '.', $_POST['maq_horas_dia'] ?? 8);
             $depto = intval($_POST['dp_codigo'] ?? 0);
-            $cod = intval($_POST['maq_codigo'] ?? 0);
+            $cod   = intval($_POST['maq_codigo'] ?? 0);
             $conta = isset($_POST['maq_conta_producao']) ? 1 : 0;
 
             if ($desc === '') {
@@ -79,6 +81,7 @@ try {
                 $stmt = $pdo->prepare('
                     UPDATE MAQUINAS SET
                         maq_descricao      = :desc,
+                        maq_grupo          = :grupo,
                         maq_qtde           = :qtde,
                         maq_producao_min   = :prod,
                         maq_horas_dia      = :horas,
@@ -87,23 +90,24 @@ try {
                     WHERE maq_codigo = :cod
                 ');
                 $stmt->execute([
-                    ':desc' => $desc,  ':qtde' => $qtde,
-                    ':prod' => $prod,  ':horas' => $horas,
-                    ':depto' => $depto, ':cod' => $cod,
-                    ':conta' => $conta,
+                    ':desc' => $desc,  ':grupo' => $grupo,
+                    ':qtde' => $qtde,  ':prod'  => $prod,
+                    ':horas' => $horas, ':depto' => $depto,
+                    ':cod' => $cod,    ':conta' => $conta,
                 ]);
                 $db_ok_msg = 'Máquina atualizada com sucesso.';
             } else {
                 // INSERT
                 $stmt = $pdo->prepare('
                     INSERT INTO MAQUINAS
-                        (maq_descricao, maq_qtde, maq_producao_min, maq_horas_dia, dp_codigo, maq_conta_producao)
-                    VALUES (:desc, :qtde, :prod, :horas, :depto, :conta)
+                        (maq_descricao, maq_grupo, maq_qtde, maq_producao_min, maq_horas_dia, dp_codigo, maq_conta_producao)
+                    VALUES (:desc, :grupo, :qtde, :prod, :horas, :depto, :conta)
                 ');
                 $stmt->execute([
-                    ':desc' => $desc,  ':qtde' => $qtde,
-                    ':prod' => $prod,  ':horas' => $horas,
-                    ':depto' => $depto, ':conta' => $conta,
+                    ':desc' => $desc,  ':grupo' => $grupo,
+                    ':qtde' => $qtde,  ':prod'  => $prod,
+                    ':horas' => $horas, ':depto' => $depto,
+                    ':conta' => $conta,
                 ]);
                 $db_ok_msg = 'Máquina cadastrada com sucesso.';
             }
@@ -169,9 +173,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .alert{border-radius:8px;padding:10px 16px;font-size:12.5px;display:flex;align-items:center;gap:8px;margin-bottom:18px;}
 .alert-err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--red);}
 .alert-ok{background:rgba(0,201,167,.1);border:1px solid rgba(0,201,167,.2);color:var(--teal);}
-.page-grid{display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start;flex:1;min-height:0;}
+.page-grid{display:grid;grid-template-columns:380px 1fr;gap:20px;flex:1;min-height:0;}
 @media(max-width:1000px){.page-grid{grid-template-columns:1fr;}}
-.form-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;position:sticky;top:0;}
+.form-panel{background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;align-self:start;position:sticky;top:0;}
 .form-panel-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
 .form-panel-head h2{font-size:14px;font-weight:600;}
 .badge-edit{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(245,158,11,.12);color:var(--amber);display:none;}
@@ -286,7 +290,14 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
               <div class="field">
                 <label>Descrição *</label>
                 <input type="text" name="maq_descricao" id="f_descricao"
-                       placeholder="Ex: Corte Bag, Impressão Sacaria…" maxlength="120" required>
+                       placeholder="Ex: Corte Bag 01, Impressão Sacaria 02…" maxlength="120" required>
+              </div>
+
+              <div class="field">
+                <label>Grupo</label>
+                <input type="text" name="maq_grupo" id="f_grupo"
+                       placeholder="Ex: Corte Bag, Costura Bag… (deixe em branco para usar a descrição)" maxlength="80">
+                <span class="field-hint">Agrupa máquinas semelhantes no planejamento PCP</span>
               </div>
 
               <div class="field">
@@ -380,6 +391,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
                 <tr>
                   <th style="width:44px;">#</th>
                   <th>Descrição</th>
+                  <th>Grupo PCP</th>
                   <th>Depto</th>
                   <th style="width:55px;text-align:center;">Qtde</th>
                   <th style="width:95px;text-align:right;">Prod./min</th>
@@ -392,10 +404,18 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
               <tbody>
               <?php foreach ($maquinas as $m):
                   $cap = $m['maq_qtde'] * $m['maq_producao_min'] * 60 * $m['maq_horas_dia'];
+                  $grupo_efetivo = $m['maq_grupo'] ?: $m['maq_descricao'];
                   ?>
                 <tr id="row-<?= $m['maq_codigo'] ?>">
                   <td><span class="cod-badge"><?= $m['maq_codigo'] ?></span></td>
                   <td><span class="desc-main"><?= htmlspecialchars($m['maq_descricao']) ?></span></td>
+                  <td>
+                    <?php if ($m['maq_grupo']): ?>
+                      <span class="depto-badge" style="background:rgba(16,185,129,.1);color:#34d399;"><?= htmlspecialchars($m['maq_grupo']) ?></span>
+                    <?php else: ?>
+                      <span class="num-mono" style="font-size:11px;opacity:.5;">— usa descrição —</span>
+                    <?php endif; ?>
+                  </td>
                   <td><span class="depto-badge"><?= htmlspecialchars($m['dp_descricao']) ?></span></td>
                   <td style="text-align:center;" class="num-mono"><?= number_format($m['maq_qtde'], 0, ',', '.') ?></td>
                   <td style="text-align:right;"  class="num-mono"><?= number_format($m['maq_producao_min'], 4, ',', '.') ?></td>
@@ -417,6 +437,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
                       <button class="btn-edit" onclick="editarMaquina(
                         <?= $m['maq_codigo'] ?>,
                         <?= htmlspecialchars(json_encode($m['maq_descricao'])) ?>,
+                        <?= htmlspecialchars(json_encode($m['maq_grupo'] ?? '')) ?>,
                         <?= $m['maq_qtde'] ?>,
                         <?= $m['maq_producao_min'] ?>,
                         <?= $m['maq_horas_dia'] ?>,
@@ -483,6 +504,7 @@ calcCap();
 function novoRegistro() {
   document.getElementById('f_codigo').value    = '0';
   document.getElementById('f_descricao').value = '';
+  document.getElementById('f_grupo').value     = '';
   document.getElementById('f_depto').value     = '';
   document.getElementById('f_qtde').value      = '1';
   document.getElementById('f_prod').value      = '0';
@@ -498,9 +520,10 @@ function novoRegistro() {
 }
 
 // ── Preenche formulário para edição ─────────────
-function editarMaquina(cod, desc, qtde, prod, horas, depto, contaProducao) {
+function editarMaquina(cod, desc, grupo, qtde, prod, horas, depto, contaProducao) {
   document.getElementById('f_codigo').value    = cod;
   document.getElementById('f_descricao').value = desc;
+  document.getElementById('f_grupo').value     = grupo;
   document.getElementById('f_depto').value     = depto;
   document.getElementById('f_qtde').value      = qtde;
   document.getElementById('f_prod').value      = prod;
