@@ -47,6 +47,9 @@ try {
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 
+    // Diagnóstico: lista colunas reais da tabela
+    $actualCols = $pdo->query('SHOW COLUMNS FROM MAQUINAS')->fetchAll(PDO::FETCH_COLUMN);
+
     // Garante colunas adicionadas após a criação inicial da tabela
     $missingCols = [
         'maq_qtde'           => "ALTER TABLE MAQUINAS ADD COLUMN maq_qtde NUMERIC(6,2) NOT NULL DEFAULT 1",
@@ -56,9 +59,15 @@ try {
         'maq_grupo'          => "ALTER TABLE MAQUINAS ADD COLUMN maq_grupo VARCHAR(80) NULL DEFAULT NULL",
     ];
     foreach ($missingCols as $col => $ddl) {
-        if (!$pdo->query("SHOW COLUMNS FROM MAQUINAS LIKE '$col'")->fetch()) {
+        if (!in_array($col, $actualCols)) {
             $pdo->exec($ddl);
+            $actualCols[] = $col;
         }
+    }
+
+    // Se colunas essenciais ainda faltam, expõe o schema real para diagnóstico
+    if (!in_array('maq_descricao', $actualCols) || !in_array('maq_codigo', $actualCols)) {
+        $db_error = 'Schema da tabela MAQUINAS incompatível. Colunas encontradas: ' . implode(', ', $actualCols);
     }
 
     // ── Ações POST ───────────────────────────────
