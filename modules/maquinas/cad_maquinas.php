@@ -48,14 +48,17 @@ try {
     ");
 
     // Garante colunas adicionadas após a criação inicial da tabela
-    foreach ([
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_qtde NUMERIC(6,2) NOT NULL DEFAULT 1",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_producao_min NUMERIC(10,4) NOT NULL DEFAULT 0",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_horas_dia NUMERIC(5,2) NOT NULL DEFAULT 8",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_grupo VARCHAR(80) NULL DEFAULT NULL",
-    ] as $ddl) {
-        try { $pdo->exec($ddl); } catch (PDOException) {}
+    $missingCols = [
+        'maq_qtde'           => "ALTER TABLE MAQUINAS ADD COLUMN maq_qtde NUMERIC(6,2) NOT NULL DEFAULT 1",
+        'maq_producao_min'   => "ALTER TABLE MAQUINAS ADD COLUMN maq_producao_min NUMERIC(10,4) NOT NULL DEFAULT 0 COMMENT 'Unidades por minuto'",
+        'maq_horas_dia'      => "ALTER TABLE MAQUINAS ADD COLUMN maq_horas_dia NUMERIC(5,2) NOT NULL DEFAULT 8",
+        'maq_conta_producao' => "ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1",
+        'maq_grupo'          => "ALTER TABLE MAQUINAS ADD COLUMN maq_grupo VARCHAR(80) NULL DEFAULT NULL",
+    ];
+    foreach ($missingCols as $col => $ddl) {
+        if (!$pdo->query("SHOW COLUMNS FROM MAQUINAS LIKE '$col'")->fetch()) {
+            $pdo->exec($ddl);
+        }
     }
 
     // ── Ações POST ───────────────────────────────
@@ -404,8 +407,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
               </thead>
               <tbody>
               <?php foreach ($maquinas as $m):
-                  $cap = $m['maq_qtde'] * $m['maq_producao_min'] * 60 * $m['maq_horas_dia'];
-                  $grupo_efetivo = $m['maq_grupo'] ?: $m['maq_descricao'];
+                  $cap = ($m['maq_qtde'] ?? 1) * ($m['maq_producao_min'] ?? 0) * 60 * ($m['maq_horas_dia'] ?? 8);
+                  $grupo_efetivo = ($m['maq_grupo'] ?? '') ?: ($m['maq_descricao'] ?? '');
                   ?>
                 <tr id="row-<?= $m['maq_codigo'] ?>">
                   <td><span class="cod-badge"><?= $m['maq_codigo'] ?></span></td>
