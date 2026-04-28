@@ -72,13 +72,18 @@ RewriteRule ^relatorios/posicao-estoque/pdf$   modules/relatorios/rel_posicao_es
 RewriteRule ^relatorios/controle-estoque$  modules/relatorios/rel_controle_estoque.php [L,QSA]
 
 # Máquinas
-RewriteRule ^maquinas$                 modules/maquinas/cad_maquinas.php       [L,QSA]
+RewriteRule ^maquinas$                 modules/maquinas/consulta_maquinas.php  [L,QSA]
+RewriteRule ^maquinas/cadastro$        modules/maquinas/cad_maquinas.php       [L,QSA]
 
 # Produtos
 RewriteRule ^produtos$                 modules/produtos/cadastro_produtos.php  [L,QSA]
+RewriteRule ^produtos/cadastro$        modules/produtos/cad_produtos.php       [L,QSA]
 
 # Usuários
 RewriteRule ^usuarios$                 modules/usuarios/usuarios.php           [L,QSA]
+RewriteRule ^usuarios/cadastro$        modules/usuarios/cad_usuarios.php       [L,QSA]
+RewriteRule ^usuarios/grupos$          modules/usuarios/consulta_grupos.php    [L,QSA]
+RewriteRule ^usuarios/grupos/cadastro$ modules/usuarios/cad_grupos.php        [L,QSA]
 RewriteRule ^minha-senha$              modules/usuarios/minha_senha.php        [L,QSA]
 
 # Trello
