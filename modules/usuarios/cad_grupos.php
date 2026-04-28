@@ -96,10 +96,35 @@ $titulo_pagina = $editando
 <link rel="stylesheet" href="/public/css/unified_admin.css">
 <link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
-.cad-wrap{display:flex;justify-content:center;padding:8px 0;}
-.cad-card{width:100%;max-width:480px;}
-.form-panel .form-panel-head{display:flex;align-items:center;gap:10px;}
-.badge-edit{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(245,158,11,.12);color:var(--amber);display:inline-flex;align-items:center;gap:4px;}
+.content { overflow-y: auto; flex-direction: column; align-items: center; gap: 16px; padding: 28px 24px; }
+
+.cad-alert { width: 100%; max-width: 480px; border-radius: 10px; padding: 11px 16px; font-size: 12.5px; display: flex; align-items: center; gap: 8px; }
+.cad-alert-err { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.25); color: #ef4444; }
+
+.cad-card { width: 100%; max-width: 480px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 4px 28px rgba(0,0,0,.22); }
+
+.cad-head { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; background: linear-gradient(120deg, rgba(30,79,201,.1) 0%, transparent 70%); border-top: 3px solid var(--blue-accent); }
+.cad-icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(30,79,201,.15); border: 1px solid rgba(30,79,201,.25); color: #7db3ff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.cad-head-info { flex: 1; }
+.cad-head-info h2 { font-size: 15px; font-weight: 700; }
+.cad-head-info p  { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+.badge-edit { font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px; background: rgba(245,158,11,.12); color: var(--amber); display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+
+.cad-section { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.cad-section + .cad-section { border-top: 1px solid var(--border); }
+
+.f-hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; line-height: 1.5; }
+
+.cad-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 8px; background: rgba(0,0,0,.08); }
+.cad-footer .btn-primary { flex: 1; justify-content: center; font-size: 13.5px; padding: 10px 20px; }
+
+@media (max-width: 560px) {
+  .content { padding: 14px 12px; gap: 12px; }
+  .cad-head, .cad-section, .cad-footer { padding-left: 18px; padding-right: 18px; }
+  .cad-footer { flex-direction: column-reverse; }
+  .cad-footer .btn-primary { flex: none; }
+  .cad-icon { width: 34px; height: 34px; }
+}
 </style>
 </head>
 <body>
@@ -116,7 +141,7 @@ $titulo_pagina = $editando
       </div>
       <div class="topbar-actions">
         <a class="btn-secondary" href="/usuarios/grupos">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
           Ver Lista
         </a>
       </div>
@@ -125,66 +150,71 @@ $titulo_pagina = $editando
     <div class="content">
 
       <?php if ($msg): ?>
-      <div class="alert <?= $msg_tipo === 'ok' ? 'alert-ok' : 'alert-err' ?>" id="alertMsg">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-          <?= $msg_tipo === 'ok'
-            ? '<polyline points="20 6 9 17 4 12"/>'
-            : '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>' ?>
-        </svg>
+      <div class="cad-alert cad-alert-err" id="alertEl">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <?= $msg ?>
       </div>
       <?php endif; ?>
 
-      <div class="cad-wrap">
-        <div class="cad-card">
-          <div class="form-panel">
-            <div class="form-panel-head">
-              <h2><?= $editando ? 'Editar Grupo' : 'Novo Grupo' ?></h2>
-              <?php if ($editando): ?>
-              <span class="badge-edit">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                Editando
-              </span>
-              <?php endif; ?>
+      <div class="cad-card">
+
+        <div class="cad-head">
+          <div class="cad-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          </div>
+          <div class="cad-head-info">
+            <h2><?= $editando ? 'Editar Grupo' : 'Novo Grupo de Usuários' ?></h2>
+            <p><?= $editando ? 'Atualizando: ' . htmlspecialchars($editando['GRU_NOME']) : 'Defina nome e descrição do grupo' ?></p>
+          </div>
+          <?php if ($editando): ?>
+          <span class="badge-edit">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Editando
+          </span>
+          <?php endif; ?>
+        </div>
+
+        <form method="POST" onsubmit="return validarForm()">
+          <input type="hidden" name="acao" value="<?= $f_acao ?>">
+          <input type="hidden" name="cod"  value="<?= $f_cod ?>">
+
+          <div class="cad-section">
+
+            <div class="field">
+              <label>Nome do Grupo *</label>
+              <input type="text" name="nome" id="f_nome"
+                     value="<?= htmlspecialchars($f_nome) ?>"
+                     placeholder="Ex: Produção, Vendas, Financeiro…"
+                     maxlength="50" required autocomplete="off" autofocus>
             </div>
 
-            <form method="POST" onsubmit="return validarForm()">
-              <input type="hidden" name="acao" value="<?= $f_acao ?>">
-              <input type="hidden" name="cod"  value="<?= $f_cod ?>">
+            <div class="field">
+              <label>Descrição <span style="font-size:10px;font-weight:400;color:var(--text-muted);text-transform:none;letter-spacing:0;">(opcional)</span></label>
+              <input type="text" name="descricao" id="f_desc"
+                     value="<?= htmlspecialchars($f_desc) ?>"
+                     placeholder="Breve descrição das permissões ou responsabilidades…"
+                     maxlength="200" autocomplete="off">
+              <span class="f-hint">Visível apenas para administradores.</span>
+            </div>
 
-              <div class="form-body">
-
-                <div class="field">
-                  <label>Nome do Grupo *</label>
-                  <input type="text" name="nome" id="f_nome"
-                         value="<?= htmlspecialchars($f_nome) ?>"
-                         placeholder="Ex: Produção, Vendas, Financeiro..."
-                         maxlength="50" required autocomplete="off" autofocus>
-                </div>
-
-                <div class="field">
-                  <label>Descrição <span style="font-size:10px;font-weight:400;color:var(--text-muted);text-transform:none;letter-spacing:0;">(opcional)</span></label>
-                  <input type="text" name="descricao" id="f_desc"
-                         value="<?= htmlspecialchars($f_desc) ?>"
-                         placeholder="Breve descrição do grupo..."
-                         maxlength="200" autocomplete="off">
-                </div>
-
-              </div>
-
-              <div class="form-actions">
-                <button type="submit" class="btn-primary">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                  <?= $editando ? 'Salvar Alterações' : 'Criar Grupo' ?>
-                </button>
-                <a class="btn-secondary" href="/usuarios/grupos">Cancelar</a>
-              </div>
-            </form>
           </div>
-        </div>
+
+          <div class="cad-footer">
+            <a class="btn-secondary" href="/usuarios/grupos">Cancelar</a>
+            <button type="submit" class="btn-primary">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              <?= $editando ? 'Salvar Alterações' : 'Criar Grupo' ?>
+            </button>
+          </div>
+        </form>
       </div>
 
-    </div><!-- /content -->
+    </div>
   </div>
 </div>
 
@@ -195,12 +225,12 @@ function validarForm() {
   return true;
 }
 
-const alertEl = document.getElementById('alertMsg');
+const alertEl = document.getElementById('alertEl');
 if (alertEl) setTimeout(() => {
   alertEl.style.transition = 'opacity .4s';
   alertEl.style.opacity = '0';
-  setTimeout(() => alertEl.style.display = 'none', 400);
-}, 4000);
+  setTimeout(() => alertEl.remove(), 400);
+}, 5000);
 </script>
 </body>
 </html>

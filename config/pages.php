@@ -114,7 +114,7 @@ $DOMBAG_PAGINAS = [
     ],
     [
         'href'    => '/produtos',
-        'label'   => 'Consulta de Produtos',
+        'label'   => 'Produtos',
         'grupo'   => null,
         'menu'    => true,
         'publico' => false,
@@ -124,7 +124,7 @@ $DOMBAG_PAGINAS = [
         'href'    => '/produtos/cadastro',
         'label'   => 'Cadastro de Produtos',
         'grupo'   => null,
-        'menu'    => true,
+        'menu'    => false,
         'publico' => false,
         'icon'    => '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
     ],
@@ -148,8 +148,8 @@ $DOMBAG_PAGINAS = [
     ['href' => '/pcp/pdf',         'label' => 'PDF de Produção',         'grupo' => 'producao', 'menu' => false, 'publico' => false],
 
     // ── Máquinas ──────────────────────────────────────────────────────────────
-    ['href' => '/maquinas',           'label' => 'Consulta de Máquinas', 'grupo' => 'maquinas', 'menu' => true,  'publico' => false],
-    ['href' => '/maquinas/cadastro',  'label' => 'Cadastro de Máquinas', 'grupo' => 'maquinas', 'menu' => true,  'publico' => false],
+    ['href' => '/maquinas',           'label' => 'Máquinas',             'grupo' => 'maquinas', 'menu' => true,  'publico' => false],
+    ['href' => '/maquinas/cadastro',  'label' => 'Cadastro de Máquinas', 'grupo' => 'maquinas', 'menu' => false, 'publico' => false],
     ['href' => '/pcp/fila',           'label' => 'Fila de Máquinas',     'grupo' => 'maquinas', 'menu' => true,  'publico' => false],
 
     // ── Financeiro ────────────────────────────────────────────────────────────
@@ -174,10 +174,10 @@ $DOMBAG_PAGINAS = [
 
     // ── Usuários ──────────────────────────────────────────────────────────────
     ['href' => '/minha-senha',              'label' => 'Minha Senha',          'grupo' => 'usuarios', 'menu' => true,  'publico' => true,  'admin_only' => false],
-    ['href' => '/usuarios',                 'label' => 'Consulta de Usuários', 'grupo' => 'usuarios', 'menu' => true,  'publico' => false, 'admin_only' => true],
-    ['href' => '/usuarios/cadastro',        'label' => 'Cadastro de Usuários', 'grupo' => 'usuarios', 'menu' => true,  'publico' => false, 'admin_only' => true],
-    ['href' => '/usuarios/grupos',          'label' => 'Consulta de Grupos',   'grupo' => 'usuarios', 'menu' => true,  'publico' => false, 'admin_only' => true],
-    ['href' => '/usuarios/grupos/cadastro', 'label' => 'Cadastro de Grupos',   'grupo' => 'usuarios', 'menu' => true,  'publico' => false, 'admin_only' => true],
+    ['href' => '/usuarios',                 'label' => 'Usuários',             'grupo' => 'usuarios', 'menu' => true,  'publico' => false, 'admin_only' => true],
+    ['href' => '/usuarios/cadastro',        'label' => 'Cadastro de Usuários', 'grupo' => 'usuarios', 'menu' => false, 'publico' => false, 'admin_only' => true],
+    ['href' => '/usuarios/grupos',          'label' => 'Grupos de Usuários',   'grupo' => 'usuarios', 'menu' => true,  'publico' => false, 'admin_only' => true],
+    ['href' => '/usuarios/grupos/cadastro', 'label' => 'Cadastro de Grupos',   'grupo' => 'usuarios', 'menu' => false, 'publico' => false, 'admin_only' => true],
 
     // ── Parâmetros ────────────────────────────────────────────────────────────
     ['href' => '/modules/parametros/parametros.php', 'label' => 'Parâmetros do Sistema', 'grupo' => 'parametros', 'menu' => true, 'publico' => false],

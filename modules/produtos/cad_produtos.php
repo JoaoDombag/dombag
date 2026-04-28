@@ -65,15 +65,15 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
 // ══════════════════════════════════════════════════════════════════════
 $edit_id = (int) ($_GET['id'] ?? 0);
 $produto = [
-    'pro_codigo'      => 0,
-    'pro_descricao'   => '',
-    'pro_tipo'        => '',
-    'pro_comprimento' => '',
-    'pro_impressao'   => 'NAO',
-    'pro_valvulado'   => 'NAO',
+    'pro_codigo'        => 0,
+    'pro_descricao'     => '',
+    'pro_tipo'          => '',
+    'pro_comprimento'   => '',
+    'pro_impressao'     => 'NAO',
+    'pro_valvulado'     => 'NAO',
     'pro_maq_impressao' => '',
-    'pro_codigo_yz'   => '',
-    'pro_fluxo'       => '',
+    'pro_codigo_yz'     => '',
+    'pro_fluxo'         => '',
 ];
 $is_edit = false;
 
@@ -119,17 +119,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_SERVER['HTTP_X_REQUESTED_W
     $maq       = trim($_POST['pro_maq_impressao'] ?? '');
     $cod_yz    = trim($_POST['pro_codigo_yz'] ?? '') !== '' ? (int) $_POST['pro_codigo_yz'] : null;
 
-    // Preenche produto com valores postados (para reexibir em caso de erro)
     $produto = [
-        'pro_codigo'       => $id,
-        'pro_descricao'    => $descricao,
-        'pro_tipo'         => $tipo,
-        'pro_comprimento'  => $_POST['pro_comprimento'] ?? '',
-        'pro_impressao'    => $impressao,
-        'pro_valvulado'    => $valvulado,
-        'pro_maq_impressao'=> $maq,
-        'pro_codigo_yz'    => $_POST['pro_codigo_yz'] ?? '',
-        'pro_fluxo'        => $fluxo,
+        'pro_codigo'        => $id,
+        'pro_descricao'     => $descricao,
+        'pro_tipo'          => $tipo,
+        'pro_comprimento'   => $_POST['pro_comprimento'] ?? '',
+        'pro_impressao'     => $impressao,
+        'pro_valvulado'     => $valvulado,
+        'pro_maq_impressao' => $maq,
+        'pro_codigo_yz'     => $_POST['pro_codigo_yz'] ?? '',
+        'pro_fluxo'         => $fluxo,
     ];
     $is_edit = $id > 0;
 
@@ -174,64 +173,54 @@ $h = fn(mixed $v): string => htmlspecialchars((string)($v ?? ''), ENT_QUOTES);
 <link rel="stylesheet" href="/public/css/unified_admin.css">
 <link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
-*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);color:var(--text-primary);overflow-y:auto;height:100vh;}
-.app-wrapper{display:flex;height:100vh;overflow:hidden;}
-.main{flex:1;display:flex;flex-direction:column;overflow-y:auto;min-width:0;}
+.content { overflow-y: auto; flex-direction: column; align-items: center; gap: 16px; padding: 28px 24px; }
 
-/* Topbar */
-.topbar{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--blue-mid);flex-shrink:0;gap:12px;position:sticky;top:0;z-index:10;}
-.topbar-left{display:flex;align-items:center;gap:14px;min-width:0;}
-.page-title h1{font-size:17px;font-weight:600;letter-spacing:-.2px;white-space:nowrap;}
-.page-title p{font-size:11.5px;color:var(--text-muted);margin-top:1px;}
-.topbar-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;}
-.btn-secondary{background:transparent;color:var(--text-muted);border:1px solid var(--border);padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;font-family:'Segoe UI',sans-serif;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:6px;white-space:nowrap;text-decoration:none;}
-.btn-secondary:hover{background:var(--card-hover);color:var(--text-primary);}
+.cad-alert { width: 100%; max-width: 640px; border-radius: 10px; padding: 11px 16px; font-size: 12.5px; display: flex; align-items: center; gap: 8px; }
+.cad-alert-err { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.25); color: #ef4444; }
+.cad-alert-ok  { background: rgba(34,197,94,.1);  border: 1px solid rgba(34,197,94,.25); color: var(--teal); }
 
-/* Conteúdo */
-.content{padding:32px 24px;display:flex;justify-content:center;}
+.cad-card { width: 100%; max-width: 640px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 4px 28px rgba(0,0,0,.22); }
 
-/* Card do formulário */
-.form-card{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;padding:28px 32px;width:100%;max-width:640px;}
-.form-card-title{font-size:15px;font-weight:700;margin-bottom:24px;display:flex;align-items:center;gap:8px;padding-bottom:16px;border-bottom:1px solid var(--border);}
+.cad-head { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; background: linear-gradient(120deg, rgba(30,79,201,.1) 0%, transparent 70%); border-top: 3px solid var(--blue-accent); }
+.cad-icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(30,79,201,.15); border: 1px solid rgba(30,79,201,.25); color: #7db3ff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.cad-head-info { flex: 1; }
+.cad-head-info h2 { font-size: 15px; font-weight: 700; }
+.cad-head-info p  { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+.badge-edit { font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px; background: rgba(245,158,11,.12); color: var(--amber); display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
-/* Alertas */
-.alert{padding:10px 14px;border-radius:8px;font-size:12.5px;margin-bottom:20px;display:flex;align-items:center;gap:8px;}
-.alert-err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#ef4444;}
-.alert-ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:var(--green);}
+.cad-section { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+.cad-section + .cad-section { border-top: 1px solid var(--border); }
+.section-label { font-size: 10px; font-weight: 800; letter-spacing: 1.2px; color: var(--text-muted); text-transform: uppercase; padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
 
-/* Grupos */
-.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;}
-.form-grid.full{grid-template-columns:1fr;}
-.f-group{display:flex;flex-direction:column;gap:5px;}
-.f-group label{font-size:10.5px;font-weight:700;color:var(--text-muted);letter-spacing:.6px;text-transform:uppercase;}
-.f-input{background:#0a1628;border:1px solid var(--border);color:var(--text-primary);padding:9px 12px;border-radius:8px;font-size:13px;font-family:'Segoe UI',sans-serif;outline:none;transition:.15s;width:100%;}
-.f-input:focus{border-color:rgba(45,106,255,.5);}
-.f-input::placeholder{color:var(--text-muted);}
-.f-select{background:#0a1628;border:1px solid var(--border);color:var(--text-primary);padding:9px 12px;border-radius:8px;font-size:13px;font-family:'Segoe UI',sans-serif;outline:none;cursor:pointer;width:100%;text-transform:uppercase;}
-.f-select option{background:#112240;text-transform:uppercase;}
+.f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.f-row.t3 { grid-template-columns: repeat(3, 1fr); }
+.f-hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; line-height: 1.5; }
 
-/* Atalhos de fluxo */
-.fluxo-shortcuts{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;}
-.fluxo-btn{border:none;padding:4px 11px;border-radius:6px;font-size:11px;font-family:'Segoe UI',sans-serif;cursor:pointer;transition:.15s;font-weight:600;}
-.fluxo-btn:hover{opacity:.8;}
-.fluxo-bag{background:rgba(45,106,255,.12);color:#7db3ff;}
-.fluxo-sac{background:rgba(0,201,167,.1);color:var(--teal);}
-.fluxo-valv{background:rgba(245,158,11,.1);color:var(--amber);}
+.field select { text-transform: uppercase; }
+.field select option { text-transform: uppercase; background: var(--blue-mid); }
 
-/* Footer do form */
-.form-footer{display:flex;gap:10px;justify-content:flex-end;padding-top:20px;border-top:1px solid var(--border);margin-top:8px;}
-.btn-save{background:var(--blue-accent);color:white;border:none;padding:10px 26px;border-radius:7px;font-size:13px;font-weight:700;font-family:'Segoe UI',sans-serif;cursor:pointer;transition:.15s;}
-.btn-save:hover{background:var(--blue-light);}
-.btn-cancel{background:transparent;color:var(--text-muted);border:1px solid var(--border);padding:10px 18px;border-radius:7px;font-size:13px;font-weight:600;font-family:'Segoe UI',sans-serif;cursor:pointer;transition:.15s;text-decoration:none;display:inline-flex;align-items:center;}
-.btn-cancel:hover{background:var(--card-hover);color:var(--text-primary);}
+.shortcuts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.sc { border: none; padding: 4px 11px; border-radius: 6px; font-size: 11px; font-family: inherit; cursor: pointer; font-weight: 600; transition: opacity .15s; }
+.sc:hover { opacity: .75; }
+.sc-bag  { background: rgba(45,106,255,.12); color: #7db3ff; }
+.sc-sac  { background: rgba(0,201,167,.1);  color: var(--teal); }
+.sc-valv { background: rgba(245,158,11,.1); color: var(--amber); }
 
-@media(max-width:640px){.form-grid{grid-template-columns:1fr;}.form-card{padding:20px 16px;}}
+.cad-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 8px; background: rgba(0,0,0,.08); }
+.cad-footer .btn-primary { flex: 1; justify-content: center; font-size: 13.5px; padding: 10px 20px; }
+
+@media (max-width: 700px) {
+  .content { padding: 14px 12px; gap: 12px; }
+  .cad-head, .cad-section, .cad-footer { padding-left: 18px; padding-right: 18px; }
+  .cad-footer { flex-direction: column-reverse; }
+  .cad-footer .btn-primary { flex: none; }
+  .f-row, .f-row.t3 { grid-template-columns: 1fr; }
+  .cad-icon { width: 34px; height: 34px; }
+}
 </style>
 </head>
 <body>
 <div class="app-wrapper">
-
 <?php include $_SERVER['DOCUMENT_ROOT'] . '/shared/sidebar.php'; ?>
 
 <div class="main">
@@ -251,127 +240,158 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
   </header>
 
   <div class="content">
-    <div class="form-card">
-      <div class="form-card-title">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-        <?= $h($page_title) ?>
-      </div>
 
-      <?php if ($msg_err): ?>
-      <div class="alert alert-err">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <?= $h($msg_err) ?>
-      </div>
-      <?php endif; ?>
+    <?php if ($msg_err): ?>
+    <div class="cad-alert cad-alert-err" id="alertEl">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <?= $h($msg_err) ?>
+    </div>
+    <?php endif; ?>
+    <?php if ($msg_ok): ?>
+    <div class="cad-alert cad-alert-ok" id="alertEl">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
+      <?= $h($msg_ok) ?>
+    </div>
+    <?php endif; ?>
 
-      <?php if ($msg_ok): ?>
-      <div class="alert alert-ok">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
-        <?= $h($msg_ok) ?>
+    <div class="cad-card">
+
+      <div class="cad-head">
+        <div class="cad-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <path d="m3.27 6.96 8.73 5.04 8.73-5.04"/><line x1="12" y1="22" x2="12" y2="12"/>
+          </svg>
+        </div>
+        <div class="cad-head-info">
+          <h2><?= $is_edit ? 'Editar Produto' : 'Novo Produto' ?></h2>
+          <p><?= $is_edit ? $h($produto['pro_descricao']) : 'Defina descrição, tipo e fluxo de produção' ?></p>
+        </div>
+        <?php if ($is_edit): ?>
+        <span class="badge-edit">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Editando
+        </span>
+        <?php endif; ?>
       </div>
-      <?php endif; ?>
 
       <form method="POST" action="/produtos/cadastro<?= $is_edit ? '?id=' . (int)$produto['pro_codigo'] : '' ?>">
         <input type="hidden" name="pro_codigo" value="<?= (int)$produto['pro_codigo'] ?>">
 
-        <!-- Descrição -->
-        <div class="form-grid full" style="margin-bottom:16px;">
-          <div class="f-group">
-            <label>Descricao do Produto *</label>
-            <input type="text" class="f-input" name="pro_descricao"
+        <!-- Identificação -->
+        <div class="cad-section">
+          <div class="section-label">Identificação</div>
+
+          <div class="field">
+            <label>Descrição do Produto *</label>
+            <input type="text" name="pro_descricao"
                    value="<?= $h($produto['pro_descricao']) ?>"
                    placeholder="Ex: BIG BAG CDB4 160G 90X90X100 SEM IMPRESSAO"
                    required autofocus>
           </div>
-        </div>
 
-        <!-- Tipo + Comprimento -->
-        <div class="form-grid">
-          <div class="f-group">
-            <label>Tipo</label>
-            <select class="f-select" name="pro_tipo">
-              <option value="">— Selecione —</option>
-              <option value="BAG"     <?= $produto['pro_tipo'] === 'BAG'     ? 'selected' : '' ?>>BAG (Big Bag)</option>
-              <option value="SACARIA" <?= $produto['pro_tipo'] === 'SACARIA' ? 'selected' : '' ?>>SACARIA</option>
-            </select>
-          </div>
-          <div class="f-group">
-            <label>Comprimento (cm)</label>
-            <input type="number" class="f-input" name="pro_comprimento"
-                   value="<?= $produto['pro_comprimento'] > 0 ? $h($produto['pro_comprimento']) : '' ?>"
-                   placeholder="Ex: 100" step="0.5" min="0">
-          </div>
-        </div>
-
-        <!-- Impressão + Valvulado -->
-        <div class="form-grid">
-          <div class="f-group">
-            <label>Impressao?</label>
-            <select class="f-select" name="pro_impressao">
-              <option value="NAO" <?= ($produto['pro_impressao'] ?? 'NAO') !== 'SIM' ? 'selected' : '' ?>>NAO</option>
-              <option value="SIM" <?= ($produto['pro_impressao'] ?? '') === 'SIM' ? 'selected' : '' ?>>SIM</option>
-            </select>
-          </div>
-          <div class="f-group">
-            <label>Valvulado?</label>
-            <select class="f-select" name="pro_valvulado">
-              <option value="NAO" <?= ($produto['pro_valvulado'] ?? 'NAO') !== 'SIM' ? 'selected' : '' ?>>NAO</option>
-              <option value="SIM" <?= ($produto['pro_valvulado'] ?? '') === 'SIM' ? 'selected' : '' ?>>SIM</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Máquina de Impressão + Código Yzidro -->
-        <div class="form-grid">
-          <div class="f-group">
-            <label>Maquina de Impressao</label>
-            <select class="f-select" name="pro_maq_impressao">
-              <option value="" <?= ($produto['pro_maq_impressao'] ?? '') === '' ? 'selected' : '' ?>>— Nenhuma —</option>
-              <option value="Impressao Bag"        <?= ($produto['pro_maq_impressao'] ?? '') === 'Impressao Bag'        ? 'selected' : '' ?>>IMPRESSAO BAG</option>
-              <option value="Flexo"                <?= ($produto['pro_maq_impressao'] ?? '') === 'Flexo'                ? 'selected' : '' ?>>FLEXO</option>
-              <option value="Carimbadeira Sacaria" <?= ($produto['pro_maq_impressao'] ?? '') === 'Carimbadeira Sacaria' ? 'selected' : '' ?>>CARIMBADEIRA SACARIA</option>
-            </select>
-          </div>
-          <div class="f-group">
-            <label>Codigo Yzidro (ERP)</label>
-            <input type="number" class="f-input" name="pro_codigo_yz"
-                   value="<?= $h($produto['pro_codigo_yz'] ?? '') ?>"
-                   placeholder="Codigo numerico do ERP">
-          </div>
-        </div>
-
-        <!-- Fluxo de Produção -->
-        <div class="form-grid full">
-          <div class="f-group">
-            <label>Fluxo de Producao</label>
-            <input type="text" class="f-input" name="pro_fluxo" id="fluxoInput"
-                   value="<?= $h($produto['pro_fluxo']) ?>"
-                   placeholder="Ex: Corte Bag > Impressao Bag > Costura Bag > Analise Bag">
-            <div class="fluxo-shortcuts">
-              <button type="button" class="fluxo-btn fluxo-bag"  onclick="setFluxo('Corte Bag > Costura Bag > Analise Bag')">BAG s/ impressao</button>
-              <button type="button" class="fluxo-btn fluxo-bag"  onclick="setFluxo('Corte Bag > Impressao Bag > Costura Bag > Analise Bag')">BAG c/ impressao</button>
-              <button type="button" class="fluxo-btn fluxo-sac"  onclick="setFluxo('Corte+Costura Sacaria')">Sacaria s/ impressao</button>
-              <button type="button" class="fluxo-btn fluxo-sac"  onclick="setFluxo('Flexo > Corte+Costura Sacaria')">Sacaria Flexo</button>
-              <button type="button" class="fluxo-btn fluxo-sac"  onclick="setFluxo('Carimbadeira Sacaria > Corte+Costura Sacaria')">Sacaria Carimbo</button>
-              <button type="button" class="fluxo-btn fluxo-valv" onclick="setFluxo('Corte+Costura Sacaria > Valvuladeira')">Sacaria Valvulada</button>
+          <div class="f-row">
+            <div class="field">
+              <label>Tipo</label>
+              <select name="pro_tipo">
+                <option value="">— SELECIONE —</option>
+                <option value="BAG"     <?= $produto['pro_tipo'] === 'BAG'     ? 'selected' : '' ?>>BAG (BIG BAG)</option>
+                <option value="SACARIA" <?= $produto['pro_tipo'] === 'SACARIA' ? 'selected' : '' ?>>SACARIA</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Comprimento (cm)</label>
+              <input type="number" name="pro_comprimento"
+                     value="<?= $produto['pro_comprimento'] > 0 ? $h($produto['pro_comprimento']) : '' ?>"
+                     placeholder="Ex: 100" step="0.5" min="0">
             </div>
           </div>
         </div>
 
-        <div class="form-footer">
-          <a href="/produtos" class="btn-cancel">Cancelar</a>
-          <button type="submit" class="btn-save">Salvar Produto</button>
+        <!-- Especificações técnicas -->
+        <div class="cad-section">
+          <div class="section-label">Especificações Técnicas</div>
+
+          <div class="f-row t3">
+            <div class="field">
+              <label>Impressão?</label>
+              <select name="pro_impressao">
+                <option value="NAO" <?= ($produto['pro_impressao'] ?? 'NAO') !== 'SIM' ? 'selected' : '' ?>>NÃO</option>
+                <option value="SIM" <?= ($produto['pro_impressao'] ?? '') === 'SIM' ? 'selected' : '' ?>>SIM</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Valvulado?</label>
+              <select name="pro_valvulado">
+                <option value="NAO" <?= ($produto['pro_valvulado'] ?? 'NAO') !== 'SIM' ? 'selected' : '' ?>>NÃO</option>
+                <option value="SIM" <?= ($produto['pro_valvulado'] ?? '') === 'SIM' ? 'selected' : '' ?>>SIM</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Código Yzidro (ERP)</label>
+              <input type="number" name="pro_codigo_yz"
+                     value="<?= $h($produto['pro_codigo_yz'] ?? '') ?>"
+                     placeholder="Código numérico">
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Máquina de Impressão</label>
+            <select name="pro_maq_impressao">
+              <option value="" <?= ($produto['pro_maq_impressao'] ?? '') === '' ? 'selected' : '' ?>>— NENHUMA —</option>
+              <option value="Impressao Bag"        <?= ($produto['pro_maq_impressao'] ?? '') === 'Impressao Bag'        ? 'selected' : '' ?>>IMPRESSÃO BAG</option>
+              <option value="Flexo"                <?= ($produto['pro_maq_impressao'] ?? '') === 'Flexo'                ? 'selected' : '' ?>>FLEXO</option>
+              <option value="Carimbadeira Sacaria" <?= ($produto['pro_maq_impressao'] ?? '') === 'Carimbadeira Sacaria' ? 'selected' : '' ?>>CARIMBADEIRA SACARIA</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Fluxo de produção -->
+        <div class="cad-section">
+          <div class="section-label">Fluxo de Produção</div>
+
+          <div class="field">
+            <label>Sequência de Etapas</label>
+            <input type="text" name="pro_fluxo" id="fluxoInput"
+                   value="<?= $h($produto['pro_fluxo']) ?>"
+                   placeholder="Ex: Corte Bag > Impressão Bag > Costura Bag > Análise Bag">
+            <span class="f-hint">Etapas separadas por " > ". Use os atalhos abaixo para preencher rapidamente.</span>
+            <div class="shortcuts">
+              <button type="button" class="sc sc-bag"  onclick="setFluxo('Corte Bag > Costura Bag > Analise Bag')">BAG s/ impressão</button>
+              <button type="button" class="sc sc-bag"  onclick="setFluxo('Corte Bag > Impressao Bag > Costura Bag > Analise Bag')">BAG c/ impressão</button>
+              <button type="button" class="sc sc-sac"  onclick="setFluxo('Corte+Costura Sacaria')">Sacaria s/ impressão</button>
+              <button type="button" class="sc sc-sac"  onclick="setFluxo('Flexo > Corte+Costura Sacaria')">Sacaria Flexo</button>
+              <button type="button" class="sc sc-sac"  onclick="setFluxo('Carimbadeira Sacaria > Corte+Costura Sacaria')">Sacaria Carimbo</button>
+              <button type="button" class="sc sc-valv" onclick="setFluxo('Corte+Costura Sacaria > Valvuladeira')">Sacaria Valvulada</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="cad-footer">
+          <a href="/produtos" class="btn-secondary">Cancelar</a>
+          <button type="submit" class="btn-primary">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            <?= $is_edit ? 'Salvar Alterações' : 'Salvar Produto' ?>
+          </button>
         </div>
       </form>
     </div>
+
   </div>
-</div><!-- /main -->
-</div><!-- /app-wrapper -->
+</div>
+</div>
 
 <script>
 function setFluxo(v) {
   document.getElementById('fluxoInput').value = v;
 }
+
+const alertEl = document.getElementById('alertEl');
+if (alertEl) setTimeout(() => {
+  alertEl.style.transition = 'opacity .4s';
+  alertEl.style.opacity = '0';
+  setTimeout(() => alertEl.remove(), 400);
+}, 5000);
 </script>
 </body>
 </html>

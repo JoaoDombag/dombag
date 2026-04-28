@@ -113,7 +113,6 @@ try {
         $cod   = intval($_POST['maq_codigo'] ?? 0);
         $conta = isset($_POST['maq_conta_producao']) ? 1 : 0;
 
-        // Repopula o formulário em caso de erro de validação
         $f = [
             'maq_codigo'         => $cod,
             'maq_descricao'      => $desc,
@@ -132,7 +131,6 @@ try {
         } elseif ($depto === 0) {
             $db_error = 'Selecione o departamento.';
         } elseif ($cod > 0) {
-            // UPDATE
             try {
                 $stmt = $pdo->prepare('
                     UPDATE MAQUINAS SET
@@ -157,7 +155,6 @@ try {
                 $db_error = 'Erro ao atualizar: ' . $e->getMessage();
             }
         } else {
-            // INSERT
             try {
                 $stmt = $pdo->prepare('
                     INSERT INTO MAQUINAS
@@ -191,63 +188,55 @@ try {
   <link rel="stylesheet" href="/public/css/unified_admin.css">
   <link rel="icon" href="/public/css/icone.ico" type="image/png">
   <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--blue-deep); color: var(--text-primary); overflow: hidden; height: 100vh; }
-    .app-wrapper { display: flex; height: 100vh; overflow: hidden; }
-    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+  .content { overflow-y: auto; flex-direction: column; align-items: center; gap: 16px; padding: 28px 24px; }
 
-    /* Topbar */
-    .topbar { padding: 14px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: var(--blue-mid); flex-shrink: 0; gap: 12px; }
-    .topbar-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
-    .page-title h1 { font-size: 17px; font-weight: 600; letter-spacing: -.2px; }
-    .page-title p  { font-size: 11.5px; color: var(--text-muted); margin-top: 1px; }
-    .topbar-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .cad-alert { width: 100%; max-width: 580px; border-radius: 10px; padding: 11px 16px; font-size: 12.5px; display: flex; align-items: center; gap: 8px; }
+  .cad-alert-err { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.25); color: #ef4444; }
 
-    /* Botões */
-    .btn-primary { background: var(--blue-accent); color: #fff; border: none; padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 600; font-family: 'Segoe UI', sans-serif; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: background .15s; }
-    .btn-primary:hover { background: var(--blue-light); }
-    .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 500; font-family: 'Segoe UI', sans-serif; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; transition: all .15s; }
-    .btn-secondary:hover { background: var(--card-hover); color: var(--text-primary); }
+  .cad-card { width: 100%; max-width: 580px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 4px 28px rgba(0,0,0,.22); }
 
-    /* Content */
-    .content { flex: 1; overflow: auto; padding: 32px 24px; display: flex; flex-direction: column; align-items: center; }
+  .cad-head { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; background: linear-gradient(120deg, rgba(30,79,201,.1) 0%, transparent 70%); border-top: 3px solid var(--blue-accent); }
+  .cad-icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(30,79,201,.15); border: 1px solid rgba(30,79,201,.25); color: #7db3ff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .cad-head-info { flex: 1; }
+  .cad-head-info h2 { font-size: 15px; font-weight: 700; }
+  .cad-head-info p  { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+  .badge-edit { font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px; background: rgba(245,158,11,.12); color: var(--amber); display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
-    /* Alertas */
-    .alert { border-radius: 8px; padding: 10px 16px; font-size: 12.5px; display: flex; align-items: center; gap: 8px; margin-bottom: 18px; width: 100%; max-width: 560px; }
-    .alert-err { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.25); color: var(--red); }
+  .cad-section { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .cad-section + .cad-section { border-top: 1px solid var(--border); }
+  .section-label { font-size: 10px; font-weight: 800; letter-spacing: 1.2px; color: var(--text-muted); text-transform: uppercase; padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
 
-    /* Form panel */
-    .form-panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); width: 100%; max-width: 560px; overflow: hidden; }
-    .form-panel-head { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
-    .form-panel-head h2 { font-size: 14px; font-weight: 600; }
-    .badge-edit { font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 20px; background: rgba(245,158,11,.12); color: var(--amber); display: inline-flex; align-items: center; gap: 4px; }
+  .f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .f-row.t3 { grid-template-columns: repeat(3, 1fr); }
+  .f-hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; line-height: 1.5; }
 
-    /* Campos */
-    .form-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-    .field { display: flex; flex-direction: column; gap: 6px; }
-    .field label { font-size: 11px; font-weight: 700; letter-spacing: .6px; color: var(--text-muted); text-transform: uppercase; }
-    .field input, .field select { background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 8px; padding: 9px 13px; font-size: 13.5px; font-family: 'Segoe UI', sans-serif; color: var(--text-primary); outline: none; transition: border-color .15s, background .15s; width: 100%; }
-    .field input:focus, .field select:focus { border-color: rgba(45,106,255,.5); background: rgba(45,106,255,.05); }
-    .field input::placeholder { color: var(--text-muted); }
-    .field select { text-transform: uppercase; }
-    .field select option { background: #112240; color: var(--text-primary); text-transform: uppercase; }
-    .field-hint { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field select { text-transform: uppercase; }
+  .field select option { text-transform: uppercase; background: var(--blue-mid); }
 
-    /* Calc box */
-    .calc-box { background: rgba(0,201,167,.07); border: 1px solid rgba(0,201,167,.2); border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; }
-    .calc-box-label { font-size: 11px; color: var(--teal); font-weight: 600; letter-spacing: .4px; text-transform: uppercase; }
-    .calc-box-val  { font-size: 20px; font-weight: 700; color: var(--teal); letter-spacing: -.5px; }
-    .calc-box-unit { font-size: 11px; color: rgba(0,201,167,.6); margin-top: 1px; }
+  .check-widget { display: flex; align-items: flex-start; gap: 10px; background: rgba(255,255,255,.025); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; cursor: pointer; }
+  .check-widget input[type=checkbox] { width: 16px; height: 16px; min-width: 16px; margin-top: 2px; accent-color: var(--blue-accent); cursor: pointer; background: transparent; border: none; padding: 0; }
+  .check-widget-info { display: flex; flex-direction: column; gap: 3px; }
+  .check-widget-label { font-size: 13px; font-weight: 500; }
+  .check-widget-hint { font-size: 11px; color: var(--text-muted); line-height: 1.5; margin-top: 2px; }
 
-    /* Form actions */
-    .form-actions { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; }
-    .form-actions .btn-primary { flex: 1; justify-content: center; }
+  .calc-box { background: rgba(0,201,167,.06); border: 1px solid rgba(0,201,167,.18); border-radius: 10px; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .calc-box-label { font-size: 10.5px; font-weight: 700; color: var(--teal); letter-spacing: .5px; text-transform: uppercase; }
+  .calc-box-sub   { font-size: 11px; color: rgba(0,201,167,.55); margin-top: 2px; }
+  .calc-box-val   { font-size: 26px; font-weight: 800; color: var(--teal); letter-spacing: -1px; line-height: 1; }
+  .calc-box-unit  { font-size: 11px; color: rgba(0,201,167,.55); text-align: right; margin-top: 3px; }
 
-    @media (max-width: 620px) {
-      .content { padding: 20px 12px; }
-      .field-row { grid-template-columns: 1fr; }
-    }
+  .cad-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 8px; background: rgba(0,0,0,.08); }
+  .cad-footer .btn-primary { flex: 1; justify-content: center; font-size: 13.5px; padding: 10px 20px; }
+
+  @media (max-width: 640px) {
+    .content { padding: 14px 12px; gap: 12px; }
+    .cad-head, .cad-section, .cad-footer { padding-left: 18px; padding-right: 18px; }
+    .cad-footer { flex-direction: column-reverse; }
+    .cad-footer .btn-primary { flex: none; }
+    .f-row, .f-row.t3 { grid-template-columns: 1fr; }
+    .cad-icon { width: 34px; height: 34px; }
+    .calc-box-val { font-size: 22px; }
+  }
   </style>
 </head>
 <body>
@@ -273,18 +262,29 @@ try {
     <div class="content">
 
       <?php if ($db_error): ?>
-      <div class="alert alert-err">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <div class="cad-alert cad-alert-err" id="alertEl">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <?= htmlspecialchars($db_error) ?>
       </div>
       <?php endif; ?>
 
-      <div class="form-panel">
-        <div class="form-panel-head">
-          <h2><?= $editando ? 'Editar Máquina' : 'Nova Máquina' ?></h2>
+      <div class="cad-card">
+
+        <div class="cad-head">
+          <div class="cad-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M11 10.27 7 3.34"/><path d="m11 13.73-4 6.93"/><path d="M12 22v-2"/><path d="M12 2v2"/>
+              <path d="M14 12h8"/><path d="m17 20.66-1-1.73"/><path d="m17 3.34-1 1.73"/>
+              <path d="M2 12h2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="12" r="8"/>
+            </svg>
+          </div>
+          <div class="cad-head-info">
+            <h2><?= $editando ? 'Editar Máquina' : 'Nova Máquina' ?></h2>
+            <p><?= $editando ? htmlspecialchars($f['maq_descricao']) : 'Configure capacidade e parâmetros de produção' ?></p>
+          </div>
           <?php if ($editando): ?>
           <span class="badge-edit">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
             Editando
           </span>
           <?php endif; ?>
@@ -294,7 +294,9 @@ try {
           <input type="hidden" name="acao"       value="salvar">
           <input type="hidden" name="maq_codigo" value="<?= (int) $f['maq_codigo'] ?>">
 
-          <div class="form-body">
+          <!-- Identificação -->
+          <div class="cad-section">
+            <div class="section-label">Identificação</div>
 
             <div class="field">
               <label>Descrição *</label>
@@ -304,82 +306,90 @@ try {
                      maxlength="120" required autofocus>
             </div>
 
-            <div class="field">
-              <label>Grupo PCP</label>
-              <input type="text" name="maq_grupo"
-                     value="<?= htmlspecialchars($f['maq_grupo'] ?? '') ?>"
-                     placeholder="Ex: Corte Bag, Costura… (deixe em branco para usar a descrição)"
-                     maxlength="80">
-              <span class="field-hint">Agrupa máquinas semelhantes no planejamento PCP</span>
+            <div class="f-row">
+              <div class="field">
+                <label>Departamento *</label>
+                <select name="dp_codigo" required>
+                  <option value="">— Selecione —</option>
+                  <?php foreach ($deptos as $d): ?>
+                  <option value="<?= $d['dp_codigo'] ?>"
+                    <?= (int) $f['dp_codigo'] === (int) $d['dp_codigo'] ? 'selected' : '' ?>>
+                    <?= htmlspecialchars($d['dp_descricao']) ?>
+                  </option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+              <div class="field">
+                <label>Grupo PCP</label>
+                <input type="text" name="maq_grupo"
+                       value="<?= htmlspecialchars($f['maq_grupo'] ?? '') ?>"
+                       placeholder="Ex: Corte Bag, Costura…"
+                       maxlength="80">
+                <span class="f-hint">Agrupa máquinas semelhantes no planejamento.</span>
+              </div>
             </div>
+          </div>
 
-            <div class="field">
-              <label>Departamento *</label>
-              <select name="dp_codigo" required>
-                <option value="">— Selecione —</option>
-                <?php foreach ($deptos as $d): ?>
-                <option value="<?= $d['dp_codigo'] ?>"
-                  <?= (int) $f['dp_codigo'] === (int) $d['dp_codigo'] ? 'selected' : '' ?>>
-                  <?= htmlspecialchars($d['dp_descricao']) ?>
-                </option>
-                <?php endforeach; ?>
-              </select>
-            </div>
+          <!-- Capacidade -->
+          <div class="cad-section">
+            <div class="section-label">Capacidade de Produção</div>
 
-            <div class="field-row">
+            <div class="f-row t3">
               <div class="field">
                 <label>Qtde de Máquinas</label>
                 <input type="number" name="maq_qtde" id="f_qtde"
                        value="<?= htmlspecialchars($f['maq_qtde']) ?>"
                        min="0" step="1" oninput="calcCap()">
-                <span class="field-hint">Unidades físicas</span>
+                <span class="f-hint">Unidades físicas</span>
               </div>
               <div class="field">
                 <label>Horas / Dia</label>
                 <input type="number" name="maq_horas_dia" id="f_horas"
                        value="<?= htmlspecialchars($f['maq_horas_dia']) ?>"
                        min="0" step="0.5" max="24" oninput="calcCap()">
-                <span class="field-hint">Horas trabalhadas</span>
+                <span class="f-hint">Horas trabalhadas</span>
               </div>
-            </div>
-
-            <div class="field">
-              <label>Produção (un/min)</label>
-              <input type="number" name="maq_producao_min" id="f_prod"
-                     value="<?= htmlspecialchars($f['maq_producao_min']) ?>"
-                     min="0" step="0.0001" oninput="calcCap()">
-              <span class="field-hint">Velocidade em unidades por minuto</span>
-            </div>
-
-            <div class="field">
-              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:13px;font-weight:500;color:var(--text-primary);">
-                <input type="checkbox" name="maq_conta_producao" value="1"
-                       <?= $f['maq_conta_producao'] ? 'checked' : '' ?>
-                       style="width:16px;height:16px;accent-color:var(--blue-accent);cursor:pointer;flex-shrink:0;">
-                Contabilizar no total de produção
-              </label>
-              <span class="field-hint">Desmarque para processos intermediários (ex: carimbadeira) que não devem duplicar a contagem de unidades.</span>
+              <div class="field">
+                <label>Produção (un/min)</label>
+                <input type="number" name="maq_producao_min" id="f_prod"
+                       value="<?= htmlspecialchars($f['maq_producao_min']) ?>"
+                       min="0" step="0.0001" oninput="calcCap()">
+                <span class="f-hint">Velocidade por minuto</span>
+              </div>
             </div>
 
             <div class="calc-box">
               <div>
                 <div class="calc-box-label">Capacidade Diária</div>
-                <div class="calc-box-unit">Calculada automaticamente</div>
+                <div class="calc-box-sub">Calculada automaticamente</div>
               </div>
               <div style="text-align:right;">
                 <div class="calc-box-val" id="capDiaria">0</div>
                 <div class="calc-box-unit">un / dia</div>
               </div>
             </div>
-
           </div>
 
-          <div class="form-actions">
+          <!-- Configurações PCP -->
+          <div class="cad-section">
+            <div class="section-label">Configurações PCP</div>
+
+            <label class="check-widget">
+              <input type="checkbox" name="maq_conta_producao" value="1"
+                     <?= $f['maq_conta_producao'] ? 'checked' : '' ?>>
+              <div class="check-widget-info">
+                <span class="check-widget-label">Contabilizar no total de produção</span>
+                <span class="check-widget-hint">Desmarque para processos intermediários (ex: carimbadeira) que não devem duplicar a contagem de unidades.</span>
+              </div>
+            </label>
+          </div>
+
+          <div class="cad-footer">
+            <a href="/maquinas" class="btn-secondary">Cancelar</a>
             <button type="submit" class="btn-primary">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
               <?= $editando ? 'Salvar Alterações' : 'Salvar Máquina' ?>
             </button>
-            <a href="/maquinas" class="btn-secondary">Cancelar</a>
           </div>
         </form>
       </div>
@@ -398,6 +408,13 @@ function calcCap() {
     cap > 0 ? cap.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) : '0';
 }
 calcCap();
+
+const alertEl = document.getElementById('alertEl');
+if (alertEl) setTimeout(() => {
+  alertEl.style.transition = 'opacity .4s';
+  alertEl.style.opacity = '0';
+  setTimeout(() => alertEl.remove(), 400);
+}, 6000);
 </script>
 </body>
 </html>
