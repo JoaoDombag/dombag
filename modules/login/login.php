@@ -89,214 +89,172 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DOMBAG — Entrar</title>
 <link rel="icon" href="/public/css/icone.ico" type="image/png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <style>
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;width:100%;}
 body{
-  font-family:'DM Sans',system-ui,sans-serif;
-  background:#060d18;
+  font-family:'Segoe UI',system-ui,sans-serif;
+  background:#0a1628;
   color:#e8edf5;
   overflow:hidden;
 }
 
-/* ══════════════════════════════════
-   FUNDO
-══════════════════════════════════ */
-.bg-deco{
-  position:fixed;inset:0;pointer-events:none;z-index:0;
-}
+/* ── Fundo animado ─────────────────────────────── */
+.bg-deco{position:fixed;inset:0;pointer-events:none;z-index:0;}
 .bg-deco::before{
   content:'';position:absolute;inset:0;
   background-image:
-    linear-gradient(rgba(45,106,255,.04) 1px,transparent 1px),
-    linear-gradient(90deg,rgba(45,106,255,.04) 1px,transparent 1px);
-  background-size:48px 48px;
-  animation:gridMove 28s linear infinite;
+    linear-gradient(rgba(45,106,255,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(45,106,255,.035) 1px,transparent 1px);
+  background-size:52px 52px;
+  animation:gridMove 32s linear infinite;
 }
-@keyframes gridMove{0%{background-position:0 0;}100%{background-position:48px 48px;}}
+@keyframes gridMove{0%{background-position:0 0;}100%{background-position:52px 52px;}}
 .bg-deco::after{
   content:'';position:absolute;
   left:50%;top:50%;transform:translate(-50%,-50%);
-  width:800px;height:800px;
-  background:radial-gradient(circle,rgba(45,106,255,.1) 0%,transparent 65%);
+  width:900px;height:900px;
+  background:radial-gradient(circle,rgba(30,79,201,.12) 0%,transparent 65%);
   border-radius:50%;
 }
 
-/* ══════════════════════════════════
-   TOPBAR
-══════════════════════════════════ */
-.topbar{
-  position:fixed;top:0;left:0;right:0;
-  z-index:10;
-  height:64px;
-  display:flex;align-items:center;justify-content:space-between;
-  padding:0 40px;
-  background:rgba(6,13,24,.85);
-  backdrop-filter:blur(12px);
-  -webkit-backdrop-filter:blur(12px);
-  border-bottom:1px solid rgba(255,255,255,.07);
-}
-.topbar-logo{
-  font-family:'Barlow Condensed',sans-serif;
-  font-size:26px;font-weight:800;
-  letter-spacing:3px;text-transform:uppercase;
-  color:#e8edf5;
-  display:flex;align-items:center;gap:10px;
-  text-decoration:none;
-}
-.topbar-logo .accent{color:#2d6aff;}
-.topbar-logo-dot{
-  width:8px;height:8px;
-  background:#2d6aff;
-  border-radius:50%;
-  box-shadow:0 0 10px rgba(45,106,255,.7);
-}
-.topbar-nav{
-  display:flex;align-items:center;gap:6px;
-}
-.topbar-nav a{
-  font-size:13.5px;font-weight:500;
-  color:rgba(180,200,230,.6);
-  text-decoration:none;
-  padding:6px 14px;border-radius:8px;
-  transition:color .15s,background .15s;
-}
-.topbar-nav a:hover{color:#e8edf5;background:rgba(255,255,255,.06);}
-.topbar-badge{
-  font-size:11px;font-weight:700;
-  letter-spacing:.5px;text-transform:uppercase;
-  color:#7a90b0;
-  border:1px solid rgba(255,255,255,.1);
-  border-radius:20px;
-  padding:4px 12px;
-}
-
-@media(max-width:640px){
-  .topbar-nav{display:none;}
-  .topbar{padding:0 20px;}
-}
-
-/* ══════════════════════════════════
-   LAYOUT PRINCIPAL
-══════════════════════════════════ */
+/* ── Layout ────────────────────────────────────── */
 .page{
   display:flex;align-items:center;justify-content:center;
-  min-height:100vh;
-  padding:80px 16px 24px;
+  height:100vh;
+  padding:20px 16px;
   position:relative;z-index:1;
 }
 
-/* ══════════════════════════════════
-   CARD DO FORMULÁRIO
-══════════════════════════════════ */
+/* ── Card ──────────────────────────────────────── */
 .form-card{
-  background:rgba(255,255,255,.97);
+  background:#112240;
+  border:1px solid rgba(255,255,255,.08);
   border-radius:18px;
   box-shadow:0 32px 80px rgba(0,0,0,.55),0 8px 24px rgba(0,0,0,.3);
-  padding:48px 44px 40px;
   width:100%;
-  max-width:420px;
+  max-width:480px;
+  overflow:hidden;
   animation:fadeUp .4s cubic-bezier(.4,0,.2,1) both;
-  color:#1a1a2e;
 }
-@keyframes fadeUp{from{opacity:0;transform:translateY(18px);}to{opacity:1;transform:none;}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:none;}}
 
-/* ── Cabeçalho ── */
-.card-header{margin-bottom:32px;text-align:center;}
-.card-title{
-  font-size:24px;font-weight:700;
-  color:#1a1a2e;
-  letter-spacing:-.3px;
+/* ── Topo accent ───────────────────────────────── */
+.card-top{
+  border-top:3px solid #2d6aff;
+  padding:36px 44px 28px;
+  background:linear-gradient(135deg,rgba(30,79,201,.14) 0%,transparent 60%);
+  border-bottom:1px solid rgba(255,255,255,.06);
 }
-.card-sub{
-  font-size:13px;color:#8888a0;
-  margin-top:6px;line-height:1.5;
+.brand{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:28px;
 }
+.brand-dot{
+  width:9px;height:9px;
+  background:#2d6aff;border-radius:50%;
+  box-shadow:0 0 12px rgba(45,106,255,.8);
+}
+.brand-name{
+  font-size:20px;font-weight:800;
+  letter-spacing:3px;text-transform:uppercase;
+  color:#e8edf5;
+}
+.brand-name span{color:#2d6aff;}
+.card-title{font-size:22px;font-weight:700;letter-spacing:-.3px;color:#e8edf5;}
+.card-sub{font-size:13px;color:#7a90b0;margin-top:5px;line-height:1.5;}
 
-/* ── Campos estilo underline ── */
-.field{display:flex;flex-direction:column;gap:0;margin-bottom:24px;}
-.field label{
-  font-size:11px;font-weight:700;
-  letter-spacing:.8px;text-transform:uppercase;
-  color:#aaaabc;margin-bottom:8px;
-}
-.input-wrap{position:relative;}
-.input-ico{
-  position:absolute;left:2px;top:50%;transform:translateY(-50%);
-  color:#bbbbcc;pointer-events:none;transition:color .2s;
-}
-.input-wrap:focus-within .input-ico{color:#2d6aff;}
-input[type=text],input[type=password]{
-  width:100%;
-  background:transparent;
-  border:none;
-  border-bottom:1.5px solid #d8d8e8;
-  border-radius:0;
-  padding:10px 36px 10px 28px;
-  font-size:14px;font-family:'DM Sans',sans-serif;
-  color:#1a1a2e;
-  outline:none;
-  appearance:none;-webkit-appearance:none;
-  transition:border-color .2s;
-}
-input::placeholder{color:#c0c0d0;}
-input:focus{border-bottom-color:#2d6aff;}
-input.has-error{border-bottom-color:#ef4444!important;}
+/* ── Corpo ─────────────────────────────────────── */
+.card-body{padding:28px 44px 36px;}
 
-/* ── Botão olho ── */
-.btn-eye{
-  position:absolute;right:2px;top:50%;transform:translateY(-50%);
-  background:none;border:none;cursor:pointer;
-  color:#c0c0d0;padding:4px;transition:color .15s;line-height:0;
-}
-.btn-eye:hover{color:#2d6aff;}
-
-/* ── Alerta de erro ── */
+/* ── Alerta de erro ────────────────────────────── */
 .alert-err{
-  background:#fff5f5;border:1px solid #fecaca;
+  background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);
   border-radius:10px;padding:11px 14px;
-  font-size:13px;color:#dc2626;
+  font-size:13px;color:#ef4444;
   display:flex;align-items:center;gap:8px;
-  margin-bottom:20px;
+  margin-bottom:22px;
   animation:errShake .35s ease;
 }
 @keyframes errShake{
   0%,100%{transform:none;}
-  20%{transform:translateX(-5px);}
-  40%{transform:translateX(5px);}
-  60%{transform:translateX(-3px);}
-  80%{transform:translateX(3px);}
+  20%{transform:translateX(-4px);}
+  40%{transform:translateX(4px);}
+  60%{transform:translateX(-2px);}
+  80%{transform:translateX(2px);}
 }
 
-/* ── Botão submit ── */
+/* ── Campos ────────────────────────────────────── */
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:18px;}
+.field label{
+  font-size:10.5px;font-weight:700;
+  letter-spacing:.7px;text-transform:uppercase;
+  color:#7a90b0;
+}
+.input-wrap{position:relative;}
+.input-ico{
+  position:absolute;left:13px;top:50%;transform:translateY(-50%);
+  color:#7a90b0;pointer-events:none;transition:color .2s;
+}
+.input-wrap:focus-within .input-ico{color:#2d6aff;}
+input[type=text],input[type=password]{
+  width:100%;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;
+  padding:11px 40px 11px 40px;
+  font-size:14px;font-family:'Segoe UI',system-ui,sans-serif;
+  color:#e8edf5;
+  outline:none;
+  transition:border-color .2s,background .2s,box-shadow .2s;
+}
+input::placeholder{color:#4a607a;}
+input:focus{
+  border-color:rgba(45,106,255,.55);
+  background:rgba(45,106,255,.06);
+  box-shadow:0 0 0 3px rgba(45,106,255,.1);
+}
+input.has-error{border-color:rgba(239,68,68,.5)!important;background:rgba(239,68,68,.04)!important;}
+
+/* ── Botão olho ────────────────────────────────── */
+.btn-eye{
+  position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  background:none;border:none;cursor:pointer;
+  color:#4a607a;padding:4px;transition:color .15s;line-height:0;
+}
+.btn-eye:hover{color:#2d6aff;}
+
+/* ── Botão submit ──────────────────────────────── */
 .btn-login{
-  width:100%;margin-top:8px;
-  padding:14px 20px;
-  background:#2d6aff;
-  border:none;border-radius:10px;color:white;
-  font-family:'DM Sans',sans-serif;
-  font-size:15px;font-weight:700;
+  width:100%;margin-top:10px;
+  padding:13px 20px;
+  background:#1e4fc9;
+  border:none;border-radius:10px;color:#fff;
+  font-family:'Segoe UI',system-ui,sans-serif;
+  font-size:14px;font-weight:700;
   cursor:pointer;letter-spacing:.3px;
-  transition:background .15s,transform .15s,box-shadow .15s;
-  box-shadow:0 6px 20px rgba(45,106,255,.35);
+  transition:background .15s,transform .12s,box-shadow .15s;
+  box-shadow:0 4px 16px rgba(30,79,201,.4);
+  display:flex;align-items:center;justify-content:center;gap:8px;
 }
-.btn-login:hover{background:#1a56e8;transform:translateY(-1px);box-shadow:0 10px 28px rgba(45,106,255,.45);}
-.btn-login:active{transform:none;background:#1a42c0;}
+.btn-login:hover{background:#2d6aff;transform:translateY(-1px);box-shadow:0 8px 24px rgba(45,106,255,.45);}
+.btn-login:active{transform:none;}
 
-/* ── Footer do card ── */
+/* ── Footer ────────────────────────────────────── */
 .card-footer{
-  margin-top:24px;text-align:center;
-  font-size:12px;color:#9898b0;line-height:1.7;
-  border-top:1px solid #ebebf5;padding-top:18px;
+  padding:16px 44px;
+  border-top:1px solid rgba(255,255,255,.06);
+  background:rgba(0,0,0,.12);
+  text-align:center;
+  font-size:11.5px;color:#4a607a;
 }
 
-/* ── Responsivo ── */
-@media(max-width:480px){
-  .form-card{padding:36px 24px 32px;border-radius:14px;}
-  .card-title{font-size:21px;}
+/* ── Responsivo ────────────────────────────────── */
+@media(max-width:540px){
+  .card-top,.card-body{padding-left:24px;padding-right:24px;}
+  .card-footer{padding-left:24px;padding-right:24px;}
+  .card-title{font-size:20px;}
+  .form-card{border-radius:14px;}
 }
 </style>
 </head>
@@ -304,91 +262,76 @@ input.has-error{border-bottom-color:#ef4444!important;}
 
 <div class="bg-deco"></div>
 
-<!-- ── Topbar ── -->
-<header class="topbar">
-  <a href="#" class="topbar-logo">
-    <span class="topbar-logo-dot"></span>
-    DOM<span class="accent">BAG</span>
-  </a>
-  <nav class="topbar-nav">
-    <a href="https://dombag.com.br">Sobre</a>
-    <a href="https://dombag.com.br/fale-com-um-especialista">Contato</a>
-  </nav>
-  <span class="topbar-badge">Sistema de Gestão Industrial</span>
-</header>
-
-<!-- ── Conteúdo ── -->
 <div class="page">
   <div class="form-card">
 
-    <div class="card-header">
-      <h2 class="card-title">Faça o seu login</h2>
+    <div class="card-top">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span class="brand-name">DOM<span>BAG</span></span>
+      </div>
+      <h2 class="card-title">Faça seu login</h2>
       <p class="card-sub">Insira suas credenciais para acessar o sistema.</p>
     </div>
 
-    <?php if ($erro): ?>
-    <div class="alert-err">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <?= htmlspecialchars($erro) ?>
-    </div>
-    <?php endif; ?>
+    <div class="card-body">
 
-    <form method="POST" id="frmLogin" novalidate>
-      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
-
-      <!-- Usuário -->
-      <div class="field">
-        <label for="f_login">Seu usuário*</label>
-        <div class="input-wrap">
-          <span class="input-ico">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          </span>
-          <input
-            type="text" id="f_login" name="login"
-            placeholder="seu.usuario"
-            value="<?= $login_val ?>"
-            autocomplete="username"
-            autofocus
-            <?= $erro ? 'class="has-error"' : '' ?>
-          >
-        </div>
+      <?php if ($erro): ?>
+      <div class="alert-err">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <?= htmlspecialchars($erro) ?>
       </div>
+      <?php endif; ?>
 
-      <!-- Senha -->
-      <div class="field">
-        <label for="f_senha">Sua senha*</label>
-        <div class="input-wrap">
-          <span class="input-ico">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-          </span>
-          <input
-            type="password" id="f_senha" name="senha"
-            placeholder="••••••••"
-            autocomplete="current-password"
-            <?= $erro ? 'class="has-error"' : '' ?>
-          >
-          <button type="button" class="btn-eye" id="btnEye" onclick="toggleEye()" title="Mostrar senha">
-            <svg id="eyeSvg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-            </svg>
-          </button>
+      <form method="POST" id="frmLogin" novalidate>
+        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
+
+        <div class="field">
+          <label for="f_login">Usuário</label>
+          <div class="input-wrap">
+            <span class="input-ico">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </span>
+            <input type="text" id="f_login" name="login"
+              placeholder="seu.usuario"
+              value="<?= $login_val ?>"
+              autocomplete="username" autofocus
+              <?= $erro ? 'class="has-error"' : '' ?>>
+          </div>
         </div>
-      </div>
 
+        <div class="field">
+          <label for="f_senha">Senha</label>
+          <div class="input-wrap">
+            <span class="input-ico">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </span>
+            <input type="password" id="f_senha" name="senha"
+              placeholder="••••••••"
+              autocomplete="current-password"
+              <?= $erro ? 'class="has-error"' : '' ?>>
+            <button type="button" class="btn-eye" onclick="toggleEye()" title="Mostrar senha">
+              <svg id="eyeSvg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
 
+        <button type="submit" class="btn-login" id="btnLogin">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          Entrar
+        </button>
+      </form>
 
-      <button type="submit" class="btn-login" id="btnLogin">
-        Entrar
-      </button>
-    </form>
+    </div><!-- /card-body -->
 
     <div class="card-footer">
       DOMBAG &mdash; Gestão Industrial &copy; <?= date('Y') ?>
     </div>
 
   </div>
-
-</div><!-- /.page -->
+</div>
 
 <script>
 function toggleEye() {
