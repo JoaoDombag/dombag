@@ -122,7 +122,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     try {
         $pdo = dbPDO();
         iaProspEnsureSchema($pdo);
-        $rows = $pdo->query('SELECT nome_empresa,cnpj,site,telefone,email,cidade,uf,segmento,segmento_busca,score,status_prosp,motivo_relevancia,gravado_em FROM LEADS_PROSPECTADOS ORDER BY gravado_em DESC')->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $pdo->query('SELECT nome_empresa,cnpj,site,telefone,email,cidade,uf,segmento,segmento_busca,score,status_prosp,motivo_relevancia,contato_compras_nome,contato_compras_meio,gravado_em FROM LEADS_PROSPECTADOS ORDER BY gravado_em DESC')->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable) { $rows = []; }
 
     header('Content-Type: text/csv; charset=utf-8');
@@ -134,6 +134,78 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
         foreach ($rows as $r) fputcsv($out, $r, ';');
     }
     fclose($out);
+    exit;
+}
+
+// ── Export PDF ────────────────────────────────────────────────────────────────
+if (isset($_GET['export']) && $_GET['export'] === 'pdf') {
+    try {
+        $pdo = dbPDO();
+        iaProspEnsureSchema($pdo);
+        $rows = $pdo->query('SELECT nome_empresa,cnpj,site,telefone,email,cidade,uf,segmento,segmento_busca,score,status_prosp,motivo_relevancia,contato_compras_nome,contato_compras_meio,gravado_em FROM LEADS_PROSPECTADOS ORDER BY gravado_em DESC')->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable) { $rows = []; }
+
+    require $_SERVER['DOCUMENT_ROOT'] . '/vendor/autoload.php';
+    $opts = new \Dompdf\Options();
+    $opts->set('isRemoteEnabled', false);
+    $pdf = new \Dompdf\Dompdf($opts);
+
+    $statusLabel = ['NOVO'=>'Novo','EM_CONTATO'=>'Em contato','QUALIFICADO'=>'Qualificado','DESCARTADO'=>'Descartado'];
+
+    $html  = '<!DOCTYPE html><html><head><meta charset="utf-8">';
+    $html .= '<style>
+        body{font-family:DejaVu Sans,sans-serif;font-size:8px;color:#1e293b;margin:0;padding:0}
+        h1{font-size:13px;margin:0 0 4px}
+        .sub{font-size:9px;color:#64748b;margin-bottom:12px}
+        table{width:100%;border-collapse:collapse;margin-top:4px}
+        th{background:#1e3a5f;color:#fff;font-size:7.5px;padding:5px 4px;text-align:left}
+        td{border-bottom:1px solid #e2e8f0;padding:4px;vertical-align:top;font-size:7.5px}
+        tr:nth-child(even) td{background:#f8fafc}
+        .score{display:inline-block;padding:2px 5px;border-radius:4px;font-weight:700;font-size:7px}
+        .sh{background:#d1fae5;color:#065f46}.sm{background:#fef3c7;color:#92400e}.sl{background:#fee2e2;color:#991b1b}
+        .muted{color:#64748b}
+        .contact{font-weight:600}
+        .footer{text-align:center;font-size:7px;color:#94a3b8;margin-top:10px}
+    </style></head><body>';
+    $html .= '<h1>Leads Prospectados — DomBag</h1>';
+    $html .= '<div class="sub">Gerado em ' . date('d/m/Y H:i') . ' · ' . count($rows) . ' lead(s)</div>';
+    $html .= '<table><thead><tr>
+        <th>#</th><th>Score</th><th>Empresa</th><th>CNPJ</th><th>Local</th>
+        <th>Contato Empresa</th><th>Compras / Comercial</th><th>Segmento</th><th>Status</th>
+    </tr></thead><tbody>';
+
+    foreach ($rows as $i => $r) {
+        $score = (int)($r['score'] ?? 0);
+        $sc    = $score >= 70 ? 'sh' : ($score >= 40 ? 'sm' : 'sl');
+        $tel   = htmlspecialchars($r['telefone'] ?? '');
+        $email = htmlspecialchars($r['email'] ?? '');
+        $cnome = htmlspecialchars($r['contato_compras_nome'] ?? '');
+        $cmeio = htmlspecialchars($r['contato_compras_meio'] ?? '');
+        $local = htmlspecialchars(trim(($r['cidade'] ?? '') . ' / ' . ($r['uf'] ?? ''), ' /'));
+        $status = $statusLabel[$r['status_prosp'] ?? 'NOVO'] ?? ($r['status_prosp'] ?? '');
+
+        $html .= '<tr>';
+        $html .= '<td class="muted">' . ($i + 1) . '</td>';
+        $html .= '<td><span class="score ' . $sc . '">' . $score . '</span></td>';
+        $html .= '<td><strong>' . htmlspecialchars($r['nome_empresa'] ?? '') . '</strong>'
+               . ($r['motivo_relevancia'] ? '<br><span class="muted">' . htmlspecialchars(mb_substr($r['motivo_relevancia'], 0, 80)) . '</span>' : '') . '</td>';
+        $html .= '<td class="muted">' . htmlspecialchars($r['cnpj'] ?? '') . '</td>';
+        $html .= '<td>' . $local . '</td>';
+        $html .= '<td>' . ($tel ? $tel . '<br>' : '') . ($email ? '<span class="muted">' . $email . '</span>' : '') . ($tel === '' && $email === '' ? '—' : '') . '</td>';
+        $html .= '<td>' . ($cnome ? '<span class="contact">' . $cnome . '</span>' : '') . ($cmeio ? '<br><span class="muted">' . $cmeio . '</span>' : '') . ($cnome === '' && $cmeio === '' ? '—' : '') . '</td>';
+        $html .= '<td>' . htmlspecialchars($r['segmento_busca'] ?? '') . '</td>';
+        $html .= '<td>' . htmlspecialchars($status) . '</td>';
+        $html .= '</tr>';
+    }
+
+    $html .= '</tbody></table>';
+    $html .= '<div class="footer">DomBag · leads_prospectados · ' . date('Y-m-d') . '</div>';
+    $html .= '</body></html>';
+
+    $pdf->loadHtml($html);
+    $pdf->setPaper('A4', 'landscape');
+    $pdf->render();
+    $pdf->stream('leads_prospectados_' . date('Y-m-d') . '.pdf', ['Attachment' => true]);
     exit;
 }
 
@@ -314,6 +386,10 @@ function rUrl(array $extra = [], array $remove = []): string
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Exportar CSV
     </a>
+    <a href="?export=pdf&<?= http_build_query(array_diff_key($_GET, ['page'=>'','export'=>''])) ?>" class="btn-secondary">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Gerar PDF
+    </a>
   </div>
 </header>
 
@@ -447,7 +523,8 @@ function rUrl(array $extra = [], array $remove = []): string
             <th>Empresa</th>
             <th>CNPJ</th>
             <th>Local</th>
-            <th>Contato</th>
+            <th>Contato Empresa</th>
+            <th>Compras / Comercial</th>
             <th>Site</th>
             <th>Segmento</th>
             <th>Status</th>
@@ -468,10 +545,12 @@ function rUrl(array $extra = [], array $remove = []): string
             $rCnpj   = (string) ($row['cnpj'] ?? '');
             $rCidade = (string) ($row['cidade'] ?? '');
             $rUf     = (string) ($row['uf'] ?? '');
-            $rTel    = (string) ($row['telefone'] ?? '');
-            $rEmail  = (string) ($row['email'] ?? '');
-            $rSite   = (string) ($row['site'] ?? '');
-            $rSeg    = (string) ($row['segmento_busca'] ?? '');
+            $rTel         = (string) ($row['telefone'] ?? '');
+            $rEmail       = (string) ($row['email'] ?? '');
+            $rSite        = (string) ($row['site'] ?? '');
+            $rSeg         = (string) ($row['segmento_busca'] ?? '');
+            $rComprasNome = (string) ($row['contato_compras_nome'] ?? '');
+            $rComprasMeio = (string) ($row['contato_compras_meio'] ?? '');
           ?>
           <tr id="row-<?= $row['id'] ?>">
             <td class="cb-td"><input type="checkbox" class="row-cb" value="<?= $row['id'] ?>"></td>
@@ -487,6 +566,15 @@ function rUrl(array $extra = [], array $remove = []): string
               <?php if ($rTel !== ''): ?><div><?= iaH($rTel) ?></div><?php endif; ?>
               <?php if ($rEmail !== ''): ?><div style="font-size:11px;color:var(--text-muted)"><?= iaH($rEmail) ?></div><?php endif; ?>
               <?php if ($rTel === '' && $rEmail === ''): ?>—<?php endif; ?>
+            </td>
+            <td>
+              <?php if ($rComprasNome !== ''): ?>
+                <div style="font-size:12px;font-weight:600;"><?= iaH($rComprasNome) ?></div>
+              <?php endif; ?>
+              <?php if ($rComprasMeio !== ''): ?>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:2px;"><?= iaH($rComprasMeio) ?></div>
+              <?php endif; ?>
+              <?php if ($rComprasNome === '' && $rComprasMeio === ''): ?>—<?php endif; ?>
             </td>
             <td>
               <?php if ($rSite !== ''): ?>

@@ -436,6 +436,65 @@ $hoje = new DateTime();
 .card-img-count.has-images { display: inline-block; }
 
 /* Modal de imagens */
+/* ── Modal Detalhes ── */
+.det-modal {
+  position: fixed; inset: 0; z-index: 990;
+  background: rgba(0,0,0,.65); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+}
+.det-modal-box {
+  background: var(--card-bg); border: 1px solid var(--border);
+  border-radius: 16px; width: 560px; max-width: 96vw;
+  max-height: 90vh; display: flex; flex-direction: column;
+  box-shadow: 0 24px 64px rgba(0,0,0,.5);
+  overflow: hidden;
+}
+.det-modal-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 18px 20px 14px; border-bottom: 1px solid var(--border);
+  gap: 12px;
+}
+.det-modal-title { font-size: 15px; font-weight: 700; }
+.det-modal-title span { color: #7db3ff; }
+.det-modal-close {
+  background: none; border: none; color: var(--text-muted);
+  font-size: 16px; cursor: pointer; padding: 0 2px; line-height: 1;
+}
+.det-modal-close:hover { color: var(--text); }
+.det-modal-body { padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.det-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; }
+.det-full { grid-column: 1 / -1; }
+.det-field {}
+.det-label { font-size: 10.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px; }
+.det-value { font-size: 13px; font-weight: 500; }
+.det-status-badge {
+  display: inline-block; font-size: 11px; font-weight: 600;
+  padding: 2px 10px; border-radius: 20px;
+  background: rgba(45,106,255,.18); color: #7db3ff;
+  margin-top: 4px;
+}
+.det-prog-area { display: flex; flex-direction: column; gap: 6px; }
+.det-prog-row { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text-muted); }
+.det-obs-area { display: flex; flex-direction: column; gap: 6px; }
+.det-obs-text {
+  font-size: 12.5px; color: var(--text);
+  background: rgba(255,255,255,.04); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px; white-space: pre-wrap;
+}
+.det-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 12px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-muted);
+}
+.det-img-btn {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(45,106,255,.12); border: 1px solid rgba(45,106,255,.3);
+  color: #7db3ff; font-size: 11.5px; font-weight: 600;
+  border-radius: 8px; padding: 5px 12px; cursor: pointer;
+}
+.det-img-btn:hover { background: rgba(45,106,255,.22); }
+.kanban-card { cursor: pointer; }
+
 .img-modal {
   position: fixed; inset: 0; z-index: 1000;
   background: rgba(0,0,0,.65); backdrop-filter: blur(4px);
@@ -659,7 +718,23 @@ $hoje = new DateTime();
             <div class="kanban-card"
                  draggable="true"
                  data-id="<?= $item['iv_codigo'] ?>"
-                 data-status="<?= htmlspecialchars($item['iv_status']) ?>">
+                 data-status="<?= htmlspecialchars($item['iv_status']) ?>"
+                 data-pedido="<?= htmlspecialchars($pedNum ?: $item['ven_codigo']) ?>"
+                 data-cliente="<?= htmlspecialchars($item['cliente']) ?>"
+                 data-uf="<?= htmlspecialchars($item['ven_uf'] ?? '') ?>"
+                 data-produto="<?= htmlspecialchars($item['pro_descricao']) ?>"
+                 data-categoria="<?= htmlspecialchars($item['pro_categoria'] ?? '') ?>"
+                 data-tipo="<?= htmlspecialchars($item['pro_tipo'] ?? '') ?>"
+                 data-qtde="<?= number_format((float)$item['iv_qtde'], 0, ',', '.') ?>"
+                 data-entrega="<?= $entFmt ?>"
+                 data-entrega-cls="<?= $chipCls ?>"
+                 data-prio="<?= (int)$item['iv_prioridade'] ?>"
+                 data-obs="<?= htmlspecialchars($item['iv_obs'] ?? '') ?>"
+                 data-rep="<?= htmlspecialchars($item['ven_representante'] ?? '') ?>"
+                 data-produzido="<?= number_format($produzido, 0, ',', '.') ?>"
+                 data-pct="<?= $pct ?>"
+                 data-atualizado="<?= htmlspecialchars($item['iv_atualizado_em'] ?? '') ?>"
+                 onclick="if(Date.now()-_lastDragEnd>250)openDetailModal(this)">
 
               <div class="card-top">
                 <span class="card-num"><?= htmlspecialchars($pedNum ?: $item['ven_codigo']) ?></span>
@@ -722,6 +797,79 @@ $hoje = new DateTime();
   </div>
 </div>
 
+<!-- Modal de Detalhes do Pedido -->
+<div class="det-modal" id="detModal" style="display:none;" onclick="if(event.target===this)closeDetailModal()">
+  <div class="det-modal-box">
+    <div class="det-modal-header">
+      <div>
+        <div class="det-modal-title">Pedido <span id="detPedNum"></span></div>
+        <div class="det-modal-status"><span id="detStatusBadge"></span></div>
+      </div>
+      <button class="det-modal-close" onclick="closeDetailModal()">✕</button>
+    </div>
+    <div class="det-modal-body">
+      <div class="det-grid">
+        <div class="det-field">
+          <div class="det-label">Cliente</div>
+          <div class="det-value" id="detCliente"></div>
+        </div>
+        <div class="det-field">
+          <div class="det-label">UF</div>
+          <div class="det-value" id="detUF"></div>
+        </div>
+        <div class="det-field det-full">
+          <div class="det-label">Produto</div>
+          <div class="det-value" id="detProduto"></div>
+        </div>
+        <div class="det-field">
+          <div class="det-label">Categoria</div>
+          <div class="det-value" id="detCategoria"></div>
+        </div>
+        <div class="det-field">
+          <div class="det-label">Tipo</div>
+          <div class="det-value" id="detTipo"></div>
+        </div>
+        <div class="det-field">
+          <div class="det-label">Quantidade</div>
+          <div class="det-value" id="detQtde"></div>
+        </div>
+        <div class="det-field">
+          <div class="det-label">Entrega</div>
+          <div class="det-value" id="detEntrega"></div>
+        </div>
+        <div class="det-field">
+          <div class="det-label">Representante</div>
+          <div class="det-value" id="detRep"></div>
+        </div>
+        <div class="det-field">
+          <div class="det-label">Prioridade</div>
+          <div class="det-value" id="detPrio"></div>
+        </div>
+      </div>
+      <div id="detProgArea" style="display:none;" class="det-prog-area">
+        <div class="det-label">Progresso de Produção</div>
+        <div class="det-prog-row">
+          <div class="prog-bar-bg" style="flex:1;">
+            <div class="prog-bar-fill" id="detProgBar" style="width:0%;"></div>
+          </div>
+          <span id="detProgLabel"></span>
+        </div>
+      </div>
+      <div id="detObsArea" style="display:none;" class="det-obs-area">
+        <div class="det-label">Observações</div>
+        <div class="det-obs-text" id="detObs"></div>
+      </div>
+      <div class="det-footer">
+        <span id="detAtualizado"></span>
+        <button class="det-img-btn" id="detOpenImgBtn">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          Ver imagens
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Modal de Imagens -->
 <div class="img-modal" id="imgModal" style="display:none;" onclick="if(event.target===this)closeImageModal()">
   <div class="img-modal-box">
@@ -770,6 +918,7 @@ function showToast(msg, err = false) {
 // ── Drag & Drop ───────────────────────────────────────────────────────────────
 let dragging   = null;   // card element being dragged
 let fromStatus = null;
+let _lastDragEnd = 0;
 
 document.querySelectorAll('.kanban-card').forEach(addCardDrag);
 document.querySelectorAll('.col-cards').forEach(addColDrop);
@@ -783,6 +932,7 @@ function addCardDrag(card) {
     e.dataTransfer.setData('text/plain', card.dataset.id);
   });
   card.addEventListener('dragend', () => {
+    _lastDragEnd = Date.now();
     card.classList.remove('dragging');
     document.querySelectorAll('.col-cards').forEach(c => c.classList.remove('drag-over'));
     document.querySelectorAll('.kanban-card').forEach(c => c.classList.remove('drag-over-card'));
@@ -1072,9 +1222,77 @@ function closeLightbox() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (document.getElementById('imgLightbox').style.display !== 'none') { closeLightbox(); return; }
-    if (imgModal.style.display !== 'none') closeImageModal();
+    if (imgModal.style.display !== 'none') { closeImageModal(); return; }
+    if (document.getElementById('detModal').style.display !== 'none') { closeDetailModal(); return; }
   }
 });
+
+// ── Modal de Detalhes ─────────────────────────────────────────────────────────
+let _detIvCodigo = null;
+let _detPedNum   = null;
+
+function openDetailModal(card) {
+  const d = card.dataset;
+  _detIvCodigo = d.id;
+  _detPedNum   = d.pedido;
+
+  document.getElementById('detPedNum').textContent    = d.pedido;
+  document.getElementById('detCliente').textContent   = d.cliente || '—';
+  document.getElementById('detUF').textContent        = d.uf || '—';
+  document.getElementById('detProduto').textContent   = d.produto || '—';
+  document.getElementById('detCategoria').textContent = d.categoria || '—';
+  document.getElementById('detTipo').textContent      = d.tipo || '—';
+  document.getElementById('detQtde').textContent      = d.qtde + ' un';
+  document.getElementById('detRep').textContent       = d.rep || '—';
+
+  const prio = parseInt(d.prio);
+  document.getElementById('detPrio').textContent = prio > 0 ? 'P' + prio : '—';
+
+  const entEl = document.getElementById('detEntrega');
+  entEl.textContent = d.entrega;
+  entEl.className   = 'det-value ' + (d.entregaCls || d['entrega-cls'] || '');
+
+  const statusBadge = document.getElementById('detStatusBadge');
+  statusBadge.textContent = d.status || '—';
+  statusBadge.className   = 'det-status-badge';
+
+  const pct = parseInt(d.pct);
+  const progArea = document.getElementById('detProgArea');
+  if (parseInt(d.produzido.replace(/\./g,'')) > 0) {
+    progArea.style.display = '';
+    document.getElementById('detProgBar').style.width = pct + '%';
+    document.getElementById('detProgBar').className   = 'prog-bar-fill' + (pct >= 100 ? '' : ' parcial');
+    document.getElementById('detProgLabel').textContent = d.produzido + ' produzido · ' + pct + '%';
+  } else {
+    progArea.style.display = 'none';
+  }
+
+  const obsArea = document.getElementById('detObsArea');
+  const obs = d.obs || '';
+  if (obs) {
+    obsArea.style.display = '';
+    document.getElementById('detObs').textContent = obs;
+  } else {
+    obsArea.style.display = 'none';
+  }
+
+  const atEl = document.getElementById('detAtualizado');
+  atEl.textContent = d.atualizado ? 'Atualizado: ' + d.atualizado : '';
+
+  document.getElementById('detOpenImgBtn').onclick = () => {
+    closeDetailModal();
+    openImageModal(parseInt(_detIvCodigo), _detPedNum, null);
+  };
+
+  document.getElementById('detModal').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDetailModal() {
+  document.getElementById('detModal').style.display = 'none';
+  document.body.style.overflow = '';
+  _detIvCodigo = null;
+}
 
 // Animação do spinner provisório
 const spinStyle = document.createElement('style');

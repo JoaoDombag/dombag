@@ -78,7 +78,7 @@ try {
     // ── Busca departamentos ──────────────────────
     $deptos = array_map(
         fn($r) => array_change_key_case($r, CASE_LOWER),
-        $pdo->query('SELECT dp_codigo, dp_descricao FROM DEPARTAMENTOS ORDER BY dp_descricao')
+        $pdo->query("SELECT dp_codigo, dp_descricao FROM DEPARTAMENTOS WHERE UPPER(dp_descricao) IN ('BAG','SACARIA') ORDER BY dp_descricao")
             ->fetchAll(PDO::FETCH_ASSOC)
     );
 
@@ -308,27 +308,17 @@ try {
                      maxlength="120" required autofocus>
             </div>
 
-            <div class="f-row">
-              <div class="field">
-                <label>Departamento *</label>
-                <select name="dp_codigo" required>
-                  <option value="">— Selecione —</option>
-                  <?php foreach ($deptos as $d): ?>
-                  <option value="<?= $d['dp_codigo'] ?>"
-                    <?= (int) $f['dp_codigo'] === (int) $d['dp_codigo'] ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($d['dp_descricao']) ?>
-                  </option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-              <div class="field">
-                <label>Grupo PCP</label>
-                <input type="text" name="maq_grupo"
-                       value="<?= htmlspecialchars($f['maq_grupo'] ?? '') ?>"
-                       placeholder="Ex: Corte Bag, Costura…"
-                       maxlength="80">
-                <span class="f-hint">Agrupa máquinas semelhantes no planejamento.</span>
-              </div>
+            <div class="field">
+              <label>Departamento *</label>
+              <select name="dp_codigo" required>
+                <option value="">— Selecione —</option>
+                <?php foreach ($deptos as $d): ?>
+                <option value="<?= $d['dp_codigo'] ?>"
+                  <?= (int) $f['dp_codigo'] === (int) $d['dp_codigo'] ? 'selected' : '' ?>>
+                  <?= htmlspecialchars($d['dp_descricao']) ?>
+                </option>
+                <?php endforeach; ?>
+              </select>
             </div>
           </div>
 

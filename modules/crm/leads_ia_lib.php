@@ -234,6 +234,10 @@ Regras:
 - Se possível, dê preferência a empresas que mencionem ou mostrem interesse em embalagens, logística, transporte ou temas relacionados ao nosso produto foco.
 - Busque também empresas novas e em crescimento, que possam estar iniciando operações ou expandindo, mesmo que ainda não tenham grande presença online.
 - Traga apenas empresas com score acima de 60, a menos que haja um motivo muito forte para incluir empresas com score mais baixo (nesse caso, explique claramente no campo motivo_relevancia).
+- Para cada empresa, procure o contato responsável pelo setor de compras ou comercial: nome da pessoa e forma de contato (e-mail, telefone, LinkedIn ou WhatsApp).
+  Fontes a consultar: site da empresa, LinkedIn, portais de fornecedores, Receita Federal, diretórios B2B.
+  Campos: "contato_compras_nome" (nome e cargo, ex: "João Silva – Gerente de Compras") e "contato_compras_meio" (ex: "joao@empresa.com.br" ou "LinkedIn: linkedin.com/in/joaosilva").
+- OBRIGATÓRIO: retorne APENAS empresas para as quais conseguiu identificar o nome e a forma de contato do setor de compras ou comercial. Empresas sem esse dado devem ser DESCARTADAS.
 
 Retorne SOMENTE JSON válido, sem markdown e sem texto fora do JSON.
 Formato exato:
@@ -250,7 +254,9 @@ Formato exato:
       "segmento": "",
       "fonte": "",
       "motivo_relevancia": "",
-      "score": 0
+      "score": 0,
+      "contato_compras_nome": "",
+      "contato_compras_meio": ""
     }
   ]
 }
@@ -473,6 +479,16 @@ function iaProspEnsureSchema(PDO $pdo): void
     if (!(int) $col->fetchColumn()) {
         $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN usuario_id INT UNSIGNED NULL DEFAULT NULL AFTER status_prosp");
     }
+
+    $col->execute(['LEADS_PROSPECTADOS', 'contato_compras_nome']);
+    if (!(int) $col->fetchColumn()) {
+        $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN contato_compras_nome VARCHAR(255) NULL DEFAULT NULL");
+    }
+
+    $col->execute(['LEADS_PROSPECTADOS', 'contato_compras_meio']);
+    if (!(int) $col->fetchColumn()) {
+        $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN contato_compras_meio VARCHAR(255) NULL DEFAULT NULL");
+    }
 }
 
 /**
@@ -545,24 +561,26 @@ function iaProspSaveAll(PDO $pdo, array $leads, string $segmentoBusca): array
     $novos = 0;
     $duplicados = 0;
     $sql = 'INSERT IGNORE INTO LEADS_PROSPECTADOS
-        (cnpj, nome_empresa, site, telefone, email, cidade, uf, segmento, fonte, motivo_relevancia, score, segmento_busca, dedupe_key)
-        VALUES (:cnpj, :nome_empresa, :site, :telefone, :email, :cidade, :uf, :segmento, :fonte, :motivo_relevancia, :score, :segmento_busca, :dedupe_key)';
+        (cnpj, nome_empresa, site, telefone, email, cidade, uf, segmento, fonte, motivo_relevancia, score, segmento_busca, dedupe_key, contato_compras_nome, contato_compras_meio)
+        VALUES (:cnpj, :nome_empresa, :site, :telefone, :email, :cidade, :uf, :segmento, :fonte, :motivo_relevancia, :score, :segmento_busca, :dedupe_key, :contato_compras_nome, :contato_compras_meio)';
     $stmt = $pdo->prepare($sql);
     foreach ($leads as $lead) {
         $stmt->execute([
-            'cnpj'              => iaFormatCnpj((string) ($lead['cnpj'] ?? '')),
-            'nome_empresa'      => trim((string) ($lead['nome_empresa'] ?? '')),
-            'site'              => trim((string) ($lead['site'] ?? '')),
-            'telefone'          => trim((string) ($lead['telefone'] ?? '')),
-            'email'             => trim((string) ($lead['email'] ?? '')),
-            'cidade'            => trim((string) ($lead['cidade'] ?? '')),
-            'uf'                => strtoupper(trim((string) ($lead['uf'] ?? ''))),
-            'segmento'          => trim((string) ($lead['segmento'] ?? '')),
-            'fonte'             => trim((string) ($lead['fonte'] ?? '')),
-            'motivo_relevancia' => trim((string) ($lead['motivo_relevancia'] ?? '')),
-            'score'             => (int) ($lead['score'] ?? 0),
-            'segmento_busca'    => $segmentoBusca,
-            'dedupe_key'        => iaProspDedupeKey($lead),
+            'cnpj'                  => iaFormatCnpj((string) ($lead['cnpj'] ?? '')),
+            'nome_empresa'          => trim((string) ($lead['nome_empresa'] ?? '')),
+            'site'                  => trim((string) ($lead['site'] ?? '')),
+            'telefone'              => trim((string) ($lead['telefone'] ?? '')),
+            'email'                 => trim((string) ($lead['email'] ?? '')),
+            'cidade'                => trim((string) ($lead['cidade'] ?? '')),
+            'uf'                    => strtoupper(trim((string) ($lead['uf'] ?? ''))),
+            'segmento'              => trim((string) ($lead['segmento'] ?? '')),
+            'fonte'                 => trim((string) ($lead['fonte'] ?? '')),
+            'motivo_relevancia'     => trim((string) ($lead['motivo_relevancia'] ?? '')),
+            'score'                 => (int) ($lead['score'] ?? 0),
+            'segmento_busca'        => $segmentoBusca,
+            'dedupe_key'            => iaProspDedupeKey($lead),
+            'contato_compras_nome'  => trim((string) ($lead['contato_compras_nome'] ?? '')) ?: null,
+            'contato_compras_meio'  => trim((string) ($lead['contato_compras_meio'] ?? '')) ?: null,
         ]);
         if ($stmt->rowCount() > 0) $novos++;
         else $duplicados++;
