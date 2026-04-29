@@ -45,6 +45,7 @@ RewriteRule ^vendas/simulacao$         modules/pedidos/simulacao_venda.php     [
 RewriteRule ^yzidro/pedidos$           modules/yzidro/pedidos.php              [L,QSA]
 RewriteRule ^yzidro/consulta$          modules/yzidro/consulta_vendas.php      [L,QSA]
 RewriteRule ^yzidro/finalizados$       modules/yzidro/rel_finalizados.php      [L,QSA]
+RewriteRule ^yzidro/producao$          modules/yzidro/producao.php             [L,QSA]
 
 # PCP — Produção
 RewriteRule ^pcp/kanban$               modules/pcp/kanban.php                  [L,QSA]
