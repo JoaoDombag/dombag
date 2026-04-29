@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find \"/c/xampp/htdocs/dombag/{config,backend\" -type f)"
+      "Bash(find \"/c/xampp/htdocs/dombag/{config,backend\" -type f)",
+      "Bash(php -l modules/usuarios/cad_grupos.php)",
+      "Bash(php -l modules/usuarios/cad_usuarios.php)",
+      "Bash(php -l modules/maquinas/cad_maquinas.php)",
+      "Bash(php -l modules/produtos/cad_produtos.php)"
     ]
   }
 }

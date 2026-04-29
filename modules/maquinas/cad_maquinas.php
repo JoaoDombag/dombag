@@ -188,23 +188,23 @@ try {
   <link rel="stylesheet" href="/public/css/unified_admin.css">
   <link rel="icon" href="/public/css/icone.ico" type="image/png">
   <style>
-  .content { overflow-y: auto; flex-direction: column; align-items: center; gap: 16px; padding: 28px 24px; }
+  .content { flex: 1; overflow: hidden; display: flex; flex-direction: column; padding: 20px 24px; }
 
-  .cad-alert { width: 100%; max-width: 580px; border-radius: 10px; padding: 11px 16px; font-size: 12.5px; display: flex; align-items: center; gap: 8px; }
+  .cad-alert { border-radius: 10px; padding: 11px 16px; font-size: 12.5px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .cad-alert-err { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.25); color: #ef4444; }
 
-  .cad-card { width: 100%; max-width: 580px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 4px 28px rgba(0,0,0,.22); }
+  .cad-card { flex: 1; min-height: 0; background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; box-shadow: 0 4px 28px rgba(0,0,0,.22); display: flex; flex-direction: column; }
 
-  .cad-head { padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; background: linear-gradient(120deg, rgba(30,79,201,.1) 0%, transparent 70%); border-top: 3px solid var(--blue-accent); }
+  .cad-head { padding: 18px 24px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; background: linear-gradient(120deg, rgba(30,79,201,.1) 0%, transparent 70%); border-top: 3px solid var(--blue-accent); flex-shrink: 0; }
   .cad-icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(30,79,201,.15); border: 1px solid rgba(30,79,201,.25); color: #7db3ff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .cad-head-info { flex: 1; }
   .cad-head-info h2 { font-size: 15px; font-weight: 700; }
   .cad-head-info p  { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
   .badge-edit { font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px; background: rgba(245,158,11,.12); color: var(--amber); display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
 
-  .cad-section { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; }
-  .cad-section + .cad-section { border-top: 1px solid var(--border); }
-  .section-label { font-size: 10px; font-weight: 800; letter-spacing: 1.2px; color: var(--text-muted); text-transform: uppercase; padding-bottom: 6px; border-bottom: 1px solid var(--border); margin-bottom: 2px; }
+  .cad-body { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .section-label { font-size: 10px; font-weight: 800; letter-spacing: 1.2px; color: var(--text-muted); text-transform: uppercase; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .cad-section { display: flex; flex-direction: column; gap: 14px; }
 
   .f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .f-row.t3 { grid-template-columns: repeat(3, 1fr); }
@@ -225,12 +225,13 @@ try {
   .calc-box-val   { font-size: 26px; font-weight: 800; color: var(--teal); letter-spacing: -1px; line-height: 1; }
   .calc-box-unit  { font-size: 11px; color: rgba(0,201,167,.55); text-align: right; margin-top: 3px; }
 
-  .cad-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 8px; background: rgba(0,0,0,.08); }
+  .cad-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; gap: 8px; background: rgba(0,0,0,.08); flex-shrink: 0; }
   .cad-footer .btn-primary { flex: 1; justify-content: center; font-size: 13.5px; padding: 10px 20px; }
 
   @media (max-width: 640px) {
-    .content { padding: 14px 12px; gap: 12px; }
-    .cad-head, .cad-section, .cad-footer { padding-left: 18px; padding-right: 18px; }
+    .content { padding: 12px; }
+    .cad-head, .cad-body, .cad-footer { padding-left: 16px; padding-right: 16px; }
+    .cad-body { padding-top: 16px; padding-bottom: 16px; }
     .cad-footer { flex-direction: column-reverse; }
     .cad-footer .btn-primary { flex: none; }
     .f-row, .f-row.t3 { grid-template-columns: 1fr; }
@@ -260,14 +261,6 @@ try {
     </header>
 
     <div class="content">
-
-      <?php if ($db_error): ?>
-      <div class="cad-alert cad-alert-err" id="alertEl">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <?= htmlspecialchars($db_error) ?>
-      </div>
-      <?php endif; ?>
-
       <div class="cad-card">
 
         <div class="cad-head">
@@ -294,9 +287,18 @@ try {
           <input type="hidden" name="acao"       value="salvar">
           <input type="hidden" name="maq_codigo" value="<?= (int) $f['maq_codigo'] ?>">
 
-          <!-- Identificação -->
-          <div class="cad-section">
-            <div class="section-label">Identificação</div>
+          <div class="cad-body">
+
+            <?php if ($db_error): ?>
+            <div class="cad-alert cad-alert-err" id="alertEl">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <?= htmlspecialchars($db_error) ?>
+            </div>
+            <?php endif; ?>
+
+            <!-- Identificação -->
+            <div class="cad-section">
+              <div class="section-label">Identificação</div>
 
             <div class="field">
               <label>Descrição *</label>
@@ -370,19 +372,20 @@ try {
             </div>
           </div>
 
-          <!-- Configurações PCP -->
-          <div class="cad-section">
-            <div class="section-label">Configurações PCP</div>
+            <!-- Configurações PCP -->
+            <div class="cad-section">
+              <div class="section-label">Configurações PCP</div>
+              <label class="check-widget">
+                <input type="checkbox" name="maq_conta_producao" value="1"
+                       <?= $f['maq_conta_producao'] ? 'checked' : '' ?>>
+                <div class="check-widget-info">
+                  <span class="check-widget-label">Contabilizar no total de produção</span>
+                  <span class="check-widget-hint">Desmarque para processos intermediários (ex: carimbadeira) que não devem duplicar a contagem de unidades.</span>
+                </div>
+              </label>
+            </div>
 
-            <label class="check-widget">
-              <input type="checkbox" name="maq_conta_producao" value="1"
-                     <?= $f['maq_conta_producao'] ? 'checked' : '' ?>>
-              <div class="check-widget-info">
-                <span class="check-widget-label">Contabilizar no total de produção</span>
-                <span class="check-widget-hint">Desmarque para processos intermediários (ex: carimbadeira) que não devem duplicar a contagem de unidades.</span>
-              </div>
-            </label>
-          </div>
+          </div><!-- /cad-body -->
 
           <div class="cad-footer">
             <a href="/maquinas" class="btn-secondary">Cancelar</a>
@@ -392,8 +395,7 @@ try {
             </button>
           </div>
         </form>
-      </div>
-
+      </div><!-- /cad-card -->
     </div>
   </div>
 </div>
