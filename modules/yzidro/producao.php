@@ -128,7 +128,6 @@ if ($pg) {
             SELECT
                 V.PROD_CODIGO,
                 V.PROD_DATA,
-                V.PROD_TOTAL,
                 V.PROD_OBS,
                 V.PROD_TIPO,
                 V.FINALIZADO,
@@ -140,6 +139,8 @@ if ($pg) {
                 V.VENDA_REF,
                 V.TIPO_PRODUCAO,
                 V.DATA_FINALIZA,
+                COALESCE(SUM(IP.ITE_QTD), 0)       AS total_qtd,
+                COALESCE(SUM(IP.ITE_QTD_BAIXA), 0) AS total_qtd_baixa,
                 CAST(
                     CASE
                         WHEN SUM(IP.ITE_QTD) <= SUM(IP.ITE_QTD_FAT) THEN '0'
@@ -192,8 +193,9 @@ if ($pg) {
     $erp_msg = 'Sem conexão com o ERP Yzidro (PostgreSQL).';
 }
 
-$totalOrdens = count($ordens);
-$totalValor  = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['prod_total'] ?? 0), 0.0);
+$totalOrdens   = count($ordens);
+$totalQtd      = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['total_qtd']       ?? 0), 0.0);
+$totalQtdBaixa = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['total_qtd_baixa'] ?? 0), 0.0);
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -394,13 +396,13 @@ $totalValor  = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['prod_total'
         </div>
         <div class="kpi-card teal">
           <div class="kpi-header">
-            <span class="kpi-label">Valor total</span>
+            <span class="kpi-label">Qtd produzida (baixa)</span>
             <div class="kpi-icon">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             </div>
           </div>
-          <div class="kpi-value" style="font-size:18px;letter-spacing:-.5px"><?= ypMoney($totalValor) ?></div>
-          <div class="kpi-footer">soma das ordens listadas</div>
+          <div class="kpi-value"><?= number_format($totalQtdBaixa, 0, ',', '.') ?></div>
+          <div class="kpi-footer">Planejada: <?= number_format($totalQtd, 0, ',', '.') ?></div>
         </div>
         <div class="kpi-card amber">
           <div class="kpi-header">
@@ -437,7 +439,8 @@ $totalValor  = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['prod_total'
                 <th>Pedido ERP</th>
                 <th>Lote</th>
                 <th>Tipo</th>
-                <th class="col-r">Total</th>
+                <th class="col-r">Qtd plan.</th>
+                <th class="col-r">Qtd prod.</th>
                 <th>Faturamento</th>
               </tr>
             </thead>
@@ -467,11 +470,12 @@ $totalValor  = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['prod_total'
                 <td><?= ypEsc($op['ven_cod_pedido'] ?? '—') ?></td>
                 <td><?= ypEsc($op['lote_cliente'] ?? '—') ?></td>
                 <td><?= ypEsc($op['tipo_producao'] ?? $op['prod_tipo'] ?? '—') ?></td>
-                <td class="col-r col-nowrap"><?= $op['prod_total'] > 0 ? ypMoney((float)$op['prod_total']) : '<span style="color:var(--text-muted)">—</span>' ?></td>
+                <td class="col-r col-nowrap"><?= ypQty((float)($op['total_qtd'] ?? 0)) ?></td>
+                <td class="col-r col-nowrap"><?= ypQty((float)($op['total_qtd_baixa'] ?? 0)) ?></td>
                 <td><span class="st-badge st-<?= ypEsc($stCode) ?>"><?= ypEsc($stLabel) ?></span></td>
               </tr>
               <tr id="<?= ypEsc($detailId) ?>" class="op-detail-row">
-                <td colspan="11" class="op-detail-cell">
+                <td colspan="12" class="op-detail-cell">
                   <div class="op-detail-box">
                     <div class="op-detail-content">
                       <div class="op-loading">Carregando itens…</div>
@@ -515,28 +519,34 @@ function setorLabel(setor) {
 
 function buildSetorTable(itens) {
     if (!itens.length) return '<div class="op-empty">Nenhum item neste setor.</div>';
-    const rows = itens.map(i => `
+    const rows = itens.map(i => {
+        const pct = i.ite_qtd > 0 ? Math.min(100, Math.round((i.ite_qtd_baixa / i.ite_qtd) * 100)) : 0;
+        const barColor = pct >= 100 ? 'var(--teal)' : pct > 0 ? '#f59e0b' : 'rgba(255,255,255,.12)';
+        return `
         <tr>
             <td><strong>${escHtml(i.pro_descricao || '—')}</strong>
                 ${i.pro_tamanho ? `<span class="sub-muted"> · ${escHtml(i.pro_tamanho)}</span>` : ''}
                 ${i.pro_referencia ? `<br><span class="sub-muted">Ref: ${escHtml(i.pro_referencia)}</span>` : ''}
             </td>
             <td class="sub-r">${qtyBR(i.ite_qtd)} <span class="sub-muted">${escHtml(i.pro_unidade || '')}</span></td>
-            <td class="sub-r">${qtyBR(i.ite_qtd_baixa)} <span class="sub-muted">${escHtml(i.pro_segunda_unidade || i.pro_unidade || '')}</span></td>
-            <td class="sub-r sub-muted">${moneyBR(i.ite_valor_unit)}</td>
-            <td class="sub-r"><strong>${moneyBR(i.ite_total)}</strong></td>
+            <td class="sub-r"><strong>${qtyBR(i.ite_qtd_baixa)}</strong> <span class="sub-muted">${escHtml(i.pro_segunda_unidade || i.pro_unidade || '')}</span></td>
+            <td style="min-width:100px;">
+                <div style="height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;">
+                    <div style="height:100%;width:${pct}%;background:${barColor};border-radius:2px;transition:width .4s;"></div>
+                </div>
+                <span class="sub-muted" style="font-size:10px;">${pct}%</span>
+            </td>
             <td class="sub-muted">${escHtml(i.ite_obs || '')}</td>
         </tr>
-    `).join('');
+    `}).join('');
     return `
         <table class="sub-table">
             <thead>
                 <tr>
                     <th>Produto</th>
-                    <th class="sub-r">Qtd</th>
-                    <th class="sub-r">Qtd baixa</th>
-                    <th class="sub-r">Vlr unit.</th>
-                    <th class="sub-r">Total</th>
+                    <th class="sub-r">Qtd planejada</th>
+                    <th class="sub-r">Qtd produzida</th>
+                    <th>Progresso</th>
                     <th>Obs.</th>
                 </tr>
             </thead>

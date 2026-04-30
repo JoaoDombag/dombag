@@ -398,6 +398,9 @@ $data_plano_js = json_encode($data_plano);
    REUNIÃO DE PLANEJAMENTO
    ══════════════════════════════════════════════════════════════ */
 
+/* Habilita scroll na página inteira */
+.content { overflow-y: auto !important; }
+
 /* ── Step tabs ──────────────────────────────────────────────── */
 .step-tabs{display:flex;align-items:center;gap:2px;}
 .step-tab{display:inline-flex;align-items:center;gap:7px;padding:7px 16px;border:none;background:transparent;color:var(--text-muted);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;border-radius:8px;transition:all .15s;}
