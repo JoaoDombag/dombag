@@ -426,22 +426,22 @@ $totalQtdBaixa = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['total_qtd
         <?php if (empty($ordens)): ?>
         <div class="op-empty">Nenhuma ordem finalizada encontrada no período selecionado.</div>
         <?php else: ?>
-        <div style="overflow-x:auto;">
-          <table class="op-table">
+        <div style="overflow-x:auto;width:100%;">
+          <table class="op-table" style="table-layout:fixed;">
             <thead>
               <tr>
                 <th style="width:44px;"></th>
-                <th>OP</th>
+                <th style="width:70px;">OP</th>
                 <th>Cliente</th>
-                <th>Data OP</th>
-                <th>Entrega</th>
-                <th>Finalizada</th>
-                <th>Pedido ERP</th>
-                <th>Lote</th>
-                <th>Tipo</th>
-                <th class="col-r">Qtd plan.</th>
-                <th class="col-r">Qtd prod.</th>
-                <th>Faturamento</th>
+                <th style="width:100px;">Data OP</th>
+                <th style="width:90px;">Entrega</th>
+                <th style="width:100px;">Finalizada</th>
+                <th style="width:90px;">Pedido ERP</th>
+                <th style="width:80px;">Lote</th>
+                <th style="width:55px;">Tipo</th>
+                <th class="col-r" style="width:100px;">Qtd plan.</th>
+                <th class="col-r" style="width:100px;">Qtd prod.</th>
+                <th style="width:120px;">Faturamento</th>
               </tr>
             </thead>
             <tbody>
