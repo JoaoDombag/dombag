@@ -405,16 +405,6 @@ $totalQtdBaixa = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['total_qtd
           <div class="kpi-value"><?= number_format($totalQtdBaixa, 0, ',', '.') ?></div>
           <div class="kpi-footer">Planejada: <?= number_format($totalQtd, 0, ',', '.') ?></div>
         </div>
-        <div class="kpi-card amber">
-          <div class="kpi-header">
-            <span class="kpi-label">ERP</span>
-            <div class="kpi-icon">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
-            </div>
-          </div>
-          <div class="kpi-value" style="font-size:14px;letter-spacing:0"><?= $erp_ok ? 'Conectado' : 'Offline' ?></div>
-          <div class="kpi-footer">PostgreSQL Yzidro</div>
-        </div>
       </div>
 
       <!-- Tabela de ordens -->
