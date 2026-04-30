@@ -427,21 +427,21 @@ $totalQtdBaixa = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['total_qtd
         <div class="op-empty">Nenhuma ordem finalizada encontrada no período selecionado.</div>
         <?php else: ?>
         <div style="overflow-x:auto;width:100%;">
-          <table class="op-table" style="table-layout:fixed;">
+          <table class="op-table" style="table-layout:auto;min-width:860px;">
             <thead>
               <tr>
                 <th style="width:44px;"></th>
                 <th style="width:70px;">OP</th>
-                <th>Cliente</th>
-                <th style="width:100px;">Data OP</th>
-                <th style="width:90px;">Entrega</th>
-                <th style="width:100px;">Finalizada</th>
-                <th style="width:90px;">Pedido ERP</th>
-                <th style="width:80px;">Lote</th>
-                <th style="width:55px;">Tipo</th>
-                <th class="col-r" style="width:100px;">Qtd plan.</th>
-                <th class="col-r" style="width:100px;">Qtd prod.</th>
-                <th style="width:120px;">Faturamento</th>
+                <th style="width:100%;">Cliente</th>
+                <th style="white-space:nowrap;">Data OP</th>
+                <th style="white-space:nowrap;">Entrega</th>
+                <th style="white-space:nowrap;">Finalizada</th>
+                <th style="white-space:nowrap;">Pedido ERP</th>
+                <th style="white-space:nowrap;">Lote</th>
+                <th style="white-space:nowrap;">Tipo</th>
+                <th class="col-r" style="white-space:nowrap;">Qtd plan.</th>
+                <th class="col-r" style="white-space:nowrap;">Qtd prod.</th>
+                <th style="white-space:nowrap;">Faturamento</th>
               </tr>
             </thead>
             <tbody>
