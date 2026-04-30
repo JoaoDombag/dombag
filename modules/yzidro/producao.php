@@ -434,14 +434,11 @@ $totalQtdBaixa = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['total_qtd
                 <th style="width:70px;">OP</th>
                 <th style="width:100%;">Cliente</th>
                 <th style="white-space:nowrap;">Data OP</th>
-                <th style="white-space:nowrap;">Entrega</th>
                 <th style="white-space:nowrap;">Finalizada</th>
                 <th style="white-space:nowrap;">Pedido ERP</th>
                 <th style="white-space:nowrap;">Lote</th>
-                <th style="white-space:nowrap;">Tipo</th>
                 <th class="col-r" style="white-space:nowrap;">Qtd plan.</th>
                 <th class="col-r" style="white-space:nowrap;">Qtd prod.</th>
-                <th style="white-space:nowrap;">Faturamento</th>
               </tr>
             </thead>
             <tbody>
@@ -465,17 +462,14 @@ $totalQtdBaixa = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['total_qtd
                 <td class="col-mono"><strong><?= ypEsc($prodCod) ?></strong></td>
                 <td><?= ypEsc(mb_substr((string)($op['cli_nome'] ?? '—'), 0, 40)) ?></td>
                 <td class="col-nowrap"><?= ypDate($op['prod_data'] ?? '') ?></td>
-                <td class="col-nowrap"><?= ypDate($op['data_entrega'] ?? '') ?></td>
                 <td class="col-nowrap"><?= ypDate($op['data_finaliza'] ?? '') ?></td>
                 <td><?= ypEsc($op['ven_cod_pedido'] ?? '—') ?></td>
                 <td><?= ypEsc($op['lote_cliente'] ?? '—') ?></td>
-                <td><?= ypEsc($op['tipo_producao'] ?? $op['prod_tipo'] ?? '—') ?></td>
                 <td class="col-r col-nowrap"><?= ypQty((float)($op['total_qtd'] ?? 0)) ?></td>
                 <td class="col-r col-nowrap"><?= ypQty((float)($op['total_qtd_baixa'] ?? 0)) ?></td>
-                <td><span class="st-badge st-<?= ypEsc($stCode) ?>"><?= ypEsc($stLabel) ?></span></td>
               </tr>
               <tr id="<?= ypEsc($detailId) ?>" class="op-detail-row">
-                <td colspan="12" class="op-detail-cell">
+                <td colspan="9" class="op-detail-cell">
                   <div class="op-detail-box">
                     <div class="op-detail-content">
                       <div class="op-loading">Carregando itens…</div>
