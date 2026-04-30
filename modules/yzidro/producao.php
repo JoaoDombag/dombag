@@ -21,7 +21,7 @@ function ypSanitDate(?string $v): string {
     return $dt ? $dt->format('Y-m-d') : '';
 }
 function ypMoney($v): string { return 'R$ ' . number_format((float) $v, 2, ',', '.'); }
-function ypQty($v): string   { return number_format((float) $v, 3, ',', '.'); }
+function ypQty($v): string   { return number_format((float) $v, 0, ',', '.'); }
 
 // Classifica produto em 'BAG', 'SACARIA' ou '' pelo nome
 function ypSetor(string $nome): string {
@@ -90,11 +90,15 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'itens') {
 }
 
 // ── Filtros ───────────────────────────────────────────────────────────────────
-$defaultIni = date('Y-m-01');
-$defaultFim = date('Y-m-d');
+$defaultMes = date('Y-m');
 
-$fIni    = ypSanitDate($_GET['ini']    ?? '') ?: $defaultIni;
-$fFim    = ypSanitDate($_GET['fim']    ?? '') ?: $defaultFim;
+$fMes = trim((string) ($_GET['mes'] ?? ''));
+if (!preg_match('/^\d{4}-\d{2}$/', $fMes)) $fMes = $defaultMes;
+
+// Deriva ini/fim do mês selecionado
+$fIni = $fMes . '-01';
+$fFim = date('Y-m-t', strtotime($fIni));
+
 $fCliente = trim((string) ($_GET['cliente'] ?? ''));
 $fSetor   = in_array($_GET['setor'] ?? '', ['BAG', 'SACARIA', ''], true) ? ($_GET['setor'] ?? '') : '';
 
@@ -216,7 +220,7 @@ $totalQtdBaixa = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['total_qtd
 }
 .filter-grid {
     display: grid;
-    grid-template-columns: 150px 150px minmax(200px,1fr) 160px;
+    grid-template-columns: 160px minmax(200px,1fr) 160px;
     gap: 16px;
     align-items: end;
 }
@@ -352,12 +356,8 @@ $totalQtdBaixa = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['total_qtd
         <form method="GET" action="/yzidro/producao">
           <div class="filter-grid">
             <div class="filter-field">
-              <label>Data inicial</label>
-              <input type="date" name="ini" value="<?= ypEsc($fIni) ?>">
-            </div>
-            <div class="filter-field">
-              <label>Data final</label>
-              <input type="date" name="fim" value="<?= ypEsc($fFim) ?>">
+              <label>Mês</label>
+              <input type="month" name="mes" value="<?= ypEsc($fMes) ?>">
             </div>
             <div class="filter-field">
               <label>Cliente</label>
@@ -366,7 +366,7 @@ $totalQtdBaixa = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['total_qtd
             <div class="filter-field">
               <label>Setor</label>
               <select name="setor">
-                <option value=""      <?= $fSetor === ''        ? 'selected' : '' ?>>Todos</option>
+                <option value=""        <?= $fSetor === ''        ? 'selected' : '' ?>>Todos</option>
                 <option value="BAG"     <?= $fSetor === 'BAG'     ? 'selected' : '' ?>>Big Bag</option>
                 <option value="SACARIA" <?= $fSetor === 'SACARIA' ? 'selected' : '' ?>>Sacaria</option>
               </select>
@@ -392,7 +392,7 @@ $totalQtdBaixa = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['total_qtd
             </div>
           </div>
           <div class="kpi-value"><?= number_format($totalOrdens, 0, ',', '.') ?></div>
-          <div class="kpi-footer"><?= ypEsc(date('d/m/Y', strtotime($fIni))) ?> – <?= ypEsc(date('d/m/Y', strtotime($fFim))) ?></div>
+          <div class="kpi-footer"><?= ypEsc(date('m/Y', strtotime($fIni))) ?></div>
         </div>
         <div class="kpi-card teal">
           <div class="kpi-header">

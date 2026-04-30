@@ -136,7 +136,7 @@ $DOMBAG_PAGINAS = [
     // ── Yzidro ────────────────────────────────────────────────────────────────
     ['href' => '/yzidro/pedidos',     'label' => 'Pedidos de Venda',        'grupo' => 'yzidro', 'menu' => true,  'publico' => false],
     ['href' => '/yzidro/consulta',    'label' => 'Consulta Vendas',         'grupo' => 'yzidro', 'menu' => true,  'publico' => false],
-    ['href' => '/yzidro/finalizados', 'label' => 'Finalizados (Sac × Bag)', 'grupo' => 'yzidro', 'menu' => true,  'publico' => false],
+
     ['href' => '/yzidro/producao',   'label' => 'Produção (por setor)',    'grupo' => 'yzidro', 'menu' => true,  'publico' => false],
 
     // ── Produção ──────────────────────────────────────────────────────────────
