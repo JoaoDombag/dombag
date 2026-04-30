@@ -68,6 +68,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'itens') {
              INNER JOIN PRODUCAO       V ON V.PROD_CODIGO = I.PROD_CODIGO
              WHERE V.EMP_CODIGO = 1
                AND I.PROD_CODIGO = \$1
+               AND COALESCE(I.ITE_ITENS_GERADORES, '') NOT LIKE 'Item Gerado Automaticamente%'
              ORDER BY P.PRO_DESCRICAO, P.PRO_TAMANHO
         ";
 
@@ -143,8 +144,8 @@ if ($pg) {
                 V.VENDA_REF,
                 V.TIPO_PRODUCAO,
                 V.DATA_FINALIZA,
-                COALESCE(SUM(IP.ITE_QTD), 0)       AS total_qtd,
-                COALESCE(SUM(IP.ITE_QTD_BAIXA), 0) AS total_qtd_baixa,
+                COALESCE(SUM(CASE WHEN COALESCE(IP.ITE_ITENS_GERADORES,'') NOT LIKE 'Item Gerado Automaticamente%' THEN IP.ITE_QTD       ELSE 0 END), 0) AS total_qtd,
+                COALESCE(SUM(CASE WHEN COALESCE(IP.ITE_ITENS_GERADORES,'') NOT LIKE 'Item Gerado Automaticamente%' THEN IP.ITE_QTD_BAIXA ELSE 0 END), 0) AS total_qtd_baixa,
                 CAST(
                     CASE
                         WHEN SUM(IP.ITE_QTD) <= SUM(IP.ITE_QTD_FAT) THEN '0'
@@ -582,13 +583,6 @@ async function toggleOp(btn) {
     if (!row) return;
 
     const willOpen = !row.classList.contains('open');
-
-    document.querySelectorAll('.op-detail-row.open').forEach(r => {
-        if (r !== row) r.classList.remove('open');
-    });
-    document.querySelectorAll('.op-toggle[aria-expanded="true"]').forEach(b => {
-        if (b !== btn) { b.setAttribute('aria-expanded','false'); b.textContent = '+'; }
-    });
 
     if (!willOpen) {
         row.classList.remove('open');
