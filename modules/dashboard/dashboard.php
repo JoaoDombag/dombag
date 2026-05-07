@@ -420,6 +420,10 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
     .empty-row     { text-align:center; padding:32px 20px; color:var(--text-muted); font-size:13px; }
     .greeting      { font-size:11.5px; color:var(--text-muted); }
     .greeting strong { color:var(--text-primary); }
+
+    /* ── Trello widget inner grid ──────────────────── */
+    .trello-inner-grid { display:grid; grid-template-columns:1fr 180px; gap:0; align-items:start; }
+    @media(max-width:768px) { .trello-inner-grid { grid-template-columns:1fr; } .trello-inner-grid > div:last-child { border-left:none !important; border-top:1px solid var(--border); } }
   </style>
 </head>
 <body>
@@ -911,7 +915,7 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
               </div>
               <a class="panel-action" href="/trello?board=${encodeURIComponent(_bid)}">Ver board →</a>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 180px;gap:0;align-items:start;">
+            <div class="trello-inner-grid">
               <div class="maq-bar-row">
                 ${bars || '<p style="color:var(--text-muted);font-size:13px;">Nenhum card aberto.</p>'}
               </div>

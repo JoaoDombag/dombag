@@ -166,6 +166,23 @@ try {
     .modal-confirm h3 { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
     .modal-confirm p  { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
     .modal-confirm-actions { display: flex; gap: 8px; margin-top: 22px; justify-content: flex-end; }
+
+    @media (max-width: 768px) {
+      body { overflow-x: hidden; overflow-y: auto; height: auto; }
+      .app-wrapper { height: auto; min-height: 100vh; overflow: visible; }
+      .main { height: auto; overflow: visible; padding-top: 52px; }
+      .content { padding: 14px; overflow: visible; height: auto; display: block; }
+      .topbar { padding: 10px 14px; }
+      .topbar-actions { flex-wrap: wrap; }
+      .table-panel { flex: none; overflow: visible; }
+      .table-wrap { overflow-x: auto; max-height: none; }
+      .td-actions { white-space: normal; flex-wrap: wrap; }
+    }
+    @media (max-width: 480px) {
+      .topbar-actions .btn-primary { padding: 7px 10px; font-size: 12px; }
+      .maq-table th { font-size: 9px; padding: 7px 8px; }
+      .maq-table td { font-size: 11.5px; padding: 8px 8px; }
+    }
   </style>
 </head>
 <body>

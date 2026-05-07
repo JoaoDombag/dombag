@@ -82,8 +82,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 .bar-mini-bg{height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-top:8px;}
 .bar-mini-fill{height:100%;border-radius:2px;}
 .empty-fila{text-align:center;padding:48px 20px;color:var(--text-muted);font-size:13px;}
+.alloc-rules-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
 @media(max-width:1100px){.fila-layout{grid-template-columns:1fr;}}
-@media(max-width:768px){.maq-tabs{gap:4px;}}
+@media(max-width:768px){.maq-tabs{gap:4px;}.alloc-rules-grid{grid-template-columns:1fr;}}
 @media(max-width:480px){.maq-tab{padding:6px 10px;font-size:12px;}}
 </style>
 
@@ -115,7 +116,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
       <?php endif; ?>
 
       <!-- Regras de alocação de máquina -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+      <div class="alloc-rules-grid">
         <div style="background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;">
           <div style="font-size:11px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;">Sacaria com impressão — alocação por altura</div>
           <div style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;">

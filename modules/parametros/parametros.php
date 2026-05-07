@@ -182,6 +182,15 @@ if (!in_array($aba_ativa, ['integracoes', 'aparencia', 'crm'])) $aba_ativa = 'in
 .theme-opt-icon.dark  { background: rgba(0,0,0,.25); }
 .theme-opt-label { font-size: 13px; font-weight: 600; }
 .theme-opt-sub   { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+
+@media (max-width: 768px) {
+  .theme-toggle { flex-direction: column; max-width: 100%; }
+  .api-key-wrap input { font-size: 11px; }
+}
+@media (max-width: 480px) {
+  .tab-btn { font-size: 11px; padding: 7px 10px; gap: 5px; }
+  .tab-btn svg { width: 14px; height: 14px; }
+}
 </style>
 </head>
 <body>
