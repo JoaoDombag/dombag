@@ -3,3 +3,4 @@ deployment:
   tasks:
     - export COMPOSER_HOME="${HOME}/.composer"
     - /usr/local/bin/composer install --no-dev --optimize-autoloader --no-interaction 2>&1
+    - rsync -av --delete --exclude='.git' --exclude='uploads' "${DEPLOYPATH}/" "${HOME}/sistemadombag.com/" 2>&1
