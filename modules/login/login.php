@@ -262,6 +262,19 @@ input.has-error{border-color:rgba(239,68,68,.5)!important;background:rgba(239,68
 
 <div class="bg-deco"></div>
 
+<?php if (APP_ENV === 'local'): ?>
+<div style="
+  position:fixed;top:12px;left:50%;transform:translateX(-50%);
+  background:rgba(234,179,8,.15);border:1px solid rgba(234,179,8,.4);
+  border-radius:999px;padding:5px 16px;
+  font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+  color:#fbbf24;white-space:nowrap;
+  z-index:9999;backdrop-filter:blur(4px);
+">
+  &#9679; Ambiente local &mdash; banco: <?= htmlspecialchars(DB_NAME ?: '(não configurado)') ?>
+</div>
+<?php endif; ?>
+
 <div class="page">
   <div class="form-card">
 

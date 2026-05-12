@@ -1,4 +1,4 @@
 ---
 deployment:
   tasks:
-    - rsync -a --delete --exclude='.git' --exclude='uploads' "$(pwd)/" "${HOME}/sistemadombag.com/" 2>&1
+    - rsync -a --delete --exclude='.git' --exclude='uploads' --exclude='config/db.production.php' "$(pwd)/" "${HOME}/sistemadombag.com/" 2>&1

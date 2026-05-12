@@ -2,6 +2,7 @@
 .env
 .env.*
 config/db.local.php
+config/db.production.php
 
 # Uploads de usuários
 uploads/
