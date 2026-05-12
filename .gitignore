@@ -1,6 +1,7 @@
 # Credenciais — nunca commitar
 .env
 .env.*
+config/db.local.php
 
 # Dependências
 vendor/

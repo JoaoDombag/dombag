@@ -1,5 +1,5 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home2/joaofr15/public_html/
-    - /bin/cp -R * $DEPLOYPATH
+    - export COMPOSER_HOME="${HOME}/.composer"
+    - /usr/local/bin/composer install --no-dev --optimize-autoloader --no-interaction 2>&1
