@@ -9,6 +9,15 @@
 $_host = $_SERVER['HTTP_HOST'] ?? 'cli';
 define('APP_ENV', str_contains($_host, 'localhost') || str_contains($_host, '127.0.0.1') ? 'local' : 'production');
 
+// ── Sessão: caminho fixo para evitar perda entre workers do HostGator ─────────
+if (session_status() === PHP_SESSION_NONE) {
+    $_sessPath = __DIR__ . '/sessions';
+    if (!is_dir($_sessPath)) {
+        mkdir($_sessPath, 0700, true);
+    }
+    session_save_path($_sessPath);
+}
+
 // ── Credenciais por ambiente ───────────────────────
 $_credFile = __DIR__ . (APP_ENV === 'local' ? '/db.local.php' : '/db.production.php');
 if (file_exists($_credFile)) {
