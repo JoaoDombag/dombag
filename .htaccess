@@ -18,10 +18,10 @@ RewriteRule ^(config|shared|migrations)(/|$) - [F,L]
 RewriteBase /
 
 # Força HTTPS (somente em produção — desabilitado no localhost)
-# RewriteCond %{HTTPS} off
-# RewriteCond %{HTTP_HOST} !^localhost [NC]
-# RewriteCond %{HTTP_HOST} !^127\.0\.0\.1 [NC]
-# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+RewriteCond %{HTTPS} off
+RewriteCond %{HTTP_HOST} !^localhost [NC]
+RewriteCond %{HTTP_HOST} !^127\.0\.0\.1 [NC]
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # Não redireciona arquivos e pastas que existem de verdade
 RewriteCond %{REQUEST_FILENAME} !-f
