@@ -1,14 +1,10 @@
 -- ══════════════════════════════════════════════════════════════════════════════
 --  DOMBAG — Schema Completo do Banco de Dados
---  Banco: dombag  |  Charset: utf8mb4
+--  Banco: joaofr15_sistemadombag  |  Charset: utf8mb4
 --  Ordem respeitando chaves estrangeiras
 -- ══════════════════════════════════════════════════════════════════════════════
 
-CREATE DATABASE IF NOT EXISTS `dombag`
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
-USE `dombag`;
+USE `joaofr15_sistemadombag`;
 
 SET FOREIGN_KEY_CHECKS = 0;
 
