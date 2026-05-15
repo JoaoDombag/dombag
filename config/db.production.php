@@ -3,7 +3,7 @@
 define('_DB_HOST', 'br1006.hostgator.com.br');
 define('_DB_PORT', '3306');
 define('_DB_NAME', 'joaofr15_sistemadombag');
-define('_DB_USER', 'joaofr15_sistemadombag');
+define('_DB_USER', 'joaofr15_appuser');
 define('_DB_PASS', 'Dombag@12345');
 
 define('_PG_HOST',   'pg-yzidro-004.yzidro.com');
