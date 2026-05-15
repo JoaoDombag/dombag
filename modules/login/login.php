@@ -296,7 +296,7 @@ input.has-error{border-color:rgba(239,68,68,.5)!important;background:rgba(239,68
       </div>
       <?php endif; ?>
 
-      <form method="POST" id="frmLogin" novalidate>
+      <form method="POST" action="/login" id="frmLogin" novalidate>
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
 
         <div class="field">
