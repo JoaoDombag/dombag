@@ -38,13 +38,10 @@ if (!function_exists('dbPDO')) {
         if ($pdo === null) {
             $opts = [PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                      PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC];
-            $base = new PDO(
-                'mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';charset=' . DB_CHARSET,
+            $pdo = new PDO(
+                'mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';charset=' . DB_CHARSET,
                 DB_USER, DB_PASS, $opts
             );
-            $base->exec('CREATE DATABASE IF NOT EXISTS `' . DB_NAME . '` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
-            $base->exec('USE `' . DB_NAME . '`');
-            $pdo = $base;
         }
         return $pdo;
     }
