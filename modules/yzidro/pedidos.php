@@ -265,7 +265,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'set_prazo') {
             throw new RuntimeException('Pedido não informado.');
         }
         $prazoVal = $prazo === '' ? null : max(1, (int) $prazo);
-        $st = $pdo->prepare('UPDATE VENDAS SET ven_prazo_dias = ? WHERE ven_codigo = ?');
+        $st = $pdo->prepare('UPDATE VENDAS SET VEN_PRAZO_DIAS = ? WHERE VEN_CODIGO = ?');
         $st->execute([$prazoVal, $venCod]);
         echo json_encode(['ok' => true, 'prazo' => $prazoVal]);
     } catch (Throwable $e) {
@@ -287,7 +287,7 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'set_status') {
         if (!in_array($status, $allowed, true)) {
             throw new RuntimeException('Status inválido.');
         }
-        $st = $pdo->prepare('UPDATE VENDAS SET ven_status = ? WHERE ven_codigo_yzidro = ?');
+        $st = $pdo->prepare('UPDATE VENDAS SET VEN_STATUS = ? WHERE VEN_CODIGO_YZIDRO = ?');
         $st->execute([$status === '' ? null : $status, $pedido]);
         echo json_encode(['ok' => true]);
     } catch (Throwable $e) {
@@ -346,37 +346,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
         }
 
         $stmtVen = $pdo->prepare("
-            INSERT INTO VENDAS (ven_codigo_yzidro,ven_cliente,ven_fantasia,ven_cnpj,
-                ven_representante,ven_uf,ven_cidade,ven_emissao,ven_entrega,
-                ven_total,ven_segmento,ven_grupo_clientes,ven_obs,ven_status)
+            INSERT INTO VENDAS (VEN_CODIGO_YZIDRO,VEN_CLIENTE,VEN_FANTASIA,VEN_CNPJ,
+                VEN_REPRESENTANTE,VEN_UF,VEN_CIDADE,VEN_EMISSAO,VEN_ENTREGA,
+                VEN_TOTAL,VEN_SEGMENTO,VEN_GRUPO_CLIENTES,VEN_OBS,VEN_STATUS)
             VALUES (:yz,:cli,:fan,:cnpj,:rep,:uf,:cid,:emi,:ent,:tot,:seg,:grp,:obs,:sts)
             ON DUPLICATE KEY UPDATE
-                ven_cliente=VALUES(ven_cliente), ven_entrega=VALUES(ven_entrega),
-                ven_total=VALUES(ven_total),
-                ven_obs=VALUES(ven_obs),
-                ven_status=IF(VALUES(ven_status)='Urgente' AND ven_status IS NULL,'Urgente',ven_status)
+                VEN_CLIENTE=VALUES(VEN_CLIENTE), VEN_ENTREGA=VALUES(VEN_ENTREGA),
+                VEN_TOTAL=VALUES(VEN_TOTAL),
+                VEN_OBS=VALUES(VEN_OBS),
+                VEN_STATUS=IF(VALUES(VEN_STATUS)='Urgente' AND VEN_STATUS IS NULL,'Urgente',VEN_STATUS)
         ");
         $stmtPro = $pdo->prepare('
-            INSERT INTO PRODUTOS (pro_codigo_yz,pro_descricao,pro_tipo,pro_travado,pro_impressao,
-                pro_valvulado,pro_comprimento,pro_maq_impressao,pro_fluxo)
+            INSERT INTO PRODUTOS (PRO_CODIGO_YZ,PRO_DESCRICAO,PRO_TIPO,PRO_TRAVADO,PRO_IMPRESSAO,
+                PRO_VALVULADO,PRO_COMPRIMENTO,PRO_MAQ_IMPRESSAO,PRO_FLUXO)
             VALUES (:yz,:desc,:tipo,:trav,:imp,:valv,:comp,:maq,:flx)
             ON DUPLICATE KEY UPDATE
-                pro_descricao=VALUES(pro_descricao),
-                pro_tipo=VALUES(pro_tipo),
-                pro_travado=VALUES(pro_travado),
-                pro_impressao=VALUES(pro_impressao),
-                pro_valvulado=VALUES(pro_valvulado),
-                pro_comprimento=VALUES(pro_comprimento),
-                pro_maq_impressao=VALUES(pro_maq_impressao),
-                pro_fluxo=VALUES(pro_fluxo)
+                PRO_DESCRICAO=VALUES(PRO_DESCRICAO),
+                PRO_TIPO=VALUES(PRO_TIPO),
+                PRO_TRAVADO=VALUES(PRO_TRAVADO),
+                PRO_IMPRESSAO=VALUES(PRO_IMPRESSAO),
+                PRO_VALVULADO=VALUES(PRO_VALVULADO),
+                PRO_COMPRIMENTO=VALUES(PRO_COMPRIMENTO),
+                PRO_MAQ_IMPRESSAO=VALUES(PRO_MAQ_IMPRESSAO),
+                PRO_FLUXO=VALUES(PRO_FLUXO)
         ');
         $stmtIv = $pdo->prepare('
-            INSERT INTO ITENS_VENDAS (ven_codigo,pro_codigo,iv_qtde,iv_vlr_unit,iv_total,iv_unidade)
+            INSERT INTO ITENS_VENDAS (VEN_CODIGO,PRO_CODIGO,IV_QTDE,IV_VLR_UNIT,IV_TOTAL,IV_UNIDADE)
             VALUES (:ven,:pro,:qtd,:vlu,:tot,:uni)
-            ON DUPLICATE KEY UPDATE iv_qtde=VALUES(iv_qtde), iv_total=VALUES(iv_total)
+            ON DUPLICATE KEY UPDATE IV_QTDE=VALUES(IV_QTDE), IV_TOTAL=VALUES(IV_TOTAL)
         ');
-        $getFindV = $pdo->prepare('SELECT ven_codigo FROM VENDAS WHERE ven_codigo_yzidro=:yz');
-        $getFindP = $pdo->prepare('SELECT pro_codigo FROM PRODUTOS WHERE pro_codigo_yz=:yz');
+        $getFindV = $pdo->prepare('SELECT VEN_CODIGO FROM VENDAS WHERE VEN_CODIGO_YZIDRO=:yz');
+        $getFindP = $pdo->prepare('SELECT PRO_CODIGO FROM PRODUTOS WHERE PRO_CODIGO_YZ=:yz');
 
         // Garante coluna ven_prazo_dias
         try {
@@ -386,7 +386,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             );
             $chkCol->execute(['VENDAS', 'VEN_PRAZO_DIAS']);
             if (!(int) $chkCol->fetchColumn()) {
-                $pdo->exec('ALTER TABLE VENDAS ADD COLUMN ven_prazo_dias INT NULL AFTER ven_status');
+                $pdo->exec('ALTER TABLE VENDAS ADD COLUMN VEN_PRAZO_DIAS INT NULL AFTER VEN_STATUS');
             }
         } catch (Throwable) {}
 
@@ -485,7 +485,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                 try {
                     $prazoDias = pcpEstimaPrazoPedido($itensPcp);
                     if ($prazoDias !== null) {
-                        $stPrazo = $pdo->prepare('UPDATE VENDAS SET ven_prazo_dias = ? WHERE ven_codigo = ?');
+                        $stPrazo = $pdo->prepare('UPDATE VENDAS SET VEN_PRAZO_DIAS = ? WHERE VEN_CODIGO = ?');
                         $stPrazo->execute([$prazoDias, $venCod]);
                     }
                 } catch (Throwable) {}
@@ -560,10 +560,10 @@ $yz_ids_mysql = [];
 if (!empty($vendas)) {
     $nums = array_values(array_unique(array_column($vendas, 'pedido')));
     $ph = implode(',', array_fill(0, count($nums), '?'));
-    $st = $pdo->prepare("SELECT ven_codigo_yzidro, ven_status FROM VENDAS WHERE ven_codigo_yzidro IN ($ph)");
+    $st = $pdo->prepare("SELECT VEN_CODIGO_YZIDRO, VEN_STATUS FROM VENDAS WHERE VEN_CODIGO_YZIDRO IN ($ph)");
     $st->execute($nums);
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $mv) {
-        $yz_ids_mysql[$mv['ven_codigo_yzidro']] = $mv['ven_status'];
+        $yz_ids_mysql[$mv['VEN_CODIGO_YZIDRO']] = $mv['VEN_STATUS'];
     }
 }
 

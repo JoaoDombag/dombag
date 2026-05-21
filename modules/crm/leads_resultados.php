@@ -72,13 +72,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 
         // Ações unitárias (id simples)
         if ($action === 'delete' && !empty($_POST['id'])) {
-            $pdo->prepare('DELETE FROM LEADS_PROSPECTADOS WHERE id = ?')->execute([(int)$_POST['id']]);
+            $pdo->prepare('DELETE FROM LEADS_PROSPECTADOS WHERE ID = ?')->execute([(int)$_POST['id']]);
             echo json_encode(['ok' => true]);
 
         } elseif ($action === 'status' && !empty($_POST['id']) && !empty($_POST['status'])) {
             $allowed = ['NOVO','EM_CONTATO','QUALIFICADO','DESCARTADO'];
             $status  = in_array($_POST['status'], $allowed, true) ? $_POST['status'] : 'NOVO';
-            $pdo->prepare('UPDATE LEADS_PROSPECTADOS SET status_prosp = ? WHERE id = ?')
+            $pdo->prepare('UPDATE LEADS_PROSPECTADOS SET STATUS_PROSP = ? WHERE ID = ?')
                 ->execute([$status, (int)$_POST['id']]);
             echo json_encode(['ok' => true]);
 
@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $usuId = (isset($_POST['usuario_id']) && $_POST['usuario_id'] !== '') ? (int)$_POST['usuario_id'] : null;
             $ph    = implode(',', array_fill(0, count($ids), '?'));
             $params = $usuId !== null ? array_merge([$usuId], $ids) : $ids;
-            $pdo->prepare("UPDATE LEADS_PROSPECTADOS SET usuario_id = " . ($usuId !== null ? '?' : 'NULL') . " WHERE id IN ($ph)")
+            $pdo->prepare("UPDATE LEADS_PROSPECTADOS SET USUARIO_ID = " . ($usuId !== null ? '?' : 'NULL') . " WHERE ID IN ($ph)")
                 ->execute($params);
             echo json_encode(['ok' => true, 'atualizados' => count($ids)]);
 
@@ -98,14 +98,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             $status  = in_array($_POST['status'], $allowed, true) ? $_POST['status'] : 'NOVO';
             $ids     = array_map('intval', $_POST['ids']);
             $ph      = implode(',', array_fill(0, count($ids), '?'));
-            $pdo->prepare("UPDATE LEADS_PROSPECTADOS SET status_prosp = ? WHERE id IN ($ph)")
+            $pdo->prepare("UPDATE LEADS_PROSPECTADOS SET STATUS_PROSP = ? WHERE ID IN ($ph)")
                 ->execute(array_merge([$status], $ids));
             echo json_encode(['ok' => true, 'atualizados' => count($ids)]);
 
         } elseif ($action === 'lote_delete' && !empty($_POST['ids']) && is_array($_POST['ids'])) {
             $ids = array_map('intval', $_POST['ids']);
             $ph  = implode(',', array_fill(0, count($ids), '?'));
-            $pdo->prepare("DELETE FROM LEADS_PROSPECTADOS WHERE id IN ($ph)")->execute($ids);
+            $pdo->prepare("DELETE FROM LEADS_PROSPECTADOS WHERE ID IN ($ph)")->execute($ids);
             echo json_encode(['ok' => true, 'removidos' => count($ids)]);
 
         } else {
@@ -122,7 +122,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
     try {
         $pdo = dbPDO();
         iaProspEnsureSchema($pdo);
-        $rows = $pdo->query('SELECT nome_empresa,cnpj,site,telefone,email,cidade,uf,segmento,segmento_busca,score,status_prosp,motivo_relevancia,contato_compras_nome,contato_compras_meio,gravado_em FROM LEADS_PROSPECTADOS ORDER BY gravado_em DESC')->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $pdo->query('SELECT NOME_EMPRESA,CNPJ,SITE,TELEFONE,EMAIL,CIDADE,UF,SEGMENTO,SEGMENTO_BUSCA,SCORE,STATUS_PROSP,MOTIVO_RELEVANCIA,CONTATO_COMPRAS_NOME,CONTATO_COMPRAS_MEIO,GRAVADO_EM FROM LEADS_PROSPECTADOS ORDER BY GRAVADO_EM DESC')->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable) { $rows = []; }
 
     header('Content-Type: text/csv; charset=utf-8');
@@ -142,7 +142,7 @@ if (isset($_GET['export']) && $_GET['export'] === 'pdf') {
     try {
         $pdo = dbPDO();
         iaProspEnsureSchema($pdo);
-        $rows = $pdo->query('SELECT nome_empresa,cnpj,site,telefone,email,cidade,uf,segmento,segmento_busca,score,status_prosp,motivo_relevancia,contato_compras_nome,contato_compras_meio,gravado_em FROM LEADS_PROSPECTADOS ORDER BY gravado_em DESC')->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $pdo->query('SELECT NOME_EMPRESA,CNPJ,SITE,TELEFONE,EMAIL,CIDADE,UF,SEGMENTO,SEGMENTO_BUSCA,SCORE,STATUS_PROSP,MOTIVO_RELEVANCIA,CONTATO_COMPRAS_NOME,CONTATO_COMPRAS_MEIO,GRAVADO_EM FROM LEADS_PROSPECTADOS ORDER BY GRAVADO_EM DESC')->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable) { $rows = []; }
 
     require $_SERVER['DOCUMENT_ROOT'] . '/vendor/autoload.php';
@@ -250,19 +250,19 @@ try {
     }
 
     if ($filtUf !== '' && isset($ufList[$filtUf])) {
-        $where[] = 'uf = ?'; $params[] = $filtUf;
+        $where[] = 'UF = ?'; $params[] = $filtUf;
     }
     if ($filtSegmento !== '') {
-        $where[] = 'segmento_busca = ?'; $params[] = $filtSegmento;
+        $where[] = 'SEGMENTO_BUSCA = ?'; $params[] = $filtSegmento;
     }
     if ($filtStatus !== '') {
-        $where[] = 'status_prosp = ?'; $params[] = $filtStatus;
+        $where[] = 'STATUS_PROSP = ?'; $params[] = $filtStatus;
     }
     if ($filtScore > 0) {
-        $where[] = 'score >= ?'; $params[] = $filtScore;
+        $where[] = 'SCORE >= ?'; $params[] = $filtScore;
     }
     if ($filtBusca !== '') {
-        $where[] = '(nome_empresa LIKE ? OR cidade LIKE ? OR email LIKE ? OR telefone LIKE ?)';
+        $where[] = '(NOME_EMPRESA LIKE ? OR CIDADE LIKE ? OR EMAIL LIKE ? OR TELEFONE LIKE ?)';
         $like = '%' . $filtBusca . '%';
         array_push($params, $like, $like, $like, $like);
     }
@@ -273,14 +273,14 @@ try {
     $stmtCt->execute($params);
     $total = (int) $stmtCt->fetchColumn();
 
-    $stmt = $pdo->prepare("SELECT * FROM LEADS_PROSPECTADOS WHERE $whereSql ORDER BY gravado_em DESC, id DESC");
+    $stmt = $pdo->prepare("SELECT * FROM LEADS_PROSPECTADOS WHERE $whereSql ORDER BY GRAVADO_EM DESC, ID DESC");
     $stmt->execute($params);
     $rows = array_map(
         static fn($r) => array_change_key_case($r, CASE_LOWER),
         $stmt->fetchAll(PDO::FETCH_ASSOC)
     );
 
-    $statsRows = $pdo->query('SELECT segmento_busca, COUNT(*) qtd FROM LEADS_PROSPECTADOS GROUP BY segmento_busca ORDER BY qtd DESC')->fetchAll(PDO::FETCH_ASSOC);
+    $statsRows = $pdo->query('SELECT SEGMENTO_BUSCA, COUNT(*) qtd FROM LEADS_PROSPECTADOS GROUP BY SEGMENTO_BUSCA ORDER BY qtd DESC')->fetchAll(PDO::FETCH_ASSOC);
     foreach ($statsRows as $s) {
         $s = array_change_key_case($s, CASE_LOWER);
         $stats[$s['segmento_busca']] = (int)$s['qtd'];

@@ -16,19 +16,19 @@ pcpEnsureMaquinasColumns($pdo);
 
 // ── Garante tabela ─────────────────────────────────────────────────────────
 $pdo->exec("
-    CREATE TABLE IF NOT EXISTS pcp_planejamento (
-        pp_codigo    INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-        pp_data      DATE          NOT NULL,
-        maq_codigo   INT UNSIGNED  NOT NULL,
-        iv_codigo    INT UNSIGNED  NOT NULL,
-        pp_qtde_plan DECIMAL(12,2) NOT NULL DEFAULT 0,
-        pp_qtde_prod DECIMAL(12,2) DEFAULT NULL,
-        pp_status    ENUM('Planejado','Registrado') NOT NULL DEFAULT 'Planejado',
-        pp_obs       TEXT,
-        pp_criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_data (pp_data),
-        INDEX idx_maq  (maq_codigo),
-        INDEX idx_iv   (iv_codigo)
+    CREATE TABLE IF NOT EXISTS PCP_PLANEJAMENTO (
+        PP_CODIGO    INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+        PP_DATA      DATE          NOT NULL,
+        MAQ_CODIGO   INT UNSIGNED  NOT NULL,
+        IV_CODIGO    INT UNSIGNED  NOT NULL,
+        PP_QTDE_PLAN DECIMAL(12,2) NOT NULL DEFAULT 0,
+        PP_QTDE_PROD DECIMAL(12,2) DEFAULT NULL,
+        PP_STATUS    ENUM('Planejado','Registrado') NOT NULL DEFAULT 'Planejado',
+        PP_OBS       TEXT,
+        PP_CRIADO_EM DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_pp_data (PP_DATA),
+        INDEX idx_pp_maq  (MAQ_CODIGO),
+        INDEX idx_pp_iv   (IV_CODIGO)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 ");
 
@@ -44,31 +44,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
         if ($acao === 'get_pedidos') {
             $rows = $pdo->query("
                 SELECT
-                    iv.iv_codigo,
-                    ROUND(iv.iv_qtde) AS iv_qtde,
-                    iv.iv_status,
-                    v.ven_codigo_yzidro AS pedido,
-                    COALESCE(NULLIF(TRIM(v.ven_fantasia),''), NULLIF(TRIM(v.ven_cliente),''), '') AS cliente,
-                    DATE_FORMAT(v.ven_entrega,'%d/%m/%Y')  AS entrega,
-                    v.ven_entrega AS entrega_iso,
-                    p.pro_descricao,
-                    p.pro_categoria,
+                    iv.IV_CODIGO,
+                    ROUND(iv.IV_QTDE) AS iv_qtde,
+                    iv.IV_STATUS,
+                    v.VEN_CODIGO_YZIDRO AS pedido,
+                    COALESCE(NULLIF(TRIM(v.VEN_FANTASIA),''), NULLIF(TRIM(v.VEN_CLIENTE),''), '') AS cliente,
+                    DATE_FORMAT(v.VEN_ENTREGA,'%d/%m/%Y')  AS entrega,
+                    v.VEN_ENTREGA AS entrega_iso,
+                    p.PRO_DESCRICAO,
+                    p.PRO_CATEGORIA,
                     COALESCE(ps.total_produzido, 0) AS total_produzido
                 FROM ITENS_VENDAS iv
-                INNER JOIN VENDAS   v  ON v.ven_codigo  = iv.ven_codigo
-                INNER JOIN PRODUTOS p  ON p.pro_codigo  = iv.pro_codigo
+                INNER JOIN VENDAS   v  ON v.VEN_CODIGO  = iv.VEN_CODIGO
+                INNER JOIN PRODUTOS p  ON p.PRO_CODIGO  = iv.PRO_CODIGO
                 LEFT JOIN (
-                    SELECT iv_codigo, SUM(pp_qtde_prod) AS total_produzido
-                    FROM pcp_planejamento
-                    WHERE pp_qtde_prod IS NOT NULL
-                    GROUP BY iv_codigo
-                ) ps ON ps.iv_codigo = iv.iv_codigo
-                WHERE iv.iv_status IN ('Pendente de produção','Produção')
+                    SELECT IV_CODIGO, SUM(PP_QTDE_PROD) AS total_produzido
+                    FROM PCP_PLANEJAMENTO
+                    WHERE PP_QTDE_PROD IS NOT NULL
+                    GROUP BY IV_CODIGO
+                ) ps ON ps.IV_CODIGO = iv.IV_CODIGO
+                WHERE iv.IV_STATUS IN ('Pendente de produção','Produção')
                 ORDER BY
-                    CASE WHEN iv.iv_prioridade > 0 THEN iv.iv_prioridade ELSE 999999 END,
-                    v.ven_entrega,
-                    v.ven_codigo_yzidro
+                    CASE WHEN iv.IV_PRIORIDADE > 0 THEN iv.IV_PRIORIDADE ELSE 999999 END,
+                    v.VEN_ENTREGA,
+                    v.VEN_CODIGO_YZIDRO
             ")->fetchAll(PDO::FETCH_ASSOC);
+            $rows = array_map(fn($r) => array_change_key_case($r, CASE_LOWER), $rows);
             echo json_encode(['ok' => true, 'pedidos' => $rows]);
 
         // ── Adicionar ao plano ─────────────────────────────────────────────
@@ -83,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                 echo json_encode(['ok' => false, 'msg' => 'Dados inválidos.']); exit;
             }
             $pdo->prepare("
-                INSERT INTO pcp_planejamento (pp_data, maq_codigo, iv_codigo, pp_qtde_plan)
+                INSERT INTO PCP_PLANEJAMENTO (PP_DATA, MAQ_CODIGO, IV_CODIGO, PP_QTDE_PLAN)
                 VALUES (:data, :maq, :iv, :qtde)
             ")->execute([':data' => $data, ':maq' => $maq_cod, ':iv' => $iv_cod, ':qtde' => $qtde]);
 
@@ -95,11 +96,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             if (!$pp_cod) { echo json_encode(['ok' => false, 'msg' => 'ID inválido.']); exit; }
 
             // Pega o iv_codigo antes de deletar
-            $row = $pdo->prepare("SELECT iv_codigo FROM pcp_planejamento WHERE pp_codigo=:id AND pp_status='Planejado'");
+            $row = $pdo->prepare("SELECT IV_CODIGO FROM PCP_PLANEJAMENTO WHERE PP_CODIGO=:id AND PP_STATUS='Planejado'");
             $row->execute([':id' => $pp_cod]);
             $iv = $row->fetchColumn();
 
-            $pdo->prepare("DELETE FROM pcp_planejamento WHERE pp_codigo=:id AND pp_status='Planejado'")
+            $pdo->prepare("DELETE FROM PCP_PLANEJAMENTO WHERE PP_CODIGO=:id AND PP_STATUS='Planejado'")
                 ->execute([':id' => $pp_cod]);
 
             echo json_encode(['ok' => true]);
@@ -114,29 +115,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             }
 
             $pdo->prepare("
-                UPDATE pcp_planejamento
-                SET pp_qtde_prod=:q, pp_status='Registrado'
-                WHERE pp_codigo=:id
+                UPDATE PCP_PLANEJAMENTO
+                SET PP_QTDE_PROD=:q, PP_STATUS='Registrado'
+                WHERE PP_CODIGO=:id
             ")->execute([':q' => $qtde_prod, ':id' => $pp_cod]);
 
             // Calcula progresso do pedido
             $stmt = $pdo->prepare("
                 SELECT
-                    iv.iv_codigo,
-                    ROUND(iv.iv_qtde) AS iv_qtde,
-                    pp.maq_codigo,
+                    iv.IV_CODIGO,
+                    ROUND(iv.IV_QTDE) AS iv_qtde,
+                    pp.MAQ_CODIGO,
                     COALESCE((
-                        SELECT SUM(pp2.pp_qtde_prod)
-                        FROM pcp_planejamento pp2
-                        WHERE pp2.iv_codigo = pp.iv_codigo
-                          AND pp2.pp_qtde_prod IS NOT NULL
+                        SELECT SUM(pp2.PP_QTDE_PROD)
+                        FROM PCP_PLANEJAMENTO pp2
+                        WHERE pp2.IV_CODIGO = pp.IV_CODIGO
+                          AND pp2.PP_QTDE_PROD IS NOT NULL
                     ), 0) AS total_produzido
-                FROM pcp_planejamento pp
-                INNER JOIN ITENS_VENDAS iv ON iv.iv_codigo = pp.iv_codigo
-                WHERE pp.pp_codigo = :id
+                FROM PCP_PLANEJAMENTO pp
+                INNER JOIN ITENS_VENDAS iv ON iv.IV_CODIGO = pp.IV_CODIGO
+                WHERE pp.PP_CODIGO = :id
             ");
             $stmt->execute([':id' => $pp_cod]);
             $info = $stmt->fetch(PDO::FETCH_ASSOC);
+            $info = $info ? array_change_key_case($info, CASE_LOWER) : $info;
 
             $restante = max(0, (float)$info['iv_qtde'] - (float)$info['total_produzido']);
             echo json_encode([
@@ -161,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                 echo json_encode(['ok' => false, 'msg' => 'Dados inválidos.']); exit;
             }
             $pdo->prepare("
-                INSERT INTO pcp_planejamento (pp_data, maq_codigo, iv_codigo, pp_qtde_plan)
+                INSERT INTO PCP_PLANEJAMENTO (PP_DATA, MAQ_CODIGO, IV_CODIGO, PP_QTDE_PLAN)
                 VALUES (:data, :maq, :iv, :qtde)
             ")->execute([':data' => $data, ':maq' => $maq_cod, ':iv' => $iv_cod, ':qtde' => $qtde]);
             echo json_encode(['ok' => true]);
@@ -182,7 +184,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                 echo json_encode(['ok' => false, 'msg' => 'Dados inválidos.']); exit;
             }
             $pdo->prepare("
-                INSERT INTO pcp_planejamento (pp_data, maq_codigo, iv_codigo, pp_qtde_plan)
+                INSERT INTO PCP_PLANEJAMENTO (PP_DATA, MAQ_CODIGO, IV_CODIGO, PP_QTDE_PLAN)
                 VALUES (:data, :maq, :iv, :qtde)
             ")->execute([':data' => $data, ':maq' => $maq_cod, ':iv' => $iv_cod, ':qtde' => $qtde]);
             echo json_encode(['ok' => true]);
@@ -210,32 +212,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             // Pré-carrega maq_codigo por maq_descricao
             $maqMap = [];
             $rmRows = $pdo->query("
-                SELECT maq_codigo, maq_descricao,
-                       COALESCE(maq_producao_min,0) * COALESCE(maq_qtde,1) AS vel
+                SELECT MAQ_CODIGO, MAQ_DESCRICAO,
+                       COALESCE(MAQ_PRODUCAO_MIN,0) * COALESCE(MAQ_QTDE,1) AS vel
                 FROM MAQUINAS
             ")->fetchAll(PDO::FETCH_ASSOC);
             foreach ($rmRows as $rm) {
+                $rm = array_change_key_case($rm, CASE_LOWER);
                 $maqMap[$rm['maq_descricao']] = ['codigo' => (int)$rm['maq_codigo'], 'vel' => (float)$rm['vel']];
             }
 
             $inseridos = 0;
             $pulados   = 0;
             $stIv = $pdo->prepare("
-                SELECT iv.iv_codigo
+                SELECT iv.IV_CODIGO
                 FROM ITENS_VENDAS iv
-                INNER JOIN VENDAS   v ON v.ven_codigo  = iv.ven_codigo
-                INNER JOIN PRODUTOS p ON p.pro_codigo  = iv.pro_codigo
-                WHERE v.ven_codigo_yzidro = :ped
-                  AND p.pro_descricao     = :prod
-                  AND iv.iv_status IN ('Pendente de produção','Produção')
+                INNER JOIN VENDAS   v ON v.VEN_CODIGO  = iv.VEN_CODIGO
+                INNER JOIN PRODUTOS p ON p.PRO_CODIGO  = iv.PRO_CODIGO
+                WHERE v.VEN_CODIGO_YZIDRO = :ped
+                  AND p.PRO_DESCRICAO     = :prod
+                  AND iv.IV_STATUS IN ('Pendente de produção','Produção')
                 LIMIT 1
             ");
             $stExiste = $pdo->prepare("
-                SELECT COUNT(*) FROM pcp_planejamento
-                WHERE pp_data=:data AND maq_codigo=:maq AND iv_codigo=:iv
+                SELECT COUNT(*) FROM PCP_PLANEJAMENTO
+                WHERE PP_DATA=:data AND MAQ_CODIGO=:maq AND IV_CODIGO=:iv
             ");
             $stIns = $pdo->prepare("
-                INSERT INTO pcp_planejamento (pp_data, maq_codigo, iv_codigo, pp_qtde_plan)
+                INSERT INTO PCP_PLANEJAMENTO (PP_DATA, MAQ_CODIGO, IV_CODIGO, PP_QTDE_PLAN)
                 VALUES (:data, :maq, :iv, :qtde)
             ");
 
@@ -279,34 +282,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             }
             $rows = $pdo->prepare("
                 SELECT
-                    iv.iv_codigo,
-                    ROUND(iv.iv_qtde) AS iv_qtde,
-                    iv.iv_status,
-                    v.ven_codigo_yzidro AS pedido,
-                    COALESCE(NULLIF(TRIM(v.ven_fantasia),''), NULLIF(TRIM(v.ven_cliente),''), '') AS cliente,
-                    DATE_FORMAT(v.ven_entrega,'%d/%m/%Y')  AS entrega,
-                    v.ven_entrega AS entrega_iso,
-                    p.pro_descricao,
-                    p.pro_categoria,
+                    iv.IV_CODIGO,
+                    ROUND(iv.IV_QTDE) AS iv_qtde,
+                    iv.IV_STATUS,
+                    v.VEN_CODIGO_YZIDRO AS pedido,
+                    COALESCE(NULLIF(TRIM(v.VEN_FANTASIA),''), NULLIF(TRIM(v.VEN_CLIENTE),''), '') AS cliente,
+                    DATE_FORMAT(v.VEN_ENTREGA,'%d/%m/%Y')  AS entrega,
+                    v.VEN_ENTREGA AS entrega_iso,
+                    p.PRO_DESCRICAO,
+                    p.PRO_CATEGORIA,
                     COALESCE(ps.total_produzido, 0) AS total_produzido
                 FROM ITENS_VENDAS iv
-                INNER JOIN VENDAS   v  ON v.ven_codigo  = iv.ven_codigo
-                INNER JOIN PRODUTOS p  ON p.pro_codigo  = iv.pro_codigo
+                INNER JOIN VENDAS   v  ON v.VEN_CODIGO  = iv.VEN_CODIGO
+                INNER JOIN PRODUTOS p  ON p.PRO_CODIGO  = iv.PRO_CODIGO
                 LEFT JOIN (
-                    SELECT iv_codigo, SUM(pp_qtde_prod) AS total_produzido
-                    FROM pcp_planejamento
-                    WHERE pp_qtde_prod IS NOT NULL
-                    GROUP BY iv_codigo
-                ) ps ON ps.iv_codigo = iv.iv_codigo
-                WHERE iv.iv_status IN ('Pendente de produção','Produção')
-                  AND (COALESCE(v.ven_fantasia, v.ven_cliente) LIKE :termo)
+                    SELECT IV_CODIGO, SUM(PP_QTDE_PROD) AS total_produzido
+                    FROM PCP_PLANEJAMENTO
+                    WHERE PP_QTDE_PROD IS NOT NULL
+                    GROUP BY IV_CODIGO
+                ) ps ON ps.IV_CODIGO = iv.IV_CODIGO
+                WHERE iv.IV_STATUS IN ('Pendente de produção','Produção')
+                  AND (COALESCE(v.VEN_FANTASIA, v.VEN_CLIENTE) LIKE :termo)
                 ORDER BY
-                    CASE WHEN iv.iv_prioridade > 0 THEN iv.iv_prioridade ELSE 999999 END,
-                    v.ven_entrega,
-                    v.ven_codigo_yzidro
+                    CASE WHEN iv.IV_PRIORIDADE > 0 THEN iv.IV_PRIORIDADE ELSE 999999 END,
+                    v.VEN_ENTREGA,
+                    v.VEN_CODIGO_YZIDRO
             ");
             $rows->execute([':termo' => '%' . $termo . '%']);
-            echo json_encode(['ok' => true, 'pedidos' => $rows->fetchAll(PDO::FETCH_ASSOC)]);
+            $pedidos = array_map(fn($r) => array_change_key_case($r, CASE_LOWER), $rows->fetchAll(PDO::FETCH_ASSOC));
+            echo json_encode(['ok' => true, 'pedidos' => $pedidos]);
 
         } else {
             echo json_encode(['ok' => false, 'msg' => 'Ação desconhecida.']);
@@ -331,45 +335,48 @@ $is_today   = ($data_plano === date('Y-m-d'));
 $is_future  = ($data_plano > date('Y-m-d'));
 
 // Máquinas reais (não grupos lógicos)
-$maquinas = $pdo->query("
-    SELECT m.maq_codigo, m.maq_descricao, d.dp_descricao,
-           COALESCE(m.maq_producao_min, 0) AS maq_producao_min,
-           COALESCE(m.maq_horas_dia, 8)    AS maq_horas_dia,
-           COALESCE(m.maq_qtde, 1)         AS maq_qtde
-    FROM MAQUINAS m
-    INNER JOIN DEPARTAMENTOS d ON d.dp_codigo = m.dp_codigo
-    ORDER BY d.dp_descricao, m.maq_descricao
-")->fetchAll(PDO::FETCH_ASSOC);
+$maquinas = array_map(
+    fn($r) => array_change_key_case($r, CASE_LOWER),
+    $pdo->query("
+        SELECT m.MAQ_CODIGO, m.MAQ_DESCRICAO, d.DP_DESCRICAO,
+               COALESCE(m.MAQ_PRODUCAO_MIN, 0) AS maq_producao_min,
+               COALESCE(m.MAQ_HORAS_DIA, 8)    AS maq_horas_dia,
+               COALESCE(m.MAQ_QTDE, 1)         AS maq_qtde
+        FROM MAQUINAS m
+        INNER JOIN DEPARTAMENTOS d ON d.DP_CODIGO = m.DP_CODIGO
+        ORDER BY d.DP_DESCRICAO, m.MAQ_DESCRICAO
+    ")->fetchAll(PDO::FETCH_ASSOC)
+);
 
 // Plano do dia selecionado
 $stmt = $pdo->prepare("
     SELECT
-        pp.pp_codigo, pp.pp_data, pp.pp_qtde_plan, pp.pp_qtde_prod, pp.pp_status, pp.pp_obs,
-        pp.maq_codigo, pp.iv_codigo,
-        m.maq_descricao, d.dp_descricao,
-        ROUND(iv.iv_qtde)                            AS iv_qtde,
-        iv.iv_status                                 AS iv_status,
-        v.ven_codigo_yzidro                          AS pedido,
-        COALESCE(NULLIF(TRIM(v.ven_fantasia),''), NULLIF(TRIM(v.ven_cliente),''), '') AS cliente,
-        DATE_FORMAT(v.ven_entrega,'%d/%m/%Y')        AS entrega,
-        p.pro_descricao,
+        pp.PP_CODIGO, pp.PP_DATA, pp.PP_QTDE_PLAN, pp.PP_QTDE_PROD, pp.PP_STATUS, pp.PP_OBS,
+        pp.MAQ_CODIGO, pp.IV_CODIGO,
+        m.MAQ_DESCRICAO, d.DP_DESCRICAO,
+        ROUND(iv.IV_QTDE)                            AS iv_qtde,
+        iv.IV_STATUS                                 AS iv_status,
+        v.VEN_CODIGO_YZIDRO                          AS pedido,
+        COALESCE(NULLIF(TRIM(v.VEN_FANTASIA),''), NULLIF(TRIM(v.VEN_CLIENTE),''), '') AS cliente,
+        DATE_FORMAT(v.VEN_ENTREGA,'%d/%m/%Y')        AS entrega,
+        p.PRO_DESCRICAO,
         COALESCE((
-            SELECT SUM(pp2.pp_qtde_prod)
-            FROM pcp_planejamento pp2
-            WHERE pp2.iv_codigo = pp.iv_codigo
-              AND pp2.pp_qtde_prod IS NOT NULL
+            SELECT SUM(pp2.PP_QTDE_PROD)
+            FROM PCP_PLANEJAMENTO pp2
+            WHERE pp2.IV_CODIGO = pp.IV_CODIGO
+              AND pp2.PP_QTDE_PROD IS NOT NULL
         ), 0) AS total_produzido
-    FROM pcp_planejamento pp
-    INNER JOIN MAQUINAS     m  ON m.maq_codigo  = pp.maq_codigo
-    INNER JOIN DEPARTAMENTOS d  ON d.dp_codigo   = m.dp_codigo
-    INNER JOIN ITENS_VENDAS iv  ON iv.iv_codigo  = pp.iv_codigo
-    INNER JOIN VENDAS        v  ON v.ven_codigo  = iv.ven_codigo
-    INNER JOIN PRODUTOS      p  ON p.pro_codigo  = iv.pro_codigo
-    WHERE pp.pp_data = :data
-    ORDER BY d.dp_descricao, m.maq_descricao, pp.pp_codigo
+    FROM PCP_PLANEJAMENTO pp
+    INNER JOIN MAQUINAS     m  ON m.MAQ_CODIGO  = pp.MAQ_CODIGO
+    INNER JOIN DEPARTAMENTOS d  ON d.DP_CODIGO   = m.DP_CODIGO
+    INNER JOIN ITENS_VENDAS iv  ON iv.IV_CODIGO  = pp.IV_CODIGO
+    INNER JOIN VENDAS        v  ON v.VEN_CODIGO  = iv.VEN_CODIGO
+    INNER JOIN PRODUTOS      p  ON p.PRO_CODIGO  = iv.PRO_CODIGO
+    WHERE pp.PP_DATA = :data
+    ORDER BY d.DP_DESCRICAO, m.MAQ_DESCRICAO, pp.PP_CODIGO
 ");
 $stmt->execute([':data' => $data_plano]);
-$plano_rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$plano_rows = array_map(fn($r) => array_change_key_case($r, CASE_LOWER), $stmt->fetchAll(PDO::FETCH_ASSOC));
 
 $plano_por_maq = [];
 $reg_por_maq   = [];

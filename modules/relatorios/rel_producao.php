@@ -26,10 +26,10 @@ try {
 
     // Garante colunas adicionadas às MAQUINAS após a criação inicial da tabela
     foreach ([
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_qtde NUMERIC(6,2) NOT NULL DEFAULT 1",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_producao_min NUMERIC(10,4) NOT NULL DEFAULT 0",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_horas_dia NUMERIC(5,2) NOT NULL DEFAULT 8",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_QTDE NUMERIC(6,2) NOT NULL DEFAULT 1",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_PRODUCAO_MIN NUMERIC(10,4) NOT NULL DEFAULT 0",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_HORAS_DIA NUMERIC(5,2) NOT NULL DEFAULT 8",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_CONTA_PRODUCAO TINYINT(1) NOT NULL DEFAULT 1",
     ] as $ddl) {
         try { $pdo->exec($ddl); } catch (PDOException) {}
     }
@@ -38,13 +38,13 @@ try {
     // total_und conta apenas máquinas com maq_conta_producao=1 (evita duplicidade)
     $stmt = $pdo->prepare("
         SELECT
-            COALESCE(SUM(CASE WHEN COALESCE(m.maq_conta_producao,1)=1 THEN pd.pd_quantidade ELSE 0 END), 0) AS total_und,
+            COALESCE(SUM(CASE WHEN COALESCE(m.MAQ_CONTA_PRODUCAO,1)=1 THEN pd.PD_QUANTIDADE ELSE 0 END), 0) AS total_und,
             COUNT(*)                                  AS apontamentos,
-            COUNT(DISTINCT pd.maq_codigo)             AS maquinas_ativas,
-            COUNT(DISTINCT pd.pd_funcionario)         AS funcionarios
+            COUNT(DISTINCT pd.MAQ_CODIGO)             AS maquinas_ativas,
+            COUNT(DISTINCT pd.PD_FUNCIONARIO)         AS funcionarios
         FROM PRODUCAO_DIARIA pd
-        LEFT JOIN MAQUINAS m ON m.maq_codigo = pd.maq_codigo
-        WHERE pd.pd_data = :data
+        LEFT JOIN MAQUINAS m ON m.MAQ_CODIGO = pd.MAQ_CODIGO
+        WHERE pd.PD_DATA = :data
     ");
     $stmt->execute([':data' => $data_sel]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -55,15 +55,15 @@ try {
     // ── 2. Gráfico diário (global por hora/máquina) ──
     $stmt = $pdo->prepare("
         SELECT
-            DATE_FORMAT(pd_horario_ini, '%H:%i')  AS hora,
-            pd.maq_codigo,
-            maq.maq_descricao,
-            SUM(pd_quantidade)                    AS qtd
+            DATE_FORMAT(pd.PD_HORARIO_INI, '%H:%i')  AS hora,
+            pd.MAQ_CODIGO AS maq_codigo,
+            maq.MAQ_DESCRICAO AS maq_descricao,
+            SUM(pd.PD_QUANTIDADE)                    AS qtd
         FROM PRODUCAO_DIARIA pd
-        LEFT JOIN MAQUINAS maq ON maq.maq_codigo = pd.maq_codigo
-        WHERE pd_data = :data
-        GROUP BY DATE_FORMAT(pd_horario_ini, '%H:%i'), pd.maq_codigo
-        ORDER BY hora, pd.maq_codigo
+        LEFT JOIN MAQUINAS maq ON maq.MAQ_CODIGO = pd.MAQ_CODIGO
+        WHERE pd.PD_DATA = :data
+        GROUP BY DATE_FORMAT(pd.PD_HORARIO_INI, '%H:%i'), pd.MAQ_CODIGO
+        ORDER BY hora, pd.MAQ_CODIGO
     ");
     $stmt->execute([':data' => $data_sel]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -80,13 +80,13 @@ try {
 
     // ── 3. Gráfico mensal ────────────────────────
     $stmt = $pdo->prepare("
-        SELECT pd_data, SUM(CASE WHEN COALESCE(m.maq_conta_producao,1)=1 THEN pd.pd_quantidade ELSE 0 END) AS qtd
+        SELECT pd.PD_DATA AS pd_data, SUM(CASE WHEN COALESCE(m.MAQ_CONTA_PRODUCAO,1)=1 THEN pd.PD_QUANTIDADE ELSE 0 END) AS qtd
         FROM PRODUCAO_DIARIA pd
-        LEFT JOIN MAQUINAS m ON m.maq_codigo = pd.maq_codigo
-        WHERE YEAR(pd_data) = YEAR(:data)
-          AND MONTH(pd_data) = MONTH(:data)
-        GROUP BY pd_data
-        ORDER BY pd_data
+        LEFT JOIN MAQUINAS m ON m.MAQ_CODIGO = pd.MAQ_CODIGO
+        WHERE YEAR(pd.PD_DATA) = YEAR(:data)
+          AND MONTH(pd.PD_DATA) = MONTH(:data)
+        GROUP BY pd.PD_DATA
+        ORDER BY pd.PD_DATA
     ");
     $stmt->execute([':data' => $data_sel]);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -97,37 +97,37 @@ try {
     // ── 4. Relatório por máquina (hoje) ──────────
     $stmt = $pdo->prepare("
         SELECT
-            pd.maq_codigo,
-            m.maq_descricao,
-            d.dp_descricao,
-            COALESCE(m.maq_qtde, 1)                                          AS qtde_maquinas,
-            COALESCE(m.maq_horas_dia, 8)                                     AS horas_dia,
-            COALESCE(m.maq_producao_min, 0)                                  AS prod_min_cadastro,
-            SUM(pd.pd_quantidade)                                            AS total_und,
+            pd.MAQ_CODIGO AS maq_codigo,
+            m.MAQ_DESCRICAO AS maq_descricao,
+            d.DP_DESCRICAO AS dp_descricao,
+            COALESCE(m.MAQ_QTDE, 1)                                          AS qtde_maquinas,
+            COALESCE(m.MAQ_HORAS_DIA, 8)                                     AS horas_dia,
+            COALESCE(m.MAQ_PRODUCAO_MIN, 0)                                  AS prod_min_cadastro,
+            SUM(pd.PD_QUANTIDADE)                                            AS total_und,
             COUNT(*)                                                         AS apontamentos,
             ROUND(
-                SUM(pd.pd_quantidade) /
+                SUM(pd.PD_QUANTIDADE) /
                 NULLIF(SUM(TIMESTAMPDIFF(MINUTE,
-                    CONCAT('2000-01-01 ', pd.pd_horario_ini),
-                    CONCAT(IF(pd.pd_horario_fim < pd.pd_horario_ini, '2000-01-02', '2000-01-01'), ' ', pd.pd_horario_fim)
+                    CONCAT('2000-01-01 ', pd.PD_HORARIO_INI),
+                    CONCAT(IF(pd.PD_HORARIO_FIM < pd.PD_HORARIO_INI, '2000-01-02', '2000-01-01'), ' ', pd.PD_HORARIO_FIM)
                 )), 0)
             , 4)                                                             AS prod_min_real,
-            MIN(DATE_FORMAT(pd.pd_horario_ini, '%H:%i'))                     AS hora_inicio,
-            MAX(DATE_FORMAT(pd.pd_horario_fim, '%H:%i'))                     AS hora_fim,
-            GROUP_CONCAT(DISTINCT pd.pd_funcionario
-                ORDER BY pd.pd_funcionario SEPARATOR ', ')                   AS funcionarios,
-            GROUP_CONCAT(DISTINCT pd.pd_pedido
-                ORDER BY pd.pd_pedido SEPARATOR ', ')                        AS pedidos,
+            MIN(DATE_FORMAT(pd.PD_HORARIO_INI, '%H:%i'))                     AS hora_inicio,
+            MAX(DATE_FORMAT(pd.PD_HORARIO_FIM, '%H:%i'))                     AS hora_fim,
+            GROUP_CONCAT(DISTINCT pd.PD_FUNCIONARIO
+                ORDER BY pd.PD_FUNCIONARIO SEPARATOR ', ')                   AS funcionarios,
+            GROUP_CONCAT(DISTINCT pd.PD_PEDIDO
+                ORDER BY pd.PD_PEDIDO SEPARATOR ', ')                        AS pedidos,
             SUM(TIMESTAMPDIFF(MINUTE,
-                CONCAT('2000-01-01 ', pd.pd_horario_ini),
-                CONCAT(IF(pd.pd_horario_fim < pd.pd_horario_ini, '2000-01-02', '2000-01-01'), ' ', pd.pd_horario_fim)
+                CONCAT('2000-01-01 ', pd.PD_HORARIO_INI),
+                CONCAT(IF(pd.PD_HORARIO_FIM < pd.PD_HORARIO_INI, '2000-01-02', '2000-01-01'), ' ', pd.PD_HORARIO_FIM)
             ))                                                               AS minutos_trabalhados
         FROM PRODUCAO_DIARIA pd
-        LEFT JOIN MAQUINAS m ON m.maq_codigo = pd.maq_codigo
-        LEFT JOIN DEPARTAMENTOS d ON d.dp_codigo = m.dp_codigo
-        WHERE pd.pd_data = :data
-        GROUP BY pd.maq_codigo, m.maq_descricao, d.dp_descricao,
-                 m.maq_qtde, m.maq_horas_dia, m.maq_producao_min
+        LEFT JOIN MAQUINAS m ON m.MAQ_CODIGO = pd.MAQ_CODIGO
+        LEFT JOIN DEPARTAMENTOS d ON d.DP_CODIGO = m.DP_CODIGO
+        WHERE pd.PD_DATA = :data
+        GROUP BY pd.MAQ_CODIGO, m.MAQ_DESCRICAO, d.DP_DESCRICAO,
+                 m.MAQ_QTDE, m.MAQ_HORAS_DIA, m.MAQ_PRODUCAO_MIN
         ORDER BY total_und DESC
     ");
     $stmt->execute([':data' => $data_sel]);
@@ -153,30 +153,31 @@ try {
 
     // ── 5. Cadastro completo de máquinas ─────────
     $todas_maquinas = $pdo->query('
-        SELECT maq_descricao, maq_qtde, maq_producao_min, maq_horas_dia,
-               ROUND(maq_qtde * maq_producao_min * 60 * maq_horas_dia, 0) AS cap_dia
-        FROM MAQUINAS ORDER BY maq_descricao
+        SELECT MAQ_DESCRICAO AS maq_descricao, MAQ_QTDE AS maq_qtde,
+               MAQ_PRODUCAO_MIN AS maq_producao_min, MAQ_HORAS_DIA AS maq_horas_dia,
+               ROUND(MAQ_QTDE * MAQ_PRODUCAO_MIN * 60 * MAQ_HORAS_DIA, 0) AS cap_dia
+        FROM MAQUINAS ORDER BY MAQ_DESCRICAO
     ')->fetchAll(PDO::FETCH_ASSOC);
 
     // ── 6. Pedidos finalizados no dia ─────────────
     $stmt = $pdo->prepare("
         SELECT
-            v.ven_codigo_yzidro                                               AS pedido,
-            COALESCE(v.ven_fantasia, v.ven_cliente)                           AS cliente,
-            v.ven_entrega,
-            GROUP_CONCAT(DISTINCT p.pro_descricao
-                ORDER BY p.pro_descricao SEPARATOR ' / ')                     AS produtos,
-            SUM(iv.iv_qtde)                                                   AS total_qtde,
-            COUNT(iv.iv_codigo)                                               AS total_itens,
-            CASE WHEN v.ven_codigo_yzidro IS NOT NULL AND TRIM(v.ven_codigo_yzidro) != ''
+            v.VEN_CODIGO_YZIDRO                                               AS pedido,
+            COALESCE(v.VEN_FANTASIA, v.VEN_CLIENTE)                           AS cliente,
+            v.VEN_ENTREGA AS ven_entrega,
+            GROUP_CONCAT(DISTINCT p.PRO_DESCRICAO
+                ORDER BY p.PRO_DESCRICAO SEPARATOR ' / ')                     AS produtos,
+            SUM(iv.IV_QTDE)                                                   AS total_qtde,
+            COUNT(iv.IV_CODIGO)                                               AS total_itens,
+            CASE WHEN v.VEN_CODIGO_YZIDRO IS NOT NULL AND TRIM(v.VEN_CODIGO_YZIDRO) != ''
                  THEN 'erp' ELSE 'web' END                                    AS origem
         FROM ITENS_VENDAS iv
-        JOIN VENDAS v  ON v.ven_codigo  = iv.ven_codigo
-        JOIN PRODUTOS p ON p.pro_codigo = iv.pro_codigo
-        WHERE iv.iv_status = 'Finalizado'
-          AND DATE(iv.iv_atualizado_em) = :data
-        GROUP BY v.ven_codigo, v.ven_codigo_yzidro, v.ven_cliente, v.ven_fantasia, v.ven_entrega
-        ORDER BY v.ven_codigo_yzidro
+        JOIN VENDAS v  ON v.VEN_CODIGO  = iv.VEN_CODIGO
+        JOIN PRODUTOS p ON p.PRO_CODIGO = iv.PRO_CODIGO
+        WHERE iv.IV_STATUS = 'Finalizado'
+          AND DATE(iv.IV_ATUALIZADO_EM) = :data
+        GROUP BY v.VEN_CODIGO, v.VEN_CODIGO_YZIDRO, v.VEN_CLIENTE, v.VEN_FANTASIA, v.VEN_ENTREGA
+        ORDER BY v.VEN_CODIGO_YZIDRO
     ");
     $stmt->execute([':data' => $data_sel]);
     $pedidos_finalizados = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -186,25 +187,25 @@ try {
     // ── 7. Pedidos finalizados no mês ─────────────
     $stmt = $pdo->prepare("
         SELECT
-            v.ven_codigo_yzidro                                               AS pedido,
-            COALESCE(v.ven_fantasia, v.ven_cliente)                           AS cliente,
-            v.ven_entrega,
-            DATE(iv.iv_atualizado_em)                                         AS data_finalizacao,
-            GROUP_CONCAT(DISTINCT p.pro_descricao
-                ORDER BY p.pro_descricao SEPARATOR ' / ')                     AS produtos,
-            SUM(iv.iv_qtde)                                                   AS total_qtde,
-            COUNT(iv.iv_codigo)                                               AS total_itens,
-            CASE WHEN v.ven_codigo_yzidro IS NOT NULL AND TRIM(v.ven_codigo_yzidro) != ''
+            v.VEN_CODIGO_YZIDRO                                               AS pedido,
+            COALESCE(v.VEN_FANTASIA, v.VEN_CLIENTE)                           AS cliente,
+            v.VEN_ENTREGA AS ven_entrega,
+            DATE(iv.IV_ATUALIZADO_EM)                                         AS data_finalizacao,
+            GROUP_CONCAT(DISTINCT p.PRO_DESCRICAO
+                ORDER BY p.PRO_DESCRICAO SEPARATOR ' / ')                     AS produtos,
+            SUM(iv.IV_QTDE)                                                   AS total_qtde,
+            COUNT(iv.IV_CODIGO)                                               AS total_itens,
+            CASE WHEN v.VEN_CODIGO_YZIDRO IS NOT NULL AND TRIM(v.VEN_CODIGO_YZIDRO) != ''
                  THEN 'erp' ELSE 'web' END                                    AS origem
         FROM ITENS_VENDAS iv
-        JOIN VENDAS v  ON v.ven_codigo  = iv.ven_codigo
-        JOIN PRODUTOS p ON p.pro_codigo = iv.pro_codigo
-        WHERE iv.iv_status = 'Finalizado'
-          AND YEAR(iv.iv_atualizado_em)  = YEAR(:data)
-          AND MONTH(iv.iv_atualizado_em) = MONTH(:data)
-        GROUP BY v.ven_codigo, v.ven_codigo_yzidro, v.ven_cliente, v.ven_fantasia,
-                 v.ven_entrega, DATE(iv.iv_atualizado_em)
-        ORDER BY data_finalizacao DESC, v.ven_codigo_yzidro
+        JOIN VENDAS v  ON v.VEN_CODIGO  = iv.VEN_CODIGO
+        JOIN PRODUTOS p ON p.PRO_CODIGO = iv.PRO_CODIGO
+        WHERE iv.IV_STATUS = 'Finalizado'
+          AND YEAR(iv.IV_ATUALIZADO_EM)  = YEAR(:data)
+          AND MONTH(iv.IV_ATUALIZADO_EM) = MONTH(:data)
+        GROUP BY v.VEN_CODIGO, v.VEN_CODIGO_YZIDRO, v.VEN_CLIENTE, v.VEN_FANTASIA,
+                 v.VEN_ENTREGA, DATE(iv.IV_ATUALIZADO_EM)
+        ORDER BY data_finalizacao DESC, v.VEN_CODIGO_YZIDRO
     ");
     $stmt->execute([':data' => $data_sel]);
     $pedidos_finalizados_mes = $stmt->fetchAll(PDO::FETCH_ASSOC);

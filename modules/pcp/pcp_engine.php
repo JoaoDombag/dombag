@@ -25,13 +25,13 @@ function pcpGetMaquinas(): array
         pcpEnsureMaqGrupo($db);
         $rows = $db->query(
             "SELECT
-                maq_descricao                                           AS nome,
-                COALESCE(maq_grupo, maq_descricao)                     AS grupo,
-                COALESCE(maq_qtde, 1) * COALESCE(maq_producao_min, 0) AS velocidade,
-                COALESCE(maq_horas_dia, 8)                             AS horas_dia
+                MAQ_DESCRICAO                                               AS nome,
+                COALESCE(MAQ_GRUPO, MAQ_DESCRICAO)                         AS grupo,
+                COALESCE(MAQ_QTDE, 1) * COALESCE(MAQ_PRODUCAO_MIN, 0)     AS velocidade,
+                COALESCE(MAQ_HORAS_DIA, 8)                                 AS horas_dia
              FROM MAQUINAS
-             WHERE maq_grupo IS NOT NULL AND maq_grupo <> ''
-             ORDER BY maq_grupo, maq_descricao"
+             WHERE MAQ_GRUPO IS NOT NULL AND MAQ_GRUPO <> ''
+             ORDER BY MAQ_GRUPO, MAQ_DESCRICAO"
         )->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {
         return [];
@@ -139,10 +139,10 @@ function pcpGetPedidosERP(string $dataIni, string $dataFim): array
 function pcpEnsureMaquinasColumns(PDO $db): void
 {
     foreach ([
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_qtde NUMERIC(6,2) NOT NULL DEFAULT 1",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_producao_min NUMERIC(10,4) NOT NULL DEFAULT 0",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_horas_dia NUMERIC(5,2) NOT NULL DEFAULT 8",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_QTDE NUMERIC(6,2) NOT NULL DEFAULT 1",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_PRODUCAO_MIN NUMERIC(10,4) NOT NULL DEFAULT 0",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_HORAS_DIA NUMERIC(5,2) NOT NULL DEFAULT 8",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_CONTA_PRODUCAO TINYINT(1) NOT NULL DEFAULT 1",
     ] as $ddl) {
         try { $db->exec($ddl); } catch (Throwable) {}
     }
@@ -157,25 +157,25 @@ function pcpEnsureMaqGrupo(PDO $db): void
     );
     $exists->execute(['MAQUINAS', 'MAQ_GRUPO']);
     if (!(int) $exists->fetchColumn()) {
-        $db->exec('ALTER TABLE MAQUINAS ADD COLUMN maq_grupo VARCHAR(80) NULL DEFAULT NULL');
+        $db->exec('ALTER TABLE MAQUINAS ADD COLUMN MAQ_GRUPO VARCHAR(80) NULL DEFAULT NULL');
     }
     // Preenche apenas linhas ainda sem grupo
     $db->exec("
-        UPDATE MAQUINAS SET maq_grupo = CASE
-            WHEN maq_descricao LIKE 'Corte Bag%'              THEN 'Corte Bag'
-            WHEN maq_descricao LIKE 'Costura Bag%'            THEN 'Costura Bag'
-            WHEN maq_descricao LIKE 'Analise Bag%'
-              OR maq_descricao LIKE 'Análise Bag%'            THEN 'Analise Bag'
-            WHEN maq_descricao LIKE 'Carimbadeira Bag%'
-              OR maq_descricao LIKE 'Impressao Bag%'          THEN 'Impressao Bag'
-            WHEN maq_descricao LIKE 'Flexo%'                  THEN 'Flexo'
-            WHEN maq_descricao LIKE 'Corte+Costura Sacaria%'
-              OR maq_descricao LIKE 'Corte Sacaria%'          THEN 'Corte+Costura Sacaria'
-            WHEN maq_descricao LIKE 'Carimbadeira Sacaria%'   THEN 'Carimbadeira Sacaria'
-            WHEN maq_descricao LIKE 'Valvuladeira%'           THEN 'Valvuladeira'
-            ELSE maq_descricao
+        UPDATE MAQUINAS SET MAQ_GRUPO = CASE
+            WHEN MAQ_DESCRICAO LIKE 'Corte Bag%'              THEN 'Corte Bag'
+            WHEN MAQ_DESCRICAO LIKE 'Costura Bag%'            THEN 'Costura Bag'
+            WHEN MAQ_DESCRICAO LIKE 'Analise Bag%'
+              OR MAQ_DESCRICAO LIKE 'Análise Bag%'            THEN 'Analise Bag'
+            WHEN MAQ_DESCRICAO LIKE 'Carimbadeira Bag%'
+              OR MAQ_DESCRICAO LIKE 'Impressao Bag%'          THEN 'Impressao Bag'
+            WHEN MAQ_DESCRICAO LIKE 'Flexo%'                  THEN 'Flexo'
+            WHEN MAQ_DESCRICAO LIKE 'Corte+Costura Sacaria%'
+              OR MAQ_DESCRICAO LIKE 'Corte Sacaria%'          THEN 'Corte+Costura Sacaria'
+            WHEN MAQ_DESCRICAO LIKE 'Carimbadeira Sacaria%'   THEN 'Carimbadeira Sacaria'
+            WHEN MAQ_DESCRICAO LIKE 'Valvuladeira%'           THEN 'Valvuladeira'
+            ELSE MAQ_DESCRICAO
         END
-        WHERE maq_grupo IS NULL
+        WHERE MAQ_GRUPO IS NULL
     ");
 }
 
@@ -188,7 +188,7 @@ function pcpEnsurePrioridade(PDO $db): void
     );
     $exists->execute(['ITENS_VENDAS', 'IV_PRIORIDADE']);
     if (!(int) $exists->fetchColumn()) {
-        $db->exec('ALTER TABLE ITENS_VENDAS ADD COLUMN iv_prioridade INT NULL');
+        $db->exec('ALTER TABLE ITENS_VENDAS ADD COLUMN IV_PRIORIDADE INT NULL');
     }
 }
 
@@ -200,24 +200,24 @@ function pcpGetPedidosMySQL(): array
         pcpEnsurePrioridade($db);
         $stmt = $db->query("
             SELECT
-                v.ven_codigo_yzidro                                      AS num,
-                DATE_FORMAT(v.ven_entrega, '%d/%m/%Y')                   AS entrega,
-                ''                                                        AS mes_fat,
-                COALESCE(v.ven_representante, '')                        AS rep,
-                COALESCE(NULLIF(v.ven_fantasia,''), v.ven_cliente, '')   AS fantasia,
-                COALESCE(v.ven_cliente, '')                              AS cliente,
-                p.pro_descricao                                          AS produto,
-                p.pro_categoria                                          AS grupo,
-                iv.iv_qtde                                               AS qtd,
-                iv.iv_vlr_unit                                           AS vlr_unit,
-                iv.iv_total                                              AS total_ped,
-                COALESCE(iv.iv_prioridade, 0)                           AS iv_prioridade,
-                COALESCE(iv.iv_obs, '')                                  AS obs
+                v.VEN_CODIGO_YZIDRO                                          AS num,
+                DATE_FORMAT(v.VEN_ENTREGA, '%d/%m/%Y')                       AS entrega,
+                ''                                                            AS mes_fat,
+                COALESCE(v.VEN_REPRESENTANTE, '')                            AS rep,
+                COALESCE(NULLIF(v.VEN_FANTASIA,''), v.VEN_CLIENTE, '')       AS fantasia,
+                COALESCE(v.VEN_CLIENTE, '')                                  AS cliente,
+                p.PRO_DESCRICAO                                              AS produto,
+                p.PRO_CATEGORIA                                              AS grupo,
+                iv.IV_QTDE                                                   AS qtd,
+                iv.IV_VLR_UNIT                                               AS vlr_unit,
+                iv.IV_TOTAL                                                  AS total_ped,
+                COALESCE(iv.IV_PRIORIDADE, 0)                               AS iv_prioridade,
+                COALESCE(iv.IV_OBS, '')                                      AS obs
             FROM ITENS_VENDAS iv
-            JOIN VENDAS   v ON v.ven_codigo = iv.ven_codigo
-            JOIN PRODUTOS p ON p.pro_codigo = iv.pro_codigo
-            WHERE iv.iv_status IN ('Pendente de produção','Produção')
-            ORDER BY v.ven_entrega, v.ven_codigo_yzidro, p.pro_descricao
+            JOIN VENDAS   v ON v.VEN_CODIGO = iv.VEN_CODIGO
+            JOIN PRODUTOS p ON p.PRO_CODIGO = iv.PRO_CODIGO
+            WHERE iv.IV_STATUS IN ('Pendente de produção','Produção')
+            ORDER BY v.VEN_ENTREGA, v.VEN_CODIGO_YZIDRO, p.PRO_DESCRICAO
         ");
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } catch (Exception $e) {

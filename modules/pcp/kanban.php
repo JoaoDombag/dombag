@@ -9,12 +9,12 @@ $pdo = dbPDO();
 try {
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS ITENS_VENDAS_IMAGENS (
-            img_codigo    INT AUTO_INCREMENT PRIMARY KEY,
-            iv_codigo     INT          NOT NULL,
-            img_arquivo   VARCHAR(255) NOT NULL,
-            img_nome_orig VARCHAR(255) NOT NULL,
-            img_criado_em DATETIME     DEFAULT NOW(),
-            INDEX idx_iv (iv_codigo)
+            IMG_CODIGO    INT AUTO_INCREMENT PRIMARY KEY,
+            IV_CODIGO     INT          NOT NULL,
+            IMG_ARQUIVO   VARCHAR(255) NOT NULL,
+            IMG_NOME_ORIG VARCHAR(255) NOT NULL,
+            IMG_CRIADO_EM DATETIME     DEFAULT NOW(),
+            INDEX idx_iv (IV_CODIGO)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ");
 } catch (Throwable $e) {}
@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             echo json_encode(['ok' => false, 'msg' => 'Dados inválidos.']);
             exit;
         }
-        $pdo->prepare('UPDATE ITENS_VENDAS SET iv_status=:s, iv_atualizado_em=NOW() WHERE iv_codigo=:id')
+        $pdo->prepare('UPDATE ITENS_VENDAS SET IV_STATUS=:s, IV_ATUALIZADO_EM=NOW() WHERE IV_CODIGO=:id')
             ->execute([':s' => $status, ':id' => $id]);
         echo json_encode(['ok' => true]);
     } catch (Throwable $e) {
@@ -47,9 +47,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET' && ($_GET['action'] ?? '') === 'get_ima
     $id = (int) ($_GET['id'] ?? 0);
     if (!$id) { echo json_encode(['ok' => false, 'images' => []]); exit; }
     try {
-        $st = $pdo->prepare('SELECT img_codigo, img_arquivo, img_nome_orig FROM ITENS_VENDAS_IMAGENS WHERE iv_codigo=:id ORDER BY img_criado_em');
+        $st = $pdo->prepare('SELECT IMG_CODIGO, IMG_ARQUIVO, IMG_NOME_ORIG FROM ITENS_VENDAS_IMAGENS WHERE IV_CODIGO=:id ORDER BY IMG_CRIADO_EM');
         $st->execute([':id' => $id]);
-        echo json_encode(['ok' => true, 'images' => $st->fetchAll(PDO::FETCH_ASSOC)]);
+        $images = array_map(fn($r) => array_change_key_case($r, CASE_LOWER), $st->fetchAll(PDO::FETCH_ASSOC));
+        echo json_encode(['ok' => true, 'images' => $images]);
     } catch (Throwable $e) {
         echo json_encode(['ok' => false, 'images' => []]);
     }
@@ -77,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             echo json_encode(['ok' => false, 'msg' => 'Erro ao salvar arquivo.']); exit;
         }
         try {
-            $pdo->prepare('INSERT INTO ITENS_VENDAS_IMAGENS (iv_codigo, img_arquivo, img_nome_orig) VALUES (:iv,:arq,:orig)')
+            $pdo->prepare('INSERT INTO ITENS_VENDAS_IMAGENS (IV_CODIGO, IMG_ARQUIVO, IMG_NOME_ORIG) VALUES (:iv,:arq,:orig)')
                 ->execute([':iv' => $id, ':arq' => $nome, ':orig' => $f['name']]);
             echo json_encode(['ok' => true, 'img_codigo' => (int)$pdo->lastInsertId(), 'img_arquivo' => $nome, 'img_nome_orig' => $f['name']]);
         } catch (Throwable $e) {
@@ -91,12 +92,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $imgId = (int) ($_POST['img_codigo'] ?? 0);
         if (!$imgId) { echo json_encode(['ok' => false, 'msg' => 'ID inválido.']); exit; }
         try {
-            $st = $pdo->prepare('SELECT img_arquivo FROM ITENS_VENDAS_IMAGENS WHERE img_codigo=:id');
+            $st = $pdo->prepare('SELECT IMG_ARQUIVO FROM ITENS_VENDAS_IMAGENS WHERE IMG_CODIGO=:id');
             $st->execute([':id' => $imgId]);
             $row = $st->fetch(PDO::FETCH_ASSOC);
             if ($row) {
+                $row = array_change_key_case($row, CASE_LOWER);
                 @unlink($uploadDir . $row['img_arquivo']);
-                $pdo->prepare('DELETE FROM ITENS_VENDAS_IMAGENS WHERE img_codigo=:id')->execute([':id' => $imgId]);
+                $pdo->prepare('DELETE FROM ITENS_VENDAS_IMAGENS WHERE IMG_CODIGO=:id')->execute([':id' => $imgId]);
             }
             echo json_encode(['ok' => true]);
         } catch (Throwable $e) {
@@ -118,67 +120,71 @@ $show_amostras = isset($_GET['amostras']);
 $where = 'WHERE 1=1';
 $params = [];
 if ($f_cat) {
-    $where .= ' AND p.pro_categoria = :cat';
+    $where .= ' AND p.PRO_CATEGORIA = :cat';
     $params[':cat'] = $f_cat;
 }
 if ($f_busca) {
-    $where .= ' AND (v.ven_codigo_yzidro LIKE :q OR v.ven_cliente LIKE :q2 OR p.pro_descricao LIKE :q3)';
+    $where .= ' AND (v.VEN_CODIGO_YZIDRO LIKE :q OR v.VEN_CLIENTE LIKE :q2 OR p.PRO_DESCRICAO LIKE :q3)';
     $params[':q'] = "%$f_busca%";
     $params[':q2'] = "%$f_busca%";
     $params[':q3'] = "%$f_busca%";
 }
 if (!$show_amostras) {
-    $where .= ' AND iv.iv_qtde >= 20';
+    $where .= ' AND iv.IV_QTDE >= 20';
 }
 
 $stmt = $pdo->prepare("
     SELECT
-        iv.iv_codigo,
-        iv.iv_qtde,
-        iv.iv_status,
-        iv.iv_prioridade,
-        iv.iv_obs,
-        v.ven_codigo,
-        v.ven_codigo_yzidro,
-        COALESCE(NULLIF(v.ven_fantasia,''), v.ven_cliente, '') AS cliente,
-        v.ven_uf,
-        v.ven_entrega,
-        v.ven_representante,
-        p.pro_descricao,
-        p.pro_categoria,
-        p.pro_tipo,
-        iv.iv_atualizado_em,
-        (SELECT COUNT(*) FROM ITENS_VENDAS_IMAGENS img WHERE img.iv_codigo = iv.iv_codigo) AS img_count
+        iv.IV_CODIGO,
+        iv.IV_QTDE,
+        iv.IV_STATUS,
+        iv.IV_PRIORIDADE,
+        iv.IV_OBS,
+        v.VEN_CODIGO,
+        v.VEN_CODIGO_YZIDRO,
+        COALESCE(NULLIF(v.VEN_FANTASIA,''), v.VEN_CLIENTE, '') AS cliente,
+        v.VEN_UF,
+        v.VEN_ENTREGA,
+        v.VEN_REPRESENTANTE,
+        p.PRO_DESCRICAO,
+        p.PRO_CATEGORIA,
+        p.PRO_TIPO,
+        iv.IV_ATUALIZADO_EM,
+        (SELECT COUNT(*) FROM ITENS_VENDAS_IMAGENS img WHERE img.IV_CODIGO = iv.IV_CODIGO) AS img_count
     FROM ITENS_VENDAS iv
-    INNER JOIN VENDAS   v ON v.ven_codigo  = iv.ven_codigo
-    INNER JOIN PRODUTOS p ON p.pro_codigo  = iv.pro_codigo
+    INNER JOIN VENDAS   v ON v.VEN_CODIGO  = iv.VEN_CODIGO
+    INNER JOIN PRODUTOS p ON p.PRO_CODIGO  = iv.PRO_CODIGO
     $where
     ORDER BY
-        CASE WHEN COALESCE(iv.iv_prioridade,0) > 0 THEN 0 ELSE 1 END,
-        COALESCE(iv.iv_prioridade, 999999),
-        v.ven_entrega,
-        v.ven_codigo_yzidro
+        CASE WHEN COALESCE(iv.IV_PRIORIDADE,0) > 0 THEN 0 ELSE 1 END,
+        COALESCE(iv.IV_PRIORIDADE, 999999),
+        v.VEN_ENTREGA,
+        v.VEN_CODIGO_YZIDRO
 ");
 $stmt->execute($params);
-$todos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$todos = array_map(
+    fn($r) => array_change_key_case($r, CASE_LOWER),
+    $stmt->fetchAll(PDO::FETCH_ASSOC)
+);
 
 // ── Progresso real ────────────────────────────────────────────────────────────
 $prodProgress = [];
 try {
     $pp = $pdo->query("
-        SELECT pd_pedido, SUM(pd_quantidade) AS produzido
+        SELECT PD_PEDIDO, SUM(PD_QUANTIDADE) AS produzido
         FROM PRODUCAO_DIARIA
-        WHERE pd_pedido IS NOT NULL AND TRIM(pd_pedido) <> ''
-        GROUP BY pd_pedido
+        WHERE PD_PEDIDO IS NOT NULL AND TRIM(PD_PEDIDO) <> ''
+        GROUP BY PD_PEDIDO
     ");
     foreach ($pp->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $r = array_change_key_case($r, CASE_LOWER);
         $prodProgress[trim($r['pd_pedido'])] = (float) $r['produzido'];
     }
 } catch (Throwable $e) {
 }
 
 // ── Categorias disponíveis para filtro ───────────────────────────────────────
-$cats = $pdo->query("SELECT DISTINCT pro_categoria FROM PRODUTOS WHERE pro_categoria IS NOT NULL AND pro_categoria <> '' ORDER BY pro_categoria")
+$cats = $pdo->query("SELECT DISTINCT PRO_CATEGORIA FROM PRODUTOS WHERE PRO_CATEGORIA IS NOT NULL AND PRO_CATEGORIA <> '' ORDER BY PRO_CATEGORIA")
             ->fetchAll(PDO::FETCH_COLUMN);
 
 // ── Colunas do Kanban ─────────────────────────────────────────────────────────

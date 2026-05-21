@@ -29,45 +29,45 @@ function leadsEnsureSchema(PDO $pdo): void
 {
     $pdo->exec(<<<SQL
         CREATE TABLE IF NOT EXISTS LEADS_ADS (
-            id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            lead_id             VARCHAR(120)   NULL,
-            data_criacao        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            nome                VARCHAR(160)   NULL,
-            telefone            VARCHAR(60)    NULL,
-            email               VARCHAR(180)   NULL,
-            empresa             VARCHAR(180)   NULL,
-            produto_interesse   VARCHAR(180)   NULL,
-            origem_botao        VARCHAR(120)   NULL,
-            origem_lp           VARCHAR(120)   NULL,
-            gclid               VARCHAR(255)   NULL,
-            gbraid              VARCHAR(255)   NULL,
-            wbraid              VARCHAR(255)   NULL,
-            utm_source          VARCHAR(120)   NULL,
-            utm_medium          VARCHAR(120)   NULL,
-            utm_campaign        VARCHAR(180)   NULL,
-            status_atual        VARCHAR(40)    NOT NULL DEFAULT 'NOVO',
-            data_qualificacao   DATETIME       NULL,
-            data_venda_fechada  DATETIME       NULL,
-            data_perda          DATETIME       NULL,
-            motivo_perda        TEXT           NULL,
-            valor_venda         DECIMAL(15,2)  NULL,
-            vendedor            VARCHAR(120)   NULL,
-            referer_url         VARCHAR(255)   NULL,
-            landing_url         VARCHAR(255)   NULL,
-            ip_origem           VARCHAR(64)    NULL,
-            user_agent          VARCHAR(255)   NULL,
-            payload_json        LONGTEXT       NULL,
-            dedupe_hash         CHAR(64)       NULL,
-            criado_em           DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            atualizado_em       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            INDEX idx_leads_status   (status_atual),
-            INDEX idx_leads_data     (data_criacao),
-            INDEX idx_leads_email    (email),
-            INDEX idx_leads_tel      (telefone),
-            INDEX idx_leads_lp       (origem_lp),
-            INDEX idx_leads_vendedor (vendedor),
-            UNIQUE KEY uq_leads_dedupe (dedupe_hash),
-            UNIQUE KEY uq_leads_lead_id (lead_id)
+            ID                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            LEAD_ID             VARCHAR(120)   NULL,
+            DATA_CRIACAO        DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            NOME                VARCHAR(160)   NULL,
+            TELEFONE            VARCHAR(60)    NULL,
+            EMAIL               VARCHAR(180)   NULL,
+            EMPRESA             VARCHAR(180)   NULL,
+            PRODUTO_INTERESSE   VARCHAR(180)   NULL,
+            ORIGEM_BOTAO        VARCHAR(120)   NULL,
+            ORIGEM_LP           VARCHAR(120)   NULL,
+            GCLID               VARCHAR(255)   NULL,
+            GBRAID              VARCHAR(255)   NULL,
+            WBRAID              VARCHAR(255)   NULL,
+            UTM_SOURCE          VARCHAR(120)   NULL,
+            UTM_MEDIUM          VARCHAR(120)   NULL,
+            UTM_CAMPAIGN        VARCHAR(180)   NULL,
+            STATUS_ATUAL        VARCHAR(40)    NOT NULL DEFAULT 'NOVO',
+            DATA_QUALIFICACAO   DATETIME       NULL,
+            DATA_VENDA_FECHADA  DATETIME       NULL,
+            DATA_PERDA          DATETIME       NULL,
+            MOTIVO_PERDA        TEXT           NULL,
+            VALOR_VENDA         DECIMAL(15,2)  NULL,
+            VENDEDOR            VARCHAR(120)   NULL,
+            REFERER_URL         VARCHAR(255)   NULL,
+            LANDING_URL         VARCHAR(255)   NULL,
+            IP_ORIGEM           VARCHAR(64)    NULL,
+            USER_AGENT          VARCHAR(255)   NULL,
+            PAYLOAD_JSON        LONGTEXT       NULL,
+            DEDUPE_HASH         CHAR(64)       NULL,
+            CRIADO_EM           DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            ATUALIZADO_EM       DATETIME       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_leads_status   (STATUS_ATUAL),
+            INDEX idx_leads_data     (DATA_CRIACAO),
+            INDEX idx_leads_email    (EMAIL),
+            INDEX idx_leads_tel      (TELEFONE),
+            INDEX idx_leads_lp       (ORIGEM_LP),
+            INDEX idx_leads_vendedor (VENDEDOR),
+            UNIQUE KEY uq_leads_dedupe (DEDUPE_HASH),
+            UNIQUE KEY uq_leads_lead_id (LEAD_ID)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     SQL);
 }
@@ -227,10 +227,10 @@ function leadsInsert(PDO $pdo, array $p): array
     $p['payload_json'] = json_encode($p, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
     $sql = 'INSERT INTO LEADS_ADS (
-        lead_id,data_criacao,nome,telefone,email,empresa,produto_interesse,origem_botao,origem_lp,
-        gclid,gbraid,wbraid,utm_source,utm_medium,utm_campaign,status_atual,data_qualificacao,
-        data_venda_fechada,data_perda,motivo_perda,valor_venda,vendedor,referer_url,landing_url,
-        ip_origem,user_agent,payload_json,dedupe_hash
+        LEAD_ID,DATA_CRIACAO,NOME,TELEFONE,EMAIL,EMPRESA,PRODUTO_INTERESSE,ORIGEM_BOTAO,ORIGEM_LP,
+        GCLID,GBRAID,WBRAID,UTM_SOURCE,UTM_MEDIUM,UTM_CAMPAIGN,STATUS_ATUAL,DATA_QUALIFICACAO,
+        DATA_VENDA_FECHADA,DATA_PERDA,MOTIVO_PERDA,VALOR_VENDA,VENDEDOR,REFERER_URL,LANDING_URL,
+        IP_ORIGEM,USER_AGENT,PAYLOAD_JSON,DEDUPE_HASH
     ) VALUES (
         :lead_id,:data_criacao,:nome,:telefone,:email,:empresa,:produto_interesse,:origem_botao,:origem_lp,
         :gclid,:gbraid,:wbraid,:utm_source,:utm_medium,:utm_campaign,:status_atual,:data_qualificacao,
@@ -243,7 +243,7 @@ function leadsInsert(PDO $pdo, array $p): array
         return ['ok' => true, 'id' => (int) $pdo->lastInsertId(), 'duplicado' => false];
     } catch (PDOException $e) {
         if ((int) $e->getCode() === 23000) {
-            $s = $pdo->prepare('SELECT id FROM LEADS_ADS WHERE lead_id = :lead_id OR dedupe_hash = :dedupe_hash ORDER BY id DESC LIMIT 1');
+            $s = $pdo->prepare('SELECT ID FROM LEADS_ADS WHERE LEAD_ID = :lead_id OR DEDUPE_HASH = :dedupe_hash ORDER BY ID DESC LIMIT 1');
             $s->execute(['lead_id' => $p['lead_id'], 'dedupe_hash' => $p['dedupe_hash']]);
             return ['ok' => true, 'id' => (int) ($s->fetchColumn() ?: 0), 'duplicado' => true];
         }
@@ -253,10 +253,10 @@ function leadsInsert(PDO $pdo, array $p): array
 
 function leadsCountByStatus(PDO $pdo): array
 {
-    $rows = $pdo->query('SELECT status_atual, COUNT(*) qtd FROM LEADS_ADS GROUP BY status_atual')->fetchAll();
+    $rows = $pdo->query('SELECT STATUS_ATUAL, COUNT(*) qtd FROM LEADS_ADS GROUP BY STATUS_ATUAL')->fetchAll();
     $out = array_fill_keys(array_keys(LEADS_STATUS_OPTIONS), 0);
     foreach ($rows as $r) {
-        $out[$r['status_atual']] = (int) $r['qtd'];
+        $out[$r['STATUS_ATUAL']] = (int) $r['qtd'];
     }
     return $out;
 }

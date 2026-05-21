@@ -25,12 +25,12 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
             if (!$id) {
                 throw new Exception('ID inválido.');
             }
-            $check = $db->prepare('SELECT COUNT(*) FROM ITENS_VENDAS WHERE pro_codigo = ?');
+            $check = $db->prepare('SELECT COUNT(*) FROM ITENS_VENDAS WHERE PRO_CODIGO = ?');
             $check->execute([$id]);
             if ($check->fetchColumn() > 0) {
                 throw new Exception('Produto possui itens de venda vinculados e não pode ser excluído.');
             }
-            $db->prepare('DELETE FROM PRODUTOS WHERE pro_codigo = ?')->execute([$id]);
+            $db->prepare('DELETE FROM PRODUTOS WHERE PRO_CODIGO = ?')->execute([$id]);
             echo json_encode(['success' => true, 'msg' => 'Produto excluído com sucesso.']);
             exit;
         }
@@ -55,18 +55,18 @@ try {
 
     $st = $db->query("
         SELECT
-            pro_codigo,
-            pro_codigo_yz,
-            pro_descricao,
-            COALESCE(pro_fluxo, '')         AS pro_fluxo,
-            COALESCE(pro_tipo, '')          AS pro_tipo,
-            COALESCE(pro_impressao, 'NAO')  AS pro_impressao,
-            COALESCE(pro_valvulado, 'NAO')  AS pro_valvulado,
-            COALESCE(pro_comprimento, 0)    AS pro_comprimento,
-            COALESCE(pro_maq_impressao, '') AS pro_maq_impressao,
-            (SELECT COUNT(*) FROM ITENS_VENDAS iv WHERE iv.pro_codigo = p.pro_codigo) AS total_itens
+            PRO_CODIGO AS pro_codigo,
+            PRO_CODIGO_YZ AS pro_codigo_yz,
+            PRO_DESCRICAO AS pro_descricao,
+            COALESCE(PRO_FLUXO, '')         AS pro_fluxo,
+            COALESCE(PRO_TIPO, '')          AS pro_tipo,
+            COALESCE(PRO_IMPRESSAO, 'NAO')  AS pro_impressao,
+            COALESCE(PRO_VALVULADO, 'NAO')  AS pro_valvulado,
+            COALESCE(PRO_COMPRIMENTO, 0)    AS pro_comprimento,
+            COALESCE(PRO_MAQ_IMPRESSAO, '') AS pro_maq_impressao,
+            (SELECT COUNT(*) FROM ITENS_VENDAS iv WHERE iv.PRO_CODIGO = p.PRO_CODIGO) AS total_itens
         FROM PRODUTOS p
-        ORDER BY pro_descricao
+        ORDER BY PRO_DESCRICAO
     ");
     $produtos    = $st->fetchAll(PDO::FETCH_ASSOC);
     $produtos_js = json_encode($produtos, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

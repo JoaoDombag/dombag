@@ -73,7 +73,7 @@ try {
     $pdo = dbPDO();
     iaProspEnsureSchema($pdo);
     $totalBanco  = (int) $pdo->query('SELECT COUNT(*) FROM LEADS_PROSPECTADOS')->fetchColumn();
-    $ultimaBusca = $pdo->query('SELECT MAX(gravado_em) FROM LEADS_PROSPECTADOS')->fetchColumn() ?: null;
+    $ultimaBusca = $pdo->query('SELECT MAX(GRAVADO_EM) FROM LEADS_PROSPECTADOS')->fetchColumn() ?: null;
 } catch (Throwable) {}
 
 $presets = LEADS_PRESETS;

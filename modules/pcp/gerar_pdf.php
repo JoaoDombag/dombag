@@ -19,10 +19,10 @@ try {
 
     // Garante colunas adicionadas às MAQUINAS após a criação inicial da tabela
     foreach ([
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_qtde NUMERIC(6,2) NOT NULL DEFAULT 1",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_producao_min NUMERIC(10,4) NOT NULL DEFAULT 0",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_horas_dia NUMERIC(5,2) NOT NULL DEFAULT 8",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_QTDE NUMERIC(6,2) NOT NULL DEFAULT 1",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_PRODUCAO_MIN NUMERIC(10,4) NOT NULL DEFAULT 0",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_HORAS_DIA NUMERIC(5,2) NOT NULL DEFAULT 8",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_CONTA_PRODUCAO TINYINT(1) NOT NULL DEFAULT 1",
     ] as $ddl) {
         try { $pdo->exec($ddl); } catch (PDOException) {}
     }
@@ -30,34 +30,34 @@ try {
     // 1. KPIs gerais do dia
     $stmt = $pdo->prepare("
         SELECT
-            COALESCE(SUM(pd.pd_quantidade), 0)                                   AS total_und,
+            COALESCE(SUM(pd.PD_QUANTIDADE), 0)                                   AS total_und,
             COUNT(*)                                                              AS apontamentos,
-            COUNT(DISTINCT pd.maq_codigo)                                        AS maquinas_ativas,
-            COUNT(DISTINCT pd.pd_funcionario)                                    AS funcionarios,
+            COUNT(DISTINCT pd.MAQ_CODIGO)                                        AS maquinas_ativas,
+            COUNT(DISTINCT pd.PD_FUNCIONARIO)                                    AS funcionarios,
             SUM(TIMESTAMPDIFF(MINUTE,
-                CONCAT('2000-01-01 ',pd.pd_horario_ini),
-                CONCAT(IF(pd.pd_horario_fim < pd.pd_horario_ini,'2000-01-02','2000-01-01'),' ',pd.pd_horario_fim)))  AS total_minutos,
-            MIN(DATE_FORMAT(pd.pd_horario_ini,'%H:%i'))                          AS primeiro_turno,
-            MAX(DATE_FORMAT(pd.pd_horario_fim,'%H:%i'))                          AS ultimo_turno
+                CONCAT('2000-01-01 ',pd.PD_HORARIO_INI),
+                CONCAT(IF(pd.PD_HORARIO_FIM < pd.PD_HORARIO_INI,'2000-01-02','2000-01-01'),' ',pd.PD_HORARIO_FIM)))  AS total_minutos,
+            MIN(DATE_FORMAT(pd.PD_HORARIO_INI,'%H:%i'))                          AS primeiro_turno,
+            MAX(DATE_FORMAT(pd.PD_HORARIO_FIM,'%H:%i'))                          AS ultimo_turno
         FROM PRODUCAO_DIARIA pd
-        WHERE pd.pd_data = :data
+        WHERE pd.PD_DATA = :data
     ");
     $stmt->execute([':data' => $data_sel]);
     $kpi = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // 2. Comparativo dia anterior
     $data_ant = date('Y-m-d', strtotime($data_sel . ' -1 day'));
-    $stmt_ant = $pdo->prepare('SELECT COALESCE(SUM(pd_quantidade),0) FROM PRODUCAO_DIARIA WHERE pd_data = :d');
+    $stmt_ant = $pdo->prepare('SELECT COALESCE(SUM(PD_QUANTIDADE),0) FROM PRODUCAO_DIARIA WHERE PD_DATA = :d');
     $stmt_ant->execute([':d' => $data_ant]);
     $total_ant = (float) $stmt_ant->fetchColumn();
 
     // 3. Produção por hora (global)
     $stmt_hora = $pdo->prepare("
-        SELECT DATE_FORMAT(pd.pd_horario_ini,'%H:%i') AS hora,
-               SUM(pd.pd_quantidade)                  AS qtd
+        SELECT DATE_FORMAT(pd.PD_HORARIO_INI,'%H:%i') AS hora,
+               SUM(pd.PD_QUANTIDADE)                  AS qtd
         FROM PRODUCAO_DIARIA pd
-        WHERE pd.pd_data = :data
-        GROUP BY DATE_FORMAT(pd.pd_horario_ini,'%H:%i')
+        WHERE pd.PD_DATA = :data
+        GROUP BY DATE_FORMAT(pd.PD_HORARIO_INI,'%H:%i')
         ORDER BY hora
     ");
     $stmt_hora->execute([':data' => $data_sel]);
@@ -66,33 +66,33 @@ try {
     // 4. Resumo por máquina
     $stmt_maq = $pdo->prepare("
         SELECT
-            pd.maq_codigo,
-            m.maq_descricao,
-            d.dp_descricao,
-            COALESCE(m.maq_qtde,1)          AS qtde_maquinas,
-            COALESCE(m.maq_horas_dia,8)     AS horas_dia,
-            COALESCE(m.maq_producao_min,0)  AS prod_min_cad,
-            SUM(pd.pd_quantidade)           AS total_und,
+            pd.MAQ_CODIGO AS maq_codigo,
+            m.MAQ_DESCRICAO AS maq_descricao,
+            d.DP_DESCRICAO AS dp_descricao,
+            COALESCE(m.MAQ_QTDE,1)          AS qtde_maquinas,
+            COALESCE(m.MAQ_HORAS_DIA,8)     AS horas_dia,
+            COALESCE(m.MAQ_PRODUCAO_MIN,0)  AS prod_min_cad,
+            SUM(pd.PD_QUANTIDADE)           AS total_und,
             COUNT(*)                        AS apontamentos,
             SUM(TIMESTAMPDIFF(MINUTE,
-                CONCAT('2000-01-01 ',pd.pd_horario_ini),
-                CONCAT(IF(pd.pd_horario_fim < pd.pd_horario_ini,'2000-01-02','2000-01-01'),' ',pd.pd_horario_fim))) AS total_min,
-            ROUND(SUM(pd.pd_quantidade) /
+                CONCAT('2000-01-01 ',pd.PD_HORARIO_INI),
+                CONCAT(IF(pd.PD_HORARIO_FIM < pd.PD_HORARIO_INI,'2000-01-02','2000-01-01'),' ',pd.PD_HORARIO_FIM))) AS total_min,
+            ROUND(SUM(pd.PD_QUANTIDADE) /
                 NULLIF(SUM(TIMESTAMPDIFF(MINUTE,
-                    CONCAT('2000-01-01 ',pd.pd_horario_ini),
-                    CONCAT(IF(pd.pd_horario_fim < pd.pd_horario_ini,'2000-01-02','2000-01-01'),' ',pd.pd_horario_fim))),0),4) AS prod_min_real,
-            MIN(DATE_FORMAT(pd.pd_horario_ini,'%H:%i'))              AS hora_ini,
-            MAX(DATE_FORMAT(pd.pd_horario_fim,'%H:%i'))              AS hora_fim,
-            GROUP_CONCAT(DISTINCT pd.pd_funcionario
-                ORDER BY pd.pd_funcionario SEPARATOR ', ')           AS funcionarios,
-            GROUP_CONCAT(DISTINCT pd.pd_pedido
-                ORDER BY pd.pd_pedido SEPARATOR ', ')                AS pedidos
+                    CONCAT('2000-01-01 ',pd.PD_HORARIO_INI),
+                    CONCAT(IF(pd.PD_HORARIO_FIM < pd.PD_HORARIO_INI,'2000-01-02','2000-01-01'),' ',pd.PD_HORARIO_FIM))),0),4) AS prod_min_real,
+            MIN(DATE_FORMAT(pd.PD_HORARIO_INI,'%H:%i'))              AS hora_ini,
+            MAX(DATE_FORMAT(pd.PD_HORARIO_FIM,'%H:%i'))              AS hora_fim,
+            GROUP_CONCAT(DISTINCT pd.PD_FUNCIONARIO
+                ORDER BY pd.PD_FUNCIONARIO SEPARATOR ', ')           AS funcionarios,
+            GROUP_CONCAT(DISTINCT pd.PD_PEDIDO
+                ORDER BY pd.PD_PEDIDO SEPARATOR ', ')                AS pedidos
         FROM PRODUCAO_DIARIA pd
-        LEFT JOIN MAQUINAS m ON m.maq_codigo = pd.maq_codigo
-        LEFT JOIN DEPARTAMENTOS d ON d.dp_codigo = m.dp_codigo
-        WHERE pd.pd_data = :data
-        GROUP BY pd.maq_codigo, m.maq_descricao, d.dp_descricao,
-                 m.maq_qtde, m.maq_horas_dia, m.maq_producao_min
+        LEFT JOIN MAQUINAS m ON m.MAQ_CODIGO = pd.MAQ_CODIGO
+        LEFT JOIN DEPARTAMENTOS d ON d.DP_CODIGO = m.DP_CODIGO
+        WHERE pd.PD_DATA = :data
+        GROUP BY pd.MAQ_CODIGO, m.MAQ_DESCRICAO, d.DP_DESCRICAO,
+                 m.MAQ_QTDE, m.MAQ_HORAS_DIA, m.MAQ_PRODUCAO_MIN
         ORDER BY total_und DESC
     ");
     $stmt_maq->execute([':data' => $data_sel]);
@@ -110,19 +110,19 @@ try {
     // 5. Apontamentos individuais (para detalhe por máquina)
     $stmt_det = $pdo->prepare("
         SELECT
-            pd.maq_codigo,
-            DATE_FORMAT(pd.pd_horario_ini,'%H:%i')  AS ini,
-            DATE_FORMAT(pd.pd_horario_fim,'%H:%i')  AS fim,
-            pd.pd_quantidade                         AS qtd,
-            pd.pd_funcionario                        AS func,
-            pd.pd_pedido                             AS pedido,
-            pd.pd_comentario                         AS obs,
+            pd.MAQ_CODIGO AS maq_codigo,
+            DATE_FORMAT(pd.PD_HORARIO_INI,'%H:%i')  AS ini,
+            DATE_FORMAT(pd.PD_HORARIO_FIM,'%H:%i')  AS fim,
+            pd.PD_QUANTIDADE                         AS qtd,
+            pd.PD_FUNCIONARIO                        AS func,
+            pd.PD_PEDIDO                             AS pedido,
+            pd.PD_COMENTARIO                         AS obs,
             TIMESTAMPDIFF(MINUTE,
-                CONCAT('2000-01-01 ',pd.pd_horario_ini),
-                CONCAT(IF(pd.pd_horario_fim < pd.pd_horario_ini,'2000-01-02','2000-01-01'),' ',pd.pd_horario_fim))  AS minutos
+                CONCAT('2000-01-01 ',pd.PD_HORARIO_INI),
+                CONCAT(IF(pd.PD_HORARIO_FIM < pd.PD_HORARIO_INI,'2000-01-02','2000-01-01'),' ',pd.PD_HORARIO_FIM))  AS minutos
         FROM PRODUCAO_DIARIA pd
-        WHERE pd.pd_data = :data
-        ORDER BY pd.maq_codigo, pd.pd_horario_ini
+        WHERE pd.PD_DATA = :data
+        ORDER BY pd.MAQ_CODIGO, pd.PD_HORARIO_INI
     ");
     $stmt_det->execute([':data' => $data_sel]);
     $det_raw = $stmt_det->fetchAll(PDO::FETCH_ASSOC);

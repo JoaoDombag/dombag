@@ -438,29 +438,29 @@ function iaProspEnsureSchema(PDO $pdo): void
 {
     $pdo->exec(<<<SQL
         CREATE TABLE IF NOT EXISTS LEADS_PROSPECTADOS (
-            id                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            cnpj              VARCHAR(18)      NOT NULL DEFAULT '',
-            nome_empresa      VARCHAR(255)     NOT NULL,
-            site              VARCHAR(255)     NULL,
-            telefone          VARCHAR(60)      NULL,
-            email             VARCHAR(180)     NULL,
-            cidade            VARCHAR(120)     NULL,
-            uf                CHAR(2)          NULL,
-            segmento          VARCHAR(180)     NULL,
-            fonte             VARCHAR(255)     NULL,
-            motivo_relevancia TEXT             NULL,
-            score             TINYINT UNSIGNED NOT NULL DEFAULT 0,
-            segmento_busca    VARCHAR(255)     NULL,
-            dedupe_key        CHAR(64)         NOT NULL,
-            status_prosp      VARCHAR(40)      NOT NULL DEFAULT 'NOVO',
-            usuario_id        INT UNSIGNED     NULL DEFAULT NULL,
-            gravado_em        DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_prosp_dedupe (dedupe_key),
-            INDEX idx_prosp_uf       (uf),
-            INDEX idx_prosp_score    (score),
-            INDEX idx_prosp_status   (status_prosp),
-            INDEX idx_prosp_segmento (segmento_busca(80)),
-            INDEX idx_prosp_usuario  (usuario_id)
+            ID                INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            CNPJ              VARCHAR(18)      NOT NULL DEFAULT '',
+            NOME_EMPRESA      VARCHAR(255)     NOT NULL,
+            SITE              VARCHAR(255)     NULL,
+            TELEFONE          VARCHAR(60)      NULL,
+            EMAIL             VARCHAR(180)     NULL,
+            CIDADE            VARCHAR(120)     NULL,
+            UF                CHAR(2)          NULL,
+            SEGMENTO          VARCHAR(180)     NULL,
+            FONTE             VARCHAR(255)     NULL,
+            MOTIVO_RELEVANCIA TEXT             NULL,
+            SCORE             TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            SEGMENTO_BUSCA    VARCHAR(255)     NULL,
+            DEDUPE_KEY        CHAR(64)         NOT NULL,
+            STATUS_PROSP      VARCHAR(40)      NOT NULL DEFAULT 'NOVO',
+            USUARIO_ID        INT UNSIGNED     NULL DEFAULT NULL,
+            GRAVADO_EM        DATETIME         NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_prosp_dedupe (DEDUPE_KEY),
+            INDEX idx_prosp_uf       (UF),
+            INDEX idx_prosp_score    (SCORE),
+            INDEX idx_prosp_status   (STATUS_PROSP),
+            INDEX idx_prosp_segmento (SEGMENTO_BUSCA(80)),
+            INDEX idx_prosp_usuario  (USUARIO_ID)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     SQL);
 
@@ -472,22 +472,22 @@ function iaProspEnsureSchema(PDO $pdo): void
 
     $col->execute(['LEADS_PROSPECTADOS', 'CNPJ']);
     if (!(int) $col->fetchColumn()) {
-        $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN cnpj VARCHAR(18) NOT NULL DEFAULT '' AFTER id");
+        $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN CNPJ VARCHAR(18) NOT NULL DEFAULT '' AFTER ID");
     }
 
     $col->execute(['LEADS_PROSPECTADOS', 'USUARIO_ID']);
     if (!(int) $col->fetchColumn()) {
-        $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN usuario_id INT UNSIGNED NULL DEFAULT NULL AFTER status_prosp");
+        $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN USUARIO_ID INT UNSIGNED NULL DEFAULT NULL AFTER STATUS_PROSP");
     }
 
-    $col->execute(['LEADS_PROSPECTADOS', 'contato_compras_nome']);
+    $col->execute(['LEADS_PROSPECTADOS', 'CONTATO_COMPRAS_NOME']);
     if (!(int) $col->fetchColumn()) {
-        $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN contato_compras_nome VARCHAR(255) NULL DEFAULT NULL");
+        $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN CONTATO_COMPRAS_NOME VARCHAR(255) NULL DEFAULT NULL");
     }
 
-    $col->execute(['LEADS_PROSPECTADOS', 'contato_compras_meio']);
+    $col->execute(['LEADS_PROSPECTADOS', 'CONTATO_COMPRAS_MEIO']);
     if (!(int) $col->fetchColumn()) {
-        $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN contato_compras_meio VARCHAR(255) NULL DEFAULT NULL");
+        $pdo->exec("ALTER TABLE LEADS_PROSPECTADOS ADD COLUMN CONTATO_COMPRAS_MEIO VARCHAR(255) NULL DEFAULT NULL");
     }
 }
 
@@ -561,7 +561,7 @@ function iaProspSaveAll(PDO $pdo, array $leads, string $segmentoBusca): array
     $novos = 0;
     $duplicados = 0;
     $sql = 'INSERT IGNORE INTO LEADS_PROSPECTADOS
-        (cnpj, nome_empresa, site, telefone, email, cidade, uf, segmento, fonte, motivo_relevancia, score, segmento_busca, dedupe_key, contato_compras_nome, contato_compras_meio)
+        (CNPJ, NOME_EMPRESA, SITE, TELEFONE, EMAIL, CIDADE, UF, SEGMENTO, FONTE, MOTIVO_RELEVANCIA, SCORE, SEGMENTO_BUSCA, DEDUPE_KEY, CONTATO_COMPRAS_NOME, CONTATO_COMPRAS_MEIO)
         VALUES (:cnpj, :nome_empresa, :site, :telefone, :email, :cidade, :uf, :segmento, :fonte, :motivo_relevancia, :score, :segmento_busca, :dedupe_key, :contato_compras_nome, :contato_compras_meio)';
     $stmt = $pdo->prepare($sql);
     foreach ($leads as $lead) {
@@ -594,7 +594,7 @@ function iaProspFilterSaved(PDO $pdo, array $leads): array
     if (empty($leads)) return $leads;
     $keys         = array_map('iaProspDedupeKey', $leads);
     $placeholders = implode(',', array_fill(0, count($keys), '?'));
-    $stmt         = $pdo->prepare("SELECT dedupe_key FROM LEADS_PROSPECTADOS WHERE dedupe_key IN ($placeholders)");
+    $stmt         = $pdo->prepare("SELECT DEDUPE_KEY FROM LEADS_PROSPECTADOS WHERE DEDUPE_KEY IN ($placeholders)");
     $stmt->execute($keys);
     $saved        = array_flip($stmt->fetchAll(PDO::FETCH_COLUMN));
     return array_values(array_filter($leads, static fn($l) => !isset($saved[iaProspDedupeKey($l)])));

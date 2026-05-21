@@ -13,7 +13,7 @@ if (!(bool) $__st->fetchColumn()) {
 $pdo = dbPDO();
 
 // Verifica o tipo atual da coluna
-$col = $pdo->query("SHOW COLUMNS FROM ITENS_VENDAS LIKE 'iv_status'")->fetch();
+$col = $pdo->query("SHOW COLUMNS FROM ITENS_VENDAS LIKE 'IV_STATUS'")->fetch();
 echo '<pre>Coluna atual: ';
 print_r($col);
 echo '</pre>';
@@ -22,7 +22,7 @@ $type = strtolower($col['Type'] ?? '');
 
 if (strpos($type, 'enum') !== false) {
     // Altera o ENUM adicionando os novos valores
-    $sql = "ALTER TABLE ITENS_VENDAS MODIFY COLUMN iv_status
+    $sql = "ALTER TABLE ITENS_VENDAS MODIFY COLUMN IV_STATUS
         ENUM('Pendente de produção','Produção','Aguardando','Aguardando envio','Aguardando expedição','Finalizado')
         NOT NULL DEFAULT 'Pendente de produção'";
     echo '<p>Executando: <code>' . htmlspecialchars($sql) . '</code></p>';
@@ -30,7 +30,7 @@ if (strpos($type, 'enum') !== false) {
     echo '<p style="color:green;font-weight:bold">✔ ALTER TABLE executado com sucesso!</p>';
 } elseif (strpos($type, 'varchar') !== false) {
     // Se for VARCHAR, só garante que tem tamanho suficiente
-    $sql = "ALTER TABLE ITENS_VENDAS MODIFY COLUMN iv_status VARCHAR(60) DEFAULT 'Pendente de produção'";
+    $sql = "ALTER TABLE ITENS_VENDAS MODIFY COLUMN IV_STATUS VARCHAR(60) DEFAULT 'Pendente de produção'";
     $pdo->exec($sql);
     echo '<p style="color:green;font-weight:bold">✔ VARCHAR expandido com sucesso!</p>';
 } else {
@@ -38,7 +38,7 @@ if (strpos($type, 'enum') !== false) {
 }
 
 // Confirma resultado
-$col2 = $pdo->query("SHOW COLUMNS FROM ITENS_VENDAS LIKE 'iv_status'")->fetch();
+$col2 = $pdo->query("SHOW COLUMNS FROM ITENS_VENDAS LIKE 'IV_STATUS'")->fetch();
 echo '<pre>Coluna após migração: ';
 print_r($col2);
 echo '</pre>';

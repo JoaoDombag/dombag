@@ -16,30 +16,30 @@ try {
     // ── DDL / migrations ────────────────────────
     $pdo->exec('
         CREATE TABLE IF NOT EXISTS DEPARTAMENTOS (
-            dp_codigo    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            dp_descricao VARCHAR(25) NOT NULL UNIQUE
+            DP_CODIGO    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            DP_DESCRICAO VARCHAR(25) NOT NULL UNIQUE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ');
 
     $pdo->exec("
-        INSERT IGNORE INTO DEPARTAMENTOS (dp_descricao) VALUES ('BAG'), ('SACARIA')
+        INSERT IGNORE INTO DEPARTAMENTOS (DP_DESCRICAO) VALUES ('BAG'), ('SACARIA')
     ");
 
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS MAQUINAS (
-            maq_codigo         INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-            maq_descricao      VARCHAR(120)  NOT NULL UNIQUE,
-            maq_qtde           NUMERIC(6,2)  NOT NULL DEFAULT 1,
-            maq_producao_min   NUMERIC(10,4) NOT NULL DEFAULT 0
+            MAQ_CODIGO         INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+            MAQ_DESCRICAO      VARCHAR(120)  NOT NULL UNIQUE,
+            MAQ_QTDE           NUMERIC(6,2)  NOT NULL DEFAULT 1,
+            MAQ_PRODUCAO_MIN   NUMERIC(10,4) NOT NULL DEFAULT 0
                                COMMENT 'Unidades por minuto',
-            maq_horas_dia      NUMERIC(5,2)  NOT NULL DEFAULT 8,
-            dp_codigo          INT UNSIGNED  NOT NULL
+            MAQ_HORAS_DIA      NUMERIC(5,2)  NOT NULL DEFAULT 8,
+            DP_CODIGO          INT UNSIGNED  NOT NULL
                                COMMENT 'Departamento da máquina',
-            maq_conta_producao TINYINT(1)    NOT NULL DEFAULT 1
+            MAQ_CONTA_PRODUCAO TINYINT(1)    NOT NULL DEFAULT 1
                                COMMENT '1=conta no total; 0=processo intermediário',
             CONSTRAINT fk_maq_depto
-                FOREIGN KEY (dp_codigo)
-                REFERENCES DEPARTAMENTOS (dp_codigo)
+                FOREIGN KEY (DP_CODIGO)
+                REFERENCES DEPARTAMENTOS (DP_CODIGO)
                 ON UPDATE CASCADE
                 ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -52,11 +52,11 @@ try {
     );
 
     $missingCols = [
-        'maq_qtde'           => "ALTER TABLE MAQUINAS ADD COLUMN maq_qtde NUMERIC(6,2) NOT NULL DEFAULT 1",
-        'maq_producao_min'   => "ALTER TABLE MAQUINAS ADD COLUMN maq_producao_min NUMERIC(10,4) NOT NULL DEFAULT 0 COMMENT 'Unidades por minuto'",
-        'maq_horas_dia'      => "ALTER TABLE MAQUINAS ADD COLUMN maq_horas_dia NUMERIC(5,2) NOT NULL DEFAULT 8",
-        'maq_conta_producao' => "ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1",
-        'maq_grupo'          => "ALTER TABLE MAQUINAS ADD COLUMN maq_grupo VARCHAR(80) NULL DEFAULT NULL",
+        'maq_qtde'           => "ALTER TABLE MAQUINAS ADD COLUMN MAQ_QTDE NUMERIC(6,2) NOT NULL DEFAULT 1",
+        'maq_producao_min'   => "ALTER TABLE MAQUINAS ADD COLUMN MAQ_PRODUCAO_MIN NUMERIC(10,4) NOT NULL DEFAULT 0 COMMENT 'Unidades por minuto'",
+        'maq_horas_dia'      => "ALTER TABLE MAQUINAS ADD COLUMN MAQ_HORAS_DIA NUMERIC(5,2) NOT NULL DEFAULT 8",
+        'maq_conta_producao' => "ALTER TABLE MAQUINAS ADD COLUMN MAQ_CONTA_PRODUCAO TINYINT(1) NOT NULL DEFAULT 1",
+        'maq_grupo'          => "ALTER TABLE MAQUINAS ADD COLUMN MAQ_GRUPO VARCHAR(80) NULL DEFAULT NULL",
     ];
     foreach ($missingCols as $col => $ddl) {
         if (!in_array($col, $actualCols)) {
@@ -69,7 +69,7 @@ try {
         $cod = intval($_POST['maq_codigo'] ?? 0);
         if ($cod > 0) {
             try {
-                $pdo->prepare('DELETE FROM MAQUINAS WHERE maq_codigo = :cod')
+                $pdo->prepare('DELETE FROM MAQUINAS WHERE MAQ_CODIGO = :cod')
                     ->execute([':cod' => $cod]);
                 $db_ok_msg = 'Máquina excluída com sucesso.';
             } catch (PDOException $e) {
@@ -82,10 +82,10 @@ try {
     $maquinas = array_map(
         fn($r) => array_change_key_case($r, CASE_LOWER),
         $pdo->query('
-            SELECT m.*, d.dp_descricao
+            SELECT m.*, d.DP_DESCRICAO
             FROM   MAQUINAS m
-            INNER  JOIN DEPARTAMENTOS d ON d.dp_codigo = m.dp_codigo
-            ORDER  BY m.maq_codigo
+            INNER  JOIN DEPARTAMENTOS d ON d.DP_CODIGO = m.DP_CODIGO
+            ORDER  BY m.MAQ_CODIGO
         ')->fetchAll(PDO::FETCH_ASSOC)
     );
 

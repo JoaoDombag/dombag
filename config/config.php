@@ -46,7 +46,8 @@ if (!function_exists('dbPDO')) {
         static $pdo = null;
         if ($pdo === null) {
             $opts = [PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC];
+                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                     PDO::ATTR_CASE               => PDO::CASE_UPPER];
             $pdo = new PDO(
                 'mysql:host=' . DB_HOST . ';port=' . DB_PORT . ';dbname=' . DB_NAME . ';charset=' . DB_CHARSET,
                 DB_USER, DB_PASS, $opts
@@ -57,12 +58,26 @@ if (!function_exists('dbPDO')) {
 
     function dbPG()
     {
+        static $conn = null, $tried = false;
+        if ($tried) return $conn;
+        $tried = true;
+
         if (!function_exists('pg_connect')) {
+            error_log('[YZIDRO] Extensão pgsql não habilitada no PHP');
             return null;
         }
-        return @pg_connect(
+
+        $conn = @pg_connect(
             'host=' . PG_HOST . ' port=' . PG_PORT .
-            ' dbname=' . PG_DBNAME . ' user=' . PG_USER . ' password=' . PG_PASS
-        ) ?: null;
+            ' dbname=' . PG_DBNAME . ' user=' . PG_USER . ' password=' . PG_PASS .
+            ' connect_timeout=10'
+        );
+
+        if (!$conn) {
+            error_log('[YZIDRO] Falha ao conectar: ' . pg_last_error());
+            $conn = null;
+        }
+
+        return $conn;
     }
 }

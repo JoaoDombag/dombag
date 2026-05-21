@@ -20,7 +20,7 @@ $pdo = dbPDO();
         );
         $chk->execute(['VENDAS', 'VEN_PRAZO_DIAS']);
         if (!(int) $chk->fetchColumn()) {
-            $pdo->exec('ALTER TABLE VENDAS ADD COLUMN ven_prazo_dias INT NULL AFTER ven_status');
+            $pdo->exec('ALTER TABLE VENDAS ADD COLUMN VEN_PRAZO_DIAS INT NULL AFTER VEN_STATUS');
         }
     } catch (Throwable) {}
 })();
@@ -77,10 +77,10 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'set_prazo') {
         );
         $chkCol->execute(['VENDAS', 'VEN_PRAZO_DIAS']);
         if (!(int) $chkCol->fetchColumn()) {
-            $pdo->exec('ALTER TABLE VENDAS ADD COLUMN ven_prazo_dias INT NULL AFTER ven_status');
+            $pdo->exec('ALTER TABLE VENDAS ADD COLUMN VEN_PRAZO_DIAS INT NULL AFTER VEN_STATUS');
         }
         $prazoVal = $prazo === '' ? null : max(1, (int) $prazo);
-        $st = $pdo->prepare('UPDATE VENDAS SET ven_prazo_dias = ? WHERE ven_codigo = ?');
+        $st = $pdo->prepare('UPDATE VENDAS SET VEN_PRAZO_DIAS = ? WHERE VEN_CODIGO = ?');
         $st->execute([$prazoVal, $venCod]);
         echo json_encode(['ok' => true, 'prazo' => $prazoVal]);
     } catch (Throwable $e) {
@@ -100,19 +100,19 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'itens') {
 
         $stmt = $pdo->prepare('
             SELECT
-                iv.iv_codigo,
-                p.pro_descricao  AS produto,
-                p.pro_categoria  AS categoria,
-                iv.iv_qtde       AS qtd,
-                iv.iv_unidade    AS unidade,
-                iv.iv_vlr_unit   AS valor_unit,
-                iv.iv_total      AS total_produto,
-                iv.iv_status     AS status,
-                iv.iv_obs        AS obs
+                iv.IV_CODIGO AS iv_codigo,
+                p.PRO_DESCRICAO  AS produto,
+                p.PRO_CATEGORIA  AS categoria,
+                iv.IV_QTDE       AS qtd,
+                iv.IV_UNIDADE    AS unidade,
+                iv.IV_VLR_UNIT   AS valor_unit,
+                iv.IV_TOTAL      AS total_produto,
+                iv.IV_STATUS     AS status,
+                iv.IV_OBS        AS obs
             FROM ITENS_VENDAS iv
-            JOIN PRODUTOS p ON p.pro_codigo = iv.pro_codigo
-            WHERE iv.ven_codigo = :id
-            ORDER BY p.pro_descricao
+            JOIN PRODUTOS p ON p.PRO_CODIGO = iv.PRO_CODIGO
+            WHERE iv.VEN_CODIGO = :id
+            ORDER BY p.PRO_DESCRICAO
         ');
         $stmt->execute([':id' => $venCod]);
         $itens = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -145,31 +145,31 @@ $where = ['1=1'];
 $params = [];
 
 if ($filters['entrega_ini'] !== '') {
-    $where[] = 'v.ven_entrega >= :ent_ini';
+    $where[] = 'v.VEN_ENTREGA >= :ent_ini';
     $params[':ent_ini'] = $filters['entrega_ini'];
 }
 if ($filters['entrega_fim'] !== '') {
-    $where[] = 'v.ven_entrega <= :ent_fim';
+    $where[] = 'v.VEN_ENTREGA <= :ent_fim';
     $params[':ent_fim'] = $filters['entrega_fim'];
 }
 if ($filters['emissao_ini'] !== '') {
-    $where[] = 'v.ven_emissao >= :emi_ini';
+    $where[] = 'v.VEN_EMISSAO >= :emi_ini';
     $params[':emi_ini'] = $filters['emissao_ini'];
 }
 if ($filters['emissao_fim'] !== '') {
-    $where[] = 'v.ven_emissao <= :emi_fim';
+    $where[] = 'v.VEN_EMISSAO <= :emi_fim';
     $params[':emi_fim'] = $filters['emissao_fim'];
 }
 if ($filters['pedido'] !== '') {
-    $where[] = 'v.ven_codigo_yzidro LIKE :ped';
+    $where[] = 'v.VEN_CODIGO_YZIDRO LIKE :ped';
     $params[':ped'] = '%' . $filters['pedido'] . '%';
 }
 if ($filters['cliente'] !== '') {
-    $where[] = '(v.ven_fantasia LIKE :cli OR v.ven_cliente LIKE :cli)';
+    $where[] = '(v.VEN_FANTASIA LIKE :cli OR v.VEN_CLIENTE LIKE :cli)';
     $params[':cli'] = '%' . $filters['cliente'] . '%';
 }
 if ($filters['representante'] !== '') {
-    $where[] = 'v.ven_representante LIKE :rep';
+    $where[] = 'v.VEN_REPRESENTANTE LIKE :rep';
     $params[':rep'] = '%' . $filters['representante'] . '%';
 }
 
@@ -179,40 +179,40 @@ $whereStr = implode(' AND ', $where);
 $havingParts = [];
 switch ($filters['situacao']) {
     case 'finalizados':
-        $havingParts[] = "COUNT(iv.iv_codigo) > 0 AND COUNT(iv.iv_codigo) = SUM(CASE WHEN iv.iv_status = 'Finalizado' THEN 1 ELSE 0 END)";
+        $havingParts[] = "COUNT(iv.IV_CODIGO) > 0 AND COUNT(iv.IV_CODIGO) = SUM(CASE WHEN iv.IV_STATUS = 'Finalizado' THEN 1 ELSE 0 END)";
         break;
     case 'em_andamento':
-        $havingParts[] = "COUNT(iv.iv_codigo) = 0 OR SUM(CASE WHEN iv.iv_status != 'Finalizado' THEN 1 ELSE 0 END) > 0";
+        $havingParts[] = "COUNT(iv.IV_CODIGO) = 0 OR SUM(CASE WHEN iv.IV_STATUS != 'Finalizado' THEN 1 ELSE 0 END) > 0";
         break;
 }
 if (!$show_amostras) {
-    $havingParts[] = 'MIN(iv.iv_qtde) >= 20';
+    $havingParts[] = 'MIN(iv.IV_QTDE) >= 20';
 }
 $having = $havingParts ? ('HAVING ' . implode(' AND ', $havingParts)) : '';
 
 $stmt = $pdo->prepare("
     SELECT
-        v.ven_codigo,
-        v.ven_codigo_yzidro                                                      AS pedido,
-        COALESCE(NULLIF(v.ven_fantasia,''), v.ven_cliente)                       AS cliente,
-        v.ven_representante                                                      AS representante,
-        v.ven_emissao                                                            AS dataemissao,
-        v.ven_entrega                                                            AS datafatura,
-        v.ven_total                                                              AS total_pedido,
-        v.ven_prazo_dias                                                         AS prazo_dias,
-        COUNT(iv.iv_codigo)                                                      AS qtd_itens,
-        SUM(CASE WHEN iv.iv_status = 'Finalizado'          THEN 1 ELSE 0 END)   AS qtd_fin,
-        SUM(CASE WHEN iv.iv_status = 'Produção'            THEN 1 ELSE 0 END)   AS qtd_prod,
-        SUM(CASE WHEN iv.iv_status = 'Aguardando expedição' THEN 1 ELSE 0 END)  AS qtd_exp,
-        SUM(CASE WHEN iv.iv_status = 'Pendente de produção' THEN 1 ELSE 0 END)  AS qtd_pend,
-        MIN(iv.iv_qtde) AS min_qtde,
-        MAX(iv.iv_qtde) AS max_qtde
+        v.VEN_CODIGO AS ven_codigo,
+        v.VEN_CODIGO_YZIDRO                                                      AS pedido,
+        COALESCE(NULLIF(v.VEN_FANTASIA,''), v.VEN_CLIENTE)                       AS cliente,
+        v.VEN_REPRESENTANTE                                                      AS representante,
+        v.VEN_EMISSAO                                                            AS dataemissao,
+        v.VEN_ENTREGA                                                            AS datafatura,
+        v.VEN_TOTAL                                                              AS total_pedido,
+        v.VEN_PRAZO_DIAS                                                         AS prazo_dias,
+        COUNT(iv.IV_CODIGO)                                                      AS qtd_itens,
+        SUM(CASE WHEN iv.IV_STATUS = 'Finalizado'          THEN 1 ELSE 0 END)   AS qtd_fin,
+        SUM(CASE WHEN iv.IV_STATUS = 'Produção'            THEN 1 ELSE 0 END)   AS qtd_prod,
+        SUM(CASE WHEN iv.IV_STATUS = 'Aguardando expedição' THEN 1 ELSE 0 END)  AS qtd_exp,
+        SUM(CASE WHEN iv.IV_STATUS = 'Pendente de produção' THEN 1 ELSE 0 END)  AS qtd_pend,
+        MIN(iv.IV_QTDE) AS min_qtde,
+        MAX(iv.IV_QTDE) AS max_qtde
     FROM VENDAS v
-    LEFT JOIN ITENS_VENDAS iv ON iv.ven_codigo = v.ven_codigo
+    LEFT JOIN ITENS_VENDAS iv ON iv.VEN_CODIGO = v.VEN_CODIGO
     WHERE {$whereStr}
-    GROUP BY v.ven_codigo
+    GROUP BY v.VEN_CODIGO
     {$having}
-    ORDER BY v.ven_entrega ASC, v.ven_codigo_yzidro DESC
+    ORDER BY v.VEN_ENTREGA ASC, v.VEN_CODIGO_YZIDRO DESC
 ");
 $stmt->execute($params);
 $vendas = $stmt->fetchAll(PDO::FETCH_ASSOC);

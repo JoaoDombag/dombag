@@ -38,14 +38,14 @@ if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQU
 
             if ($id > 0) {
                 $st = $db->prepare('UPDATE PRODUTOS SET
-                    pro_descricao=?, pro_fluxo=?, pro_tipo=?, pro_impressao=?,
-                    pro_valvulado=?, pro_comprimento=?, pro_maq_impressao=?, pro_codigo_yz=?
-                    WHERE pro_codigo=?');
+                    PRO_DESCRICAO=?, PRO_FLUXO=?, PRO_TIPO=?, PRO_IMPRESSAO=?,
+                    PRO_VALVULADO=?, PRO_COMPRIMENTO=?, PRO_MAQ_IMPRESSAO=?, PRO_CODIGO_YZ=?
+                    WHERE PRO_CODIGO=?');
                 $st->execute([$descricao, $fluxo, $tipo, $impressao, $valvulado, $comprimento ?: null, $maq, $cod_yz, $id]);
                 echo json_encode(['success' => true, 'msg' => 'Produto atualizado com sucesso.', 'id' => $id]);
             } else {
                 $st = $db->prepare('INSERT INTO PRODUTOS
-                    (pro_descricao, pro_fluxo, pro_tipo, pro_impressao, pro_valvulado, pro_comprimento, pro_maq_impressao, pro_codigo_yz)
+                    (PRO_DESCRICAO, PRO_FLUXO, PRO_TIPO, PRO_IMPRESSAO, PRO_VALVULADO, PRO_COMPRIMENTO, PRO_MAQ_IMPRESSAO, PRO_CODIGO_YZ)
                     VALUES (?,?,?,?,?,?,?,?)');
                 $st->execute([$descricao, $fluxo, $tipo, $impressao, $valvulado, $comprimento ?: null, $maq, $cod_yz]);
                 echo json_encode(['success' => true, 'msg' => 'Produto cadastrado com sucesso.', 'id' => (int) $db->lastInsertId()]);
@@ -82,15 +82,15 @@ if ($edit_id > 0) {
         $db = pcpGetPDO();
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $st = $db->prepare("
-            SELECT pro_codigo, pro_descricao,
-                   COALESCE(pro_tipo,'')           AS pro_tipo,
-                   COALESCE(pro_comprimento,0)     AS pro_comprimento,
-                   COALESCE(pro_impressao,'NAO')   AS pro_impressao,
-                   COALESCE(pro_valvulado,'NAO')   AS pro_valvulado,
-                   COALESCE(pro_maq_impressao,'')  AS pro_maq_impressao,
-                   pro_codigo_yz,
-                   COALESCE(pro_fluxo,'')          AS pro_fluxo
-            FROM PRODUTOS WHERE pro_codigo = ?
+            SELECT PRO_CODIGO AS pro_codigo, PRO_DESCRICAO AS pro_descricao,
+                   COALESCE(PRO_TIPO,'')           AS pro_tipo,
+                   COALESCE(PRO_COMPRIMENTO,0)     AS pro_comprimento,
+                   COALESCE(PRO_IMPRESSAO,'NAO')   AS pro_impressao,
+                   COALESCE(PRO_VALVULADO,'NAO')   AS pro_valvulado,
+                   COALESCE(PRO_MAQ_IMPRESSAO,'')  AS pro_maq_impressao,
+                   PRO_CODIGO_YZ AS pro_codigo_yz,
+                   COALESCE(PRO_FLUXO,'')          AS pro_fluxo
+            FROM PRODUTOS WHERE PRO_CODIGO = ?
         ");
         $st->execute([$edit_id]);
         $row = $st->fetch(PDO::FETCH_ASSOC);
@@ -141,13 +141,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_SERVER['HTTP_X_REQUESTED_W
 
             if ($id > 0) {
                 $st = $db->prepare('UPDATE PRODUTOS SET
-                    pro_descricao=?, pro_fluxo=?, pro_tipo=?, pro_impressao=?,
-                    pro_valvulado=?, pro_comprimento=?, pro_maq_impressao=?, pro_codigo_yz=?
-                    WHERE pro_codigo=?');
+                    PRO_DESCRICAO=?, PRO_FLUXO=?, PRO_TIPO=?, PRO_IMPRESSAO=?,
+                    PRO_VALVULADO=?, PRO_COMPRIMENTO=?, PRO_MAQ_IMPRESSAO=?, PRO_CODIGO_YZ=?
+                    WHERE PRO_CODIGO=?');
                 $st->execute([$descricao, $fluxo, $tipo, $impressao, $valvulado, $comprimento, $maq, $cod_yz, $id]);
             } else {
                 $st = $db->prepare('INSERT INTO PRODUTOS
-                    (pro_descricao, pro_fluxo, pro_tipo, pro_impressao, pro_valvulado, pro_comprimento, pro_maq_impressao, pro_codigo_yz)
+                    (PRO_DESCRICAO, PRO_FLUXO, PRO_TIPO, PRO_IMPRESSAO, PRO_VALVULADO, PRO_COMPRIMENTO, PRO_MAQ_IMPRESSAO, PRO_CODIGO_YZ)
                     VALUES (?,?,?,?,?,?,?,?)');
                 $st->execute([$descricao, $fluxo, $tipo, $impressao, $valvulado, $comprimento, $maq, $cod_yz]);
             }

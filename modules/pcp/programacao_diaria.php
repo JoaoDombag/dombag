@@ -164,12 +164,12 @@ $CARGA     = json_encode($cargaDiaMaq, JSON_UNESCAPED_UNICODE);
 $realizadoMap = [];
 try {
     $rowsR = $pdoDB->query("
-        SELECT DATE_FORMAT(pd_data,'%d/%m/%Y') AS data,
-               pd_pedido,
-               SUM(pd_quantidade) AS qtd
+        SELECT DATE_FORMAT(PD_DATA,'%d/%m/%Y') AS data,
+               PD_PEDIDO AS pd_pedido,
+               SUM(PD_QUANTIDADE) AS qtd
         FROM PRODUCAO_DIARIA
-        WHERE pd_pedido IS NOT NULL AND TRIM(pd_pedido) <> ''
-        GROUP BY pd_data, pd_pedido
+        WHERE PD_PEDIDO IS NOT NULL AND TRIM(PD_PEDIDO) <> ''
+        GROUP BY PD_DATA, PD_PEDIDO
     ")->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rowsR as $r) {
         $realizadoMap[$r['data']][$r['pd_pedido']] = (float) $r['qtd'];
@@ -181,13 +181,13 @@ $REALIZADO = json_encode($realizadoMap, JSON_UNESCAPED_UNICODE);
 $planMap = [];
 try {
     $rowsP = $pdoDB->query("
-        SELECT DATE_FORMAT(pp.pp_data,'%d/%m/%Y') AS data,
-               v.ven_codigo_yzidro AS pedido,
-               MAX(CASE WHEN pp.pp_status='Registrado' THEN 'Registrado' ELSE 'Planejado' END) AS status
-        FROM pcp_planejamento pp
-        INNER JOIN ITENS_VENDAS iv ON iv.iv_codigo = pp.iv_codigo
-        INNER JOIN VENDAS v ON v.ven_codigo = iv.ven_codigo
-        GROUP BY pp.pp_data, v.ven_codigo_yzidro
+        SELECT DATE_FORMAT(pp.PP_DATA,'%d/%m/%Y') AS data,
+               v.VEN_CODIGO_YZIDRO AS pedido,
+               MAX(CASE WHEN pp.PP_STATUS='Registrado' THEN 'Registrado' ELSE 'Planejado' END) AS status
+        FROM PCP_PLANEJAMENTO pp
+        INNER JOIN ITENS_VENDAS iv ON iv.IV_CODIGO = pp.IV_CODIGO
+        INNER JOIN VENDAS v ON v.VEN_CODIGO = iv.VEN_CODIGO
+        GROUP BY pp.PP_DATA, v.VEN_CODIGO_YZIDRO
     ")->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rowsP as $rp) {
         $planMap[$rp['data']][$rp['pedido']] = $rp['status'];

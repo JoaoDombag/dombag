@@ -29,30 +29,30 @@ try {
     // ── DDL mínimo: garante que as tabelas e colunas existem ──
     $pdo->exec('
         CREATE TABLE IF NOT EXISTS DEPARTAMENTOS (
-            dp_codigo    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            dp_descricao VARCHAR(25) NOT NULL UNIQUE
+            DP_CODIGO    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            DP_DESCRICAO VARCHAR(25) NOT NULL UNIQUE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ');
 
     $pdo->exec("
-        INSERT IGNORE INTO DEPARTAMENTOS (dp_descricao) VALUES ('BAG'), ('SACARIA')
+        INSERT IGNORE INTO DEPARTAMENTOS (DP_DESCRICAO) VALUES ('BAG'), ('SACARIA')
     ");
 
     $pdo->exec("
         CREATE TABLE IF NOT EXISTS MAQUINAS (
-            maq_codigo         INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
-            maq_descricao      VARCHAR(120)  NOT NULL UNIQUE,
-            maq_qtde           NUMERIC(6,2)  NOT NULL DEFAULT 1,
-            maq_producao_min   NUMERIC(10,4) NOT NULL DEFAULT 0
+            MAQ_CODIGO         INT UNSIGNED  AUTO_INCREMENT PRIMARY KEY,
+            MAQ_DESCRICAO      VARCHAR(120)  NOT NULL UNIQUE,
+            MAQ_QTDE           NUMERIC(6,2)  NOT NULL DEFAULT 1,
+            MAQ_PRODUCAO_MIN   NUMERIC(10,4) NOT NULL DEFAULT 0
                                COMMENT 'Unidades por minuto',
-            maq_horas_dia      NUMERIC(5,2)  NOT NULL DEFAULT 8,
-            dp_codigo          INT UNSIGNED  NOT NULL
+            MAQ_HORAS_DIA      NUMERIC(5,2)  NOT NULL DEFAULT 8,
+            DP_CODIGO          INT UNSIGNED  NOT NULL
                                COMMENT 'Departamento da máquina',
-            maq_conta_producao TINYINT(1)    NOT NULL DEFAULT 1
+            MAQ_CONTA_PRODUCAO TINYINT(1)    NOT NULL DEFAULT 1
                                COMMENT '1=conta no total; 0=processo intermediário',
             CONSTRAINT fk_maq_depto
-                FOREIGN KEY (dp_codigo)
-                REFERENCES DEPARTAMENTOS (dp_codigo)
+                FOREIGN KEY (DP_CODIGO)
+                REFERENCES DEPARTAMENTOS (DP_CODIGO)
                 ON UPDATE CASCADE
                 ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -63,11 +63,11 @@ try {
         $pdo->query('SHOW COLUMNS FROM MAQUINAS')->fetchAll(PDO::FETCH_COLUMN)
     );
     $missingCols = [
-        'maq_qtde'           => "ALTER TABLE MAQUINAS ADD COLUMN maq_qtde NUMERIC(6,2) NOT NULL DEFAULT 1",
-        'maq_producao_min'   => "ALTER TABLE MAQUINAS ADD COLUMN maq_producao_min NUMERIC(10,4) NOT NULL DEFAULT 0 COMMENT 'Unidades por minuto'",
-        'maq_horas_dia'      => "ALTER TABLE MAQUINAS ADD COLUMN maq_horas_dia NUMERIC(5,2) NOT NULL DEFAULT 8",
-        'maq_conta_producao' => "ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1",
-        'maq_grupo'          => "ALTER TABLE MAQUINAS ADD COLUMN maq_grupo VARCHAR(80) NULL DEFAULT NULL",
+        'maq_qtde'           => "ALTER TABLE MAQUINAS ADD COLUMN MAQ_QTDE NUMERIC(6,2) NOT NULL DEFAULT 1",
+        'maq_producao_min'   => "ALTER TABLE MAQUINAS ADD COLUMN MAQ_PRODUCAO_MIN NUMERIC(10,4) NOT NULL DEFAULT 0 COMMENT 'Unidades por minuto'",
+        'maq_horas_dia'      => "ALTER TABLE MAQUINAS ADD COLUMN MAQ_HORAS_DIA NUMERIC(5,2) NOT NULL DEFAULT 8",
+        'maq_conta_producao' => "ALTER TABLE MAQUINAS ADD COLUMN MAQ_CONTA_PRODUCAO TINYINT(1) NOT NULL DEFAULT 1",
+        'maq_grupo'          => "ALTER TABLE MAQUINAS ADD COLUMN MAQ_GRUPO VARCHAR(80) NULL DEFAULT NULL",
     ];
     foreach ($missingCols as $col => $ddl) {
         if (!in_array($col, $actualCols)) {
@@ -78,7 +78,7 @@ try {
     // ── Busca departamentos ──────────────────────
     $deptos = array_map(
         fn($r) => array_change_key_case($r, CASE_LOWER),
-        $pdo->query("SELECT dp_codigo, dp_descricao FROM DEPARTAMENTOS WHERE UPPER(dp_descricao) IN ('BAG','SACARIA') ORDER BY dp_descricao")
+        $pdo->query("SELECT DP_CODIGO, DP_DESCRICAO FROM DEPARTAMENTOS WHERE UPPER(DP_DESCRICAO) IN ('BAG','SACARIA') ORDER BY DP_DESCRICAO")
             ->fetchAll(PDO::FETCH_ASSOC)
     );
 
@@ -86,10 +86,10 @@ try {
     $id_get = intval($_GET['id'] ?? 0);
     if ($id_get > 0 && $_SERVER['REQUEST_METHOD'] !== 'POST') {
         $stmt = $pdo->prepare('
-            SELECT maq_codigo, maq_descricao, maq_grupo, maq_qtde,
-                   maq_producao_min, maq_horas_dia, dp_codigo, maq_conta_producao
+            SELECT MAQ_CODIGO, MAQ_DESCRICAO, MAQ_GRUPO, MAQ_QTDE,
+                   MAQ_PRODUCAO_MIN, MAQ_HORAS_DIA, DP_CODIGO, MAQ_CONTA_PRODUCAO
             FROM   MAQUINAS
-            WHERE  maq_codigo = :id
+            WHERE  MAQ_CODIGO = :id
         ');
         $stmt->execute([':id' => $id_get]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -134,14 +134,14 @@ try {
             try {
                 $stmt = $pdo->prepare('
                     UPDATE MAQUINAS SET
-                        maq_descricao      = :desc,
-                        maq_grupo          = :grupo,
-                        maq_qtde           = :qtde,
-                        maq_producao_min   = :prod,
-                        maq_horas_dia      = :horas,
-                        dp_codigo          = :depto,
-                        maq_conta_producao = :conta
-                    WHERE maq_codigo = :cod
+                        MAQ_DESCRICAO      = :desc,
+                        MAQ_GRUPO          = :grupo,
+                        MAQ_QTDE           = :qtde,
+                        MAQ_PRODUCAO_MIN   = :prod,
+                        MAQ_HORAS_DIA      = :horas,
+                        DP_CODIGO          = :depto,
+                        MAQ_CONTA_PRODUCAO = :conta
+                    WHERE MAQ_CODIGO = :cod
                 ');
                 $stmt->execute([
                     ':desc'  => $desc,  ':grupo' => $grupo,
@@ -158,7 +158,7 @@ try {
             try {
                 $stmt = $pdo->prepare('
                     INSERT INTO MAQUINAS
-                        (maq_descricao, maq_grupo, maq_qtde, maq_producao_min, maq_horas_dia, dp_codigo, maq_conta_producao)
+                        (MAQ_DESCRICAO, MAQ_GRUPO, MAQ_QTDE, MAQ_PRODUCAO_MIN, MAQ_HORAS_DIA, DP_CODIGO, MAQ_CONTA_PRODUCAO)
                     VALUES (:desc, :grupo, :qtde, :prod, :horas, :depto, :conta)
                 ');
                 $stmt->execute([

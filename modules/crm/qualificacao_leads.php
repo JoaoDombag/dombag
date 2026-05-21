@@ -9,7 +9,7 @@ leadsEnsureSchema($pdo);
 
 // ── Export CSV ────────────────────────────────────────────────────────────────
 if (isset($_GET['export']) && $_GET['export'] === 'csv') {
-    $rows = $pdo->query('SELECT nome,telefone,email,empresa,produto_interesse,origem_lp,origem_botao,utm_source,utm_medium,utm_campaign,status_atual,vendedor,valor_venda,motivo_perda,data_criacao FROM LEADS_ADS ORDER BY data_criacao DESC')->fetchAll(PDO::FETCH_ASSOC);
+    $rows = array_map(fn($r) => array_change_key_case($r, CASE_LOWER), $pdo->query('SELECT NOME,TELEFONE,EMAIL,EMPRESA,PRODUTO_INTERESSE,ORIGEM_LP,ORIGEM_BOTAO,UTM_SOURCE,UTM_MEDIUM,UTM_CAMPAIGN,STATUS_ATUAL,VENDEDOR,VALOR_VENDA,MOTIVO_PERDA,DATA_CRIACAO FROM LEADS_ADS ORDER BY DATA_CRIACAO DESC')->fetchAll(PDO::FETCH_ASSOC));
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="leads_webhook_' . date('Y-m-d') . '.csv"');
     $out = fopen('php://output', 'w');
@@ -39,10 +39,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             exit;
         }
 
-        $sql = 'UPDATE LEADS_ADS SET status_atual=:s, motivo_perda=:m, vendedor=:v, valor_venda=:vv, data_qualificacao=NOW()';
-        if ($status === 'VENDA')    $sql .= ', data_venda_fechada = NOW()';
-        if (in_array($status, ['PERDIDO','DESQUALIFICADO'], true)) $sql .= ', data_perda = NOW()';
-        $sql .= ' WHERE id=:id';
+        $sql = 'UPDATE LEADS_ADS SET STATUS_ATUAL=:s, MOTIVO_PERDA=:m, VENDEDOR=:v, VALOR_VENDA=:vv, DATA_QUALIFICACAO=NOW()';
+        if ($status === 'VENDA')    $sql .= ', DATA_VENDA_FECHADA = NOW()';
+        if (in_array($status, ['PERDIDO','DESQUALIFICADO'], true)) $sql .= ', DATA_PERDA = NOW()';
+        $sql .= ' WHERE ID=:id';
 
         $pdo->prepare($sql)->execute([':s' => $status, ':m' => $obs, ':v' => $vendedor, ':vv' => $valorDb, ':id' => $id]);
         echo json_encode(['ok' => true, 'msg' => 'Lead atualizado.', 'status' => $status, 'status_label' => leadsStatusLabel($status)]);
@@ -62,28 +62,28 @@ $f = [
 $where  = [];
 $params = [];
 if ($f['status'] !== '' && isset(LEADS_STATUS_OPTIONS[leadsNormalizeStatus($f['status'])])) {
-    $where[]          = 'status_atual = :status';
+    $where[]          = 'STATUS_ATUAL = :status';
     $params['status'] = leadsNormalizeStatus($f['status']);
 }
 if ($f['lp'] !== '') {
-    $where[]     = 'origem_lp = :lp';
+    $where[]     = 'ORIGEM_LP = :lp';
     $params['lp'] = $f['lp'];
 }
 if ($f['busca'] !== '') {
-    $where[]     = '(nome LIKE :b OR telefone LIKE :b OR email LIKE :b OR empresa LIKE :b OR produto_interesse LIKE :b OR vendedor LIKE :b)';
+    $where[]     = '(NOME LIKE :b OR TELEFONE LIKE :b OR EMAIL LIKE :b OR EMPRESA LIKE :b OR PRODUTO_INTERESSE LIKE :b OR VENDEDOR LIKE :b)';
     $params['b'] = '%' . $f['busca'] . '%';
 }
 
 $sql = 'SELECT * FROM LEADS_ADS';
 if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
-$sql .= ' ORDER BY data_criacao DESC, id DESC LIMIT 300';
+$sql .= ' ORDER BY DATA_CRIACAO DESC, ID DESC LIMIT 300';
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
-$rows = $stmt->fetchAll();
+$rows = array_map(fn($r) => array_change_key_case($r, CASE_LOWER), $stmt->fetchAll(PDO::FETCH_ASSOC));
 
 $stats = leadsCountByStatus($pdo);
 $total = array_sum($stats);
-$lps   = $pdo->query('SELECT origem_lp, COUNT(*) qtd FROM LEADS_ADS GROUP BY origem_lp ORDER BY qtd DESC, origem_lp ASC')->fetchAll();
+$lps   = array_map(fn($o) => array_change_key_case($o, CASE_LOWER), $pdo->query('SELECT ORIGEM_LP, COUNT(*) qtd FROM LEADS_ADS GROUP BY ORIGEM_LP ORDER BY qtd DESC, ORIGEM_LP ASC')->fetchAll(PDO::FETCH_ASSOC));
 
 $statusMap = [
     'NOVO'              => ['class' => 'sl-novo',   'label' => 'Novo'],

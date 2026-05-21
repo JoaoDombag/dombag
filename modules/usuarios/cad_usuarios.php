@@ -46,8 +46,8 @@ try {
 } catch (Throwable) {}
 
 // ── Grupos para o select ─────────────────────────────────────────────────────
-$grupos = $pdo->query('SELECT GRU_CODIGO, GRU_NOME FROM GRUPO_USUARIO ORDER BY GRU_NOME')
-              ->fetchAll(PDO::FETCH_ASSOC);
+$grupos_usu = $pdo->query('SELECT GRU_CODIGO, GRU_NOME FROM GRUPO_USUARIO ORDER BY GRU_NOME')
+                  ->fetchAll(PDO::FETCH_ASSOC);
 
 // ── Modo: edição ou criação ───────────────────────────────────────────────────
 $id_editar = isset($_GET['id']) ? (int) $_GET['id'] : 0;
@@ -312,7 +312,7 @@ $titulo_pagina = $editando
                   <label>Grupo</label>
                   <select name="gru_codigo" id="f_gru">
                     <option value="0">— SEM GRUPO —</option>
-                    <?php foreach ($grupos as $g): ?>
+                    <?php foreach ($grupos_usu as $g): ?>
                     <option value="<?= $g['GRU_CODIGO'] ?>"
                       <?= (int)$f_gru === (int)$g['GRU_CODIGO'] ? 'selected' : '' ?>>
                       <?= htmlspecialchars(strtoupper($g['GRU_NOME'])) ?>

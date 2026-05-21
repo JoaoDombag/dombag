@@ -136,41 +136,41 @@ try {
 
     // Garante colunas adicionadas às MAQUINAS após a criação inicial da tabela
     foreach ([
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_qtde NUMERIC(6,2) NOT NULL DEFAULT 1",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_producao_min NUMERIC(10,4) NOT NULL DEFAULT 0",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_horas_dia NUMERIC(5,2) NOT NULL DEFAULT 8",
-        "ALTER TABLE MAQUINAS ADD COLUMN maq_conta_producao TINYINT(1) NOT NULL DEFAULT 1",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_QTDE NUMERIC(6,2) NOT NULL DEFAULT 1",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_PRODUCAO_MIN NUMERIC(10,4) NOT NULL DEFAULT 0",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_HORAS_DIA NUMERIC(5,2) NOT NULL DEFAULT 8",
+        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_CONTA_PRODUCAO TINYINT(1) NOT NULL DEFAULT 1",
     ] as $ddl) {
         try { $pdo->exec($ddl); } catch (Throwable) {}
     }
 
     $kpi_finalizados = (int)$pdo->query(
-        "SELECT COALESCE(SUM(iv_qtde),0) FROM ITENS_VENDAS WHERE iv_status='Finalizado'"
+        "SELECT COALESCE(SUM(IV_QTDE),0) FROM ITENS_VENDAS WHERE IV_STATUS='Finalizado'"
     )->fetchColumn();
 
     $kpi_a_produzir = (int)$pdo->query(
-        "SELECT COALESCE(SUM(iv_qtde),0) FROM ITENS_VENDAS WHERE iv_status='Pendente de produção'"
+        "SELECT COALESCE(SUM(IV_QTDE),0) FROM ITENS_VENDAS WHERE IV_STATUS='Pendente de produção'"
     )->fetchColumn();
 
     $rows = $pdo->query('
-        SELECT pd.pd_data,
-               SUM(CASE WHEN COALESCE(m.maq_conta_producao,1)=1 THEN pd.pd_quantidade ELSE 0 END) AS qtd
+        SELECT pd.PD_DATA AS pd_data,
+               SUM(CASE WHEN COALESCE(m.MAQ_CONTA_PRODUCAO,1)=1 THEN pd.PD_QUANTIDADE ELSE 0 END) AS qtd
         FROM PRODUCAO_DIARIA pd
-        LEFT JOIN MAQUINAS m ON m.maq_codigo = pd.maq_codigo
-        WHERE pd.pd_data >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-        GROUP BY pd.pd_data
-        ORDER BY pd.pd_data ASC
+        LEFT JOIN MAQUINAS m ON m.MAQ_CODIGO = pd.MAQ_CODIGO
+        WHERE pd.PD_DATA >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+        GROUP BY pd.PD_DATA
+        ORDER BY pd.PD_DATA ASC
     ')->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as $r) {
         $prod_7dias[$r['pd_data']] = (int)$r['qtd'];
     }
 
     $top_maquinas = $pdo->query('
-        SELECT m.maq_descricao, SUM(pd.pd_quantidade) AS total
+        SELECT m.MAQ_DESCRICAO AS maq_descricao, SUM(pd.PD_QUANTIDADE) AS total
         FROM PRODUCAO_DIARIA pd
-        INNER JOIN MAQUINAS m ON m.maq_codigo = pd.maq_codigo
-        WHERE pd.pd_data = CURDATE()
-        GROUP BY pd.maq_codigo, m.maq_descricao
+        INNER JOIN MAQUINAS m ON m.MAQ_CODIGO = pd.MAQ_CODIGO
+        WHERE pd.PD_DATA = CURDATE()
+        GROUP BY pd.MAQ_CODIGO, m.MAQ_DESCRICAO
         ORDER BY total DESC
         LIMIT 5
     ')->fetchAll(PDO::FETCH_ASSOC);
@@ -323,7 +323,7 @@ if ($pg) {
         $pedidos_erp_lista = pg_fetch_all_columns($res, 0) ?: [];
         if (!empty($pedidos_erp_lista) && isset($pdo)) {
             $ph  = implode(',', array_fill(0, count($pedidos_erp_lista), '?'));
-            $st  = $pdo->prepare("SELECT COUNT(DISTINCT ven_codigo_yzidro) FROM VENDAS WHERE ven_codigo_yzidro IN ($ph)");
+            $st  = $pdo->prepare("SELECT COUNT(DISTINCT VEN_CODIGO_YZIDRO) FROM VENDAS WHERE VEN_CODIGO_YZIDRO IN ($ph)");
             $st->execute($pedidos_erp_lista);
             $kpi_pendentes_importar = max(0, count($pedidos_erp_lista) - (int)$st->fetchColumn());
         }

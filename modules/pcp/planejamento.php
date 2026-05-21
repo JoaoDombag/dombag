@@ -46,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                 exit;
             }
             $pdo->prepare(
-                'UPDATE ITENS_VENDAS SET iv_status=:s, iv_atualizado_em=NOW() WHERE iv_codigo=:id'
+                'UPDATE ITENS_VENDAS SET IV_STATUS=:s, IV_ATUALIZADO_EM=NOW() WHERE IV_CODIGO=:id'
             )->execute([':s' => $status, ':id' => $id]);
             echo json_encode(['ok' => true, 'status' => $status]);
 
@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             $ids = array_map('intval', $body['ids'] ?? []);
             $pdo->beginTransaction();
             foreach ($ids as $pos => $id) {
-                $pdo->prepare('UPDATE ITENS_VENDAS SET iv_prioridade=:p WHERE iv_codigo=:id')
+                $pdo->prepare('UPDATE ITENS_VENDAS SET IV_PRIORIDADE=:p WHERE IV_CODIGO=:id')
                     ->execute([':p' => $pos + 1, ':id' => $id]);
             }
             $pdo->commit();
@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                 echo json_encode(['ok' => false, 'msg' => 'ID inválido.']);
                 exit;
             }
-            $pdo->prepare('UPDATE ITENS_VENDAS SET iv_obs=:o, iv_atualizado_em=NOW() WHERE iv_codigo=:id')
+            $pdo->prepare('UPDATE ITENS_VENDAS SET IV_OBS=:o, IV_ATUALIZADO_EM=NOW() WHERE IV_CODIGO=:id')
                 ->execute([':o' => $obs, ':id' => $id]);
             echo json_encode(['ok' => true]);
 
@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                 echo json_encode(['ok' => false, 'msg' => 'Dados inválidos.']);
                 exit;
             }
-            $pdo->prepare('UPDATE VENDAS SET ven_entrega=:d WHERE ven_codigo=:id')
+            $pdo->prepare('UPDATE VENDAS SET VEN_ENTREGA=:d WHERE VEN_CODIGO=:id')
                 ->execute([':d' => $data, ':id' => $ven_codigo]);
             echo json_encode(['ok' => true]);
 
@@ -107,67 +107,71 @@ $show_amostras = isset($_GET['amostras']);
 $where = 'WHERE 1=1';
 $params = [];
 if ($f_status === 'ativos') {
-    $where .= " AND iv.iv_status IN ('Pendente de produção','Produção')";
+    $where .= " AND iv.IV_STATUS IN ('Pendente de produção','Produção')";
 } elseif ($f_status === 'todos') {
-    $where .= " AND iv.iv_status <> 'Finalizado'";
+    $where .= " AND iv.IV_STATUS <> 'Finalizado'";
 } elseif ($f_status && in_array($f_status, STATUS_PROD)) {
-    $where .= ' AND iv.iv_status = :status';
+    $where .= ' AND iv.IV_STATUS = :status';
     $params[':status'] = $f_status;
 }
 if ($f_cat && in_array($f_cat, CATEGORIAS)) {
-    $where .= ' AND p.pro_categoria = :cat';
+    $where .= ' AND p.PRO_CATEGORIA = :cat';
     $params[':cat'] = $f_cat;
 }
 if (!$show_amostras) {
-    $where .= ' AND iv.iv_qtde >= 20';
+    $where .= ' AND iv.IV_QTDE >= 20';
 }
 
 $stmt = $pdo->prepare("
     SELECT
-        iv.iv_codigo,
-        iv.iv_qtde,
-        iv.iv_vlr_unit,
-        iv.iv_total,
-        iv.iv_unidade,
-        iv.iv_status,
-        iv.iv_prioridade,
-        iv.iv_obs,
-        iv.iv_atualizado_em,
-        v.ven_codigo,
-        v.ven_codigo_yzidro,
-        v.ven_cliente,
-        v.ven_fantasia,
-        v.ven_entrega,
-        v.ven_total,
-        v.ven_representante,
-        v.ven_uf,
-        p.pro_codigo,
-        p.pro_codigo_yz,
-        p.pro_descricao,
-        p.pro_tipo,
-        p.pro_travado,
-        p.pro_impressao,
-        p.pro_categoria
+        iv.IV_CODIGO,
+        iv.IV_QTDE,
+        iv.IV_VLR_UNIT,
+        iv.IV_TOTAL,
+        iv.IV_UNIDADE,
+        iv.IV_STATUS,
+        iv.IV_PRIORIDADE,
+        iv.IV_OBS,
+        iv.IV_ATUALIZADO_EM,
+        v.VEN_CODIGO,
+        v.VEN_CODIGO_YZIDRO,
+        v.VEN_CLIENTE,
+        v.VEN_FANTASIA,
+        v.VEN_ENTREGA,
+        v.VEN_TOTAL,
+        v.VEN_REPRESENTANTE,
+        v.VEN_UF,
+        p.PRO_CODIGO,
+        p.PRO_CODIGO_YZ,
+        p.PRO_DESCRICAO,
+        p.PRO_TIPO,
+        p.PRO_TRAVADO,
+        p.PRO_IMPRESSAO,
+        p.PRO_CATEGORIA
     FROM ITENS_VENDAS iv
-    INNER JOIN VENDAS   v ON v.ven_codigo = iv.ven_codigo
-    INNER JOIN PRODUTOS p ON p.pro_codigo = iv.pro_codigo
+    INNER JOIN VENDAS   v ON v.VEN_CODIGO = iv.VEN_CODIGO
+    INNER JOIN PRODUTOS p ON p.PRO_CODIGO = iv.PRO_CODIGO
     $where
     ORDER BY
-        p.pro_categoria,
-        CASE WHEN iv.iv_prioridade = 0 THEN 1 ELSE 0 END,
-        iv.iv_prioridade,
-        v.ven_entrega,
-        v.ven_codigo_yzidro
+        p.PRO_CATEGORIA,
+        CASE WHEN iv.IV_PRIORIDADE = 0 THEN 1 ELSE 0 END,
+        iv.IV_PRIORIDADE,
+        v.VEN_ENTREGA,
+        v.VEN_CODIGO_YZIDRO
 ");
 $stmt->execute($params);
-$todos_itens = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$todos_itens = array_map(
+    fn($r) => array_change_key_case($r, CASE_LOWER),
+    $stmt->fetchAll(PDO::FETCH_ASSOC)
+);
 
 // ── KPIs por status ───────────────────────────────────────────────────────────
 $kpiStmt = $pdo->query(
-    'SELECT iv_status, COUNT(*) qtd, SUM(iv_qtde) und FROM ITENS_VENDAS GROUP BY iv_status'
+    'SELECT IV_STATUS, COUNT(*) qtd, SUM(IV_QTDE) und FROM ITENS_VENDAS GROUP BY IV_STATUS'
 );
 $kpis = [];
 foreach ($kpiStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+    $r = array_change_key_case($r, CASE_LOWER);
     $kpis[$r['iv_status']] = ['qtd' => (int) $r['qtd'], 'und' => (float) $r['und']];
 }
 
@@ -175,12 +179,13 @@ foreach ($kpiStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
 $prodProgress = [];
 try {
     $stmtPp = $pdo->query("
-        SELECT pd_pedido, SUM(pd_quantidade) AS produzido
+        SELECT PD_PEDIDO, SUM(PD_QUANTIDADE) AS produzido
         FROM PRODUCAO_DIARIA
-        WHERE pd_pedido IS NOT NULL AND TRIM(pd_pedido) <> ''
-        GROUP BY pd_pedido
+        WHERE PD_PEDIDO IS NOT NULL AND TRIM(PD_PEDIDO) <> ''
+        GROUP BY PD_PEDIDO
     ");
     foreach ($stmtPp->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $r = array_change_key_case($r, CASE_LOWER);
         $prodProgress[trim($r['pd_pedido'])] = (float) $r['produzido'];
     }
 } catch (Throwable $e) { /* tabela ainda não existe */
