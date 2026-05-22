@@ -46,7 +46,7 @@ try {
 } catch (Throwable) {}
 
 // ── Grupos para o select ─────────────────────────────────────────────────────
-$grupos_usu = $pdo->query('SELECT GRU_CODIGO, GRU_NOME FROM GRUPO_USUARIO ORDER BY GRU_NOME')
+$grupos_usu = $pdo->query('SELECT GRU_CODIGO, GRU_DESCRICAO FROM GRUPO_USUARIO ORDER BY GRU_DESCRICAO')
                   ->fetchAll(PDO::FETCH_ASSOC);
 
 // ── Modo: edição ou criação ───────────────────────────────────────────────────
@@ -99,13 +99,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             try {
                 $pdo->prepare(
-                    'INSERT INTO USUARIOS (USU_LOGIN, USU_SENHA, USU_NOME, USU_PERFIL, GRU_CODIGO)
-                     VALUES (:login, :senha, :nome, :perfil, :gru)'
+                    'INSERT INTO USUARIOS (USU_LOGIN, USU_SENHA, USU_NOME, USU_PERFIL, USU_ADMIN, GRU_CODIGO)
+                     VALUES (:login, :senha, :nome, :perfil, :admin, :gru)'
                 )->execute([
                     ':login'  => $f_login,
                     ':senha'  => password_hash($senha, PASSWORD_DEFAULT),
                     ':nome'   => $f_nome,
                     ':perfil' => $f_perfil,
+                    ':admin'  => $f_perfil === 'admin' ? 1 : 0,
                     ':gru'    => $f_gru,
                 ]);
                 header('Location: /usuarios');
@@ -136,12 +137,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             try {
                 $pdo->prepare(
-                    'UPDATE USUARIOS SET USU_LOGIN=:login, USU_NOME=:nome, USU_PERFIL=:perfil, GRU_CODIGO=:gru
+                    'UPDATE USUARIOS SET USU_LOGIN=:login, USU_NOME=:nome, USU_PERFIL=:perfil, USU_ADMIN=:admin, GRU_CODIGO=:gru
                      WHERE USU_CODIGO=:cod'
                 )->execute([
                     ':login'  => $f_login,
                     ':nome'   => $f_nome,
                     ':perfil' => $f_perfil,
+                    ':admin'  => $f_perfil === 'admin' ? 1 : 0,
                     ':gru'    => $f_gru,
                     ':cod'    => $cod,
                 ]);
@@ -304,8 +306,8 @@ $titulo_pagina = $editando
                 <div class="field">
                   <label>Perfil</label>
                   <select name="perfil" id="f_perfil">
-                    <option value="usuario" <?= $f_perfil !== 'admin' ? 'selected' : '' ?>>USUÁRIO</option>
-                    <option value="admin"   <?= $f_perfil === 'admin'  ? 'selected' : '' ?>>ADMINISTRADOR</option>
+                    <option value="usuario" <?= $f_perfil !== 'admin' ? 'selected' : '' ?>>Usuário</option>
+                    <option value="admin"   <?= $f_perfil === 'admin'  ? 'selected' : '' ?>>Administrador</option>
                   </select>
                 </div>
                 <div class="field">
@@ -315,7 +317,7 @@ $titulo_pagina = $editando
                     <?php foreach ($grupos_usu as $g): ?>
                     <option value="<?= $g['GRU_CODIGO'] ?>"
                       <?= (int)$f_gru === (int)$g['GRU_CODIGO'] ? 'selected' : '' ?>>
-                      <?= htmlspecialchars(strtoupper($g['GRU_NOME'])) ?>
+                      <?= $g['GRU_DESCRICAO'] ?>
                     </option>
                     <?php endforeach; ?>
                   </select>

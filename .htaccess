@@ -61,6 +61,7 @@ RewriteRule ^pcp/producao$             modules/pcp/producao.php                [
 RewriteRule ^pcp/fila$                 modules/pcp/fila_maquinas.php           [L,QSA]
 RewriteRule ^pcp/pdf$                  modules/pcp/gerar_pdf.php               [L,QSA]
 RewriteRule ^pcp/reuniao$              modules/pcp/planejamento_dia.php        [L,QSA]
+RewriteRule ^pcp/monitor$              modules/pcp/monitor_maquinas.php        [L,QSA]
 
 # Financeiro
 RewriteRule ^financeiro$               modules/financeiro/index.php            [L,QSA]

@@ -147,6 +147,7 @@ $DOMBAG_PAGINAS = [
     ['href' => '/pcp/programacao', 'label' => 'Programação Diária',      'grupo' => 'producao', 'menu' => true,  'publico' => false],
     ['href' => '/pcp/producao',    'label' => 'Produção',                'grupo' => 'producao', 'menu' => true,  'publico' => false],
     ['href' => '/pcp/pdf',         'label' => 'PDF de Produção',         'grupo' => 'producao', 'menu' => false, 'publico' => false],
+    ['href' => '/pcp/monitor',     'label' => 'Monitor de Máquinas',     'grupo' => 'producao', 'menu' => true,  'publico' => false],
 
     // ── Máquinas ──────────────────────────────────────────────────────────────
     ['href' => '/maquinas',           'label' => 'Máquinas',             'grupo' => 'maquinas', 'menu' => true,  'publico' => false],
