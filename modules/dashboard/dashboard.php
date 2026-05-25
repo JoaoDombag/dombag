@@ -631,7 +631,6 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
           <div class="venda-row">
             <div class="venda-left">
               <span class="venda-num"><?= htmlspecialchars($v['pedido']) ?></span>
-              <?php if ($v['grupo']): ?><span class="grupo-pill"><?= htmlspecialchars($v['grupo']) ?></span><?php endif; ?>
             </div>
             <div class="venda-mid">
               <div class="venda-cliente" title="<?= htmlspecialchars($v['cliente']) ?>"><?= htmlspecialchars(mb_substr($v['cliente'], 0, 35)) ?><?= mb_strlen($v['cliente']) > 35 ? '…' : '' ?></div>
@@ -697,7 +696,6 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
                 $pct = $max_grupo_qtd > 0 ? round($g['qtd'] / $max_grupo_qtd * 100) : 0; ?>
             <div class="maq-bar-item">
               <div class="maq-bar-label">
-                <span class="maq-bar-name" title="<?= htmlspecialchars($g['grupo']) ?>"><?= htmlspecialchars($g['grupo']) ?></span>
                 <span class="maq-bar-val"><?= (int)$g['qtd'] ?> ped.</span>
               </div>
               <div class="maq-bar-bg"><div class="maq-bar-fill" style="width:<?= $pct ?>%;background:linear-gradient(90deg,#1a6945,#00c9a7);"></div></div>
