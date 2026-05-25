@@ -12,7 +12,7 @@ define('_DB_USER', 'root');
 define('_DB_PASS', '');
 
 define('_PG_HOST',   'pg-yzidro-004.yzidro.com');
-define('_PG_PORT',   '44551');
+define('_PG_PORT',   '44552');
 define('_PG_DBNAME', '004703_dom_bag_ltda');
 define('_PG_USER',   '004703consulta');
 define('_PG_PASS',   'SUA_SENHA_PG_AQUI');

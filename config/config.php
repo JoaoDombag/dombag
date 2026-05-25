@@ -34,7 +34,7 @@ define('DB_CHARSET', 'utf8mb4');
 
 // ── PostgreSQL (ERP Yzidro — somente leitura) ──────
 define('PG_HOST',   getenv('PG_HOST')   ?: (defined('_PG_HOST')   ? _PG_HOST   : 'pg-yzidro-004.yzidro.com'));
-define('PG_PORT',   getenv('PG_PORT')   ?: (defined('_PG_PORT')   ? _PG_PORT   : '44551'));
+define('PG_PORT',   getenv('PG_PORT')   ?: (defined('_PG_PORT')   ? _PG_PORT   : '44552'));
 define('PG_DBNAME', getenv('PG_DBNAME') ?: (defined('_PG_DBNAME') ? _PG_DBNAME : '004703_dom_bag_ltda'));
 define('PG_USER',   getenv('PG_USER')   ?: (defined('_PG_USER')   ? _PG_USER   : '004703consulta'));
 define('PG_PASS',   getenv('PG_PASS')   ?: (defined('_PG_PASS')   ? _PG_PASS   : ''));
