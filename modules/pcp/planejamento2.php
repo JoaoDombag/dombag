@@ -81,6 +81,53 @@ function p2EnsureTabela(PDO $db): void
             $db->exec("ALTER TABLE PCP_PROGRAMACAO ADD COLUMN {$coluna} DATE NULL");
         }
     }
+
+    $chkCol = $db->prepare(
+        'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+    );
+    $chkCol->execute(['PCP_PROGRAMACAO', 'ETP_CODIGO']);
+    if (!(int) $chkCol->fetchColumn()) {
+        $db->exec('ALTER TABLE PCP_PROGRAMACAO ADD COLUMN ETP_CODIGO INT UNSIGNED NULL DEFAULT NULL');
+    }
+
+    $chkFk = $db->prepare(
+        'SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = ?'
+    );
+    $chkFk->execute(['PCP_PROGRAMACAO', 'FK_PRG_ETAPA']);
+    if (!(int) $chkFk->fetchColumn()) {
+        try {
+            $db->exec('
+                ALTER TABLE PCP_PROGRAMACAO
+                ADD CONSTRAINT FK_PRG_ETAPA
+                FOREIGN KEY (ETP_CODIGO) REFERENCES ETAPA_PRODUCAO (ETP_CODIGO)
+                ON DELETE SET NULL ON UPDATE CASCADE
+            ');
+        } catch (Throwable) {
+            // ETAPA_PRODUCAO pode ainda não existir num primeiro carregamento; a FK é adicionada
+            // assim que a migration correspondente rodar.
+        }
+    }
+
+    // Pedidos programados antes da coluna existir começam como "Pendente de produção"
+    $etpPadrao = p2EtapaPadraoCodigo($db);
+    if ($etpPadrao !== null) {
+        $db->prepare('UPDATE PCP_PROGRAMACAO SET ETP_CODIGO = ? WHERE ETP_CODIGO IS NULL')
+           ->execute([$etpPadrao]);
+    }
+}
+
+// ── Etapa "Pendente de produção" (padrão para OPs recém-adicionadas) ─────────
+function p2EtapaPadraoCodigo(PDO $db): ?int
+{
+    try {
+        $cod = $db->query("SELECT ETP_CODIGO FROM ETAPA_PRODUCAO WHERE ETP_DESCRICAO = 'Pendente de produção' LIMIT 1")
+                  ->fetchColumn();
+        return $cod !== false ? (int) $cod : null;
+    } catch (Throwable) {
+        return null;
+    }
 }
 
 // ── ERP: OPs candidatas para importar/programar (FINALIZADO = 'N') ───────────
@@ -154,13 +201,15 @@ function p2FetchOPUnica($pg, int $prodCodigo): ?array
 function p2FetchProgramacao(PDO $db, $pg): array
 {
     $stmt = $db->query('
-        SELECT PRG_CODIGO, PROD_CODIGO, VENDA_REF, VEN_COD_PEDIDO, CLI_CODIGO, CLI_NOME,
-               PROD_DATA, DATA_ENTREGA, DATA_ENTREGA_VENDEDOR, DATA_ENTREGA_ESPERADA,
-               PROD_TOTAL, TIPO_PRODUCAO,
-               PRG_ADICIONADO_EM, PRG_ADICIONADO_POR
-        FROM PCP_PROGRAMACAO
-        WHERE PRG_FINALIZADO = 0
-        ORDER BY PRG_ADICIONADO_EM DESC
+        SELECT p.PRG_CODIGO, p.PROD_CODIGO, p.VENDA_REF, p.VEN_COD_PEDIDO, p.CLI_CODIGO, p.CLI_NOME,
+               p.PROD_DATA, p.DATA_ENTREGA, p.DATA_ENTREGA_VENDEDOR, p.DATA_ENTREGA_ESPERADA,
+               p.PROD_TOTAL, p.TIPO_PRODUCAO,
+               p.PRG_ADICIONADO_EM, p.PRG_ADICIONADO_POR,
+               p.ETP_CODIGO, e.ETP_DESCRICAO
+        FROM PCP_PROGRAMACAO p
+        LEFT JOIN ETAPA_PRODUCAO e ON e.ETP_CODIGO = p.ETP_CODIGO
+        WHERE p.PRG_FINALIZADO = 0
+        ORDER BY p.PRG_ADICIONADO_EM DESC
     ');
     $locais = $stmt->fetchAll(PDO::FETCH_ASSOC);
     if (!$locais || !$pg) {
@@ -277,8 +326,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') ==
         $ins = $pdo->prepare('
             INSERT INTO PCP_PROGRAMACAO
                 (PROD_CODIGO, VENDA_REF, VEN_COD_PEDIDO, CLI_CODIGO, CLI_NOME, PROD_DATA, DATA_ENTREGA,
-                 DATA_ENTREGA_VENDEDOR, DATA_ENTREGA_ESPERADA, PROD_TOTAL, TIPO_PRODUCAO, PRG_ADICIONADO_POR)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 DATA_ENTREGA_VENDEDOR, DATA_ENTREGA_ESPERADA, PROD_TOTAL, TIPO_PRODUCAO, ETP_CODIGO, PRG_ADICIONADO_POR)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         $ins->execute([
             $prodCodigo,
@@ -292,6 +341,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') ==
             $dataEntregaEsperada,
             null,
             $op['tipo_producao'],
+            p2EtapaPadraoCodigo($pdo),
             usuNome(),
         ]);
 
@@ -320,6 +370,37 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') ==
     exit;
 }
 
+// ── AJAX: atualizar etapa de produção de um pedido programado ────────────────
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'atualizar_etapa') {
+    header('Content-Type: application/json; charset=utf-8');
+    $prgCodigo = (int) ($_POST['prg_codigo'] ?? 0);
+    $etpCodigo = (int) ($_POST['etp_codigo'] ?? 0);
+    try {
+        if (!$prgCodigo || !$etpCodigo) {
+            throw new RuntimeException('Dados inválidos.');
+        }
+        $chk = $pdo->prepare('SELECT COUNT(*) FROM ETAPA_PRODUCAO WHERE ETP_CODIGO = ?');
+        $chk->execute([$etpCodigo]);
+        if (!(int) $chk->fetchColumn()) {
+            throw new RuntimeException('Etapa de produção inválida.');
+        }
+        $stmt = $pdo->prepare('UPDATE PCP_PROGRAMACAO SET ETP_CODIGO = ? WHERE PRG_CODIGO = ?');
+        $stmt->execute([$etpCodigo, $prgCodigo]);
+        echo json_encode(['ok' => true]);
+    } catch (Throwable $e) {
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// ── Lista de etapas de produção (para o seletor da grid) ─────────────────────
+try {
+    $etapasProducao = $pdo->query('SELECT ETP_CODIGO, ETP_DESCRICAO FROM ETAPA_PRODUCAO ORDER BY ETP_CODIGO')
+                          ->fetchAll(PDO::FETCH_ASSOC);
+} catch (Throwable) {
+    $etapasProducao = [];
+}
+
 // ── Carga inicial da página ────────────────────────────────────────────────────
 $error = '';
 $programacao = [];
@@ -344,13 +425,21 @@ if (!$pg && $error === '') {
   .p2-cod { color: var(--text-muted); font-size: 11px; }
   .p2-empty-row td { text-align: center; padding: 28px 16px; color: var(--text-muted); font-size: 12.5px; }
 
+  .status-sel {
+    font-size: 11px; padding: 2px 5px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-primary); cursor: pointer; display: block;
+  }
+
   /* ── Modal grande: buscar/adicionar pedidos ──────────────────────────────── */
-  .p2-modal-box { width: 880px; max-width: calc(100vw - 32px); max-height: 85vh; display: flex; flex-direction: column; }
+  .p2-modal-box { width: 1180px; max-width: calc(100vw - 32px); max-height: 85vh; display: flex; flex-direction: column; }
   .p2-modal-body { overflow-y: auto; margin-top: 14px; flex: 1; min-height: 0; }
   .p2-filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 14px; }
   .p2-filter-field { display: flex; flex-direction: column; gap: 6px; }
   .p2-filter-field label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
   .p2-filter-field input { height: 36px; padding: 0 10px; font-size: 12.5px; font-family: 'Segoe UI', sans-serif; width: 170px; }
+  #p2ResultsBody td:nth-child(2) { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #p2ResultsBody input[type="date"] { width: 130px; height: 30px; padding: 0 6px; font-size: 11.5px; }
   .p2-add-btn { padding: 5px 12px; height: 28px; border-radius: 7px; border: none; background: var(--blue-accent, #1e4fc9); color: #fff; font-family: 'Segoe UI', sans-serif; font-size: 11.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
   .p2-add-btn:hover { background: var(--blue-light); }
   .p2-add-btn:disabled { opacity: .5; cursor: default; }
@@ -371,6 +460,10 @@ if (!$pg && $error === '') {
         </div>
       </div>
       <div class="topbar-actions">
+        <a href="/pcp/etapas" class="btn-secondary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:5px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          Etapas de Produção
+        </a>
         <button type="button" class="btn-refresh" id="btnAbrirBusca">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:5px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Adicionar Pedido à Programação
@@ -403,6 +496,7 @@ if (!$pg && $error === '') {
                 <th>Entrega</th>
                 <th>Entrega Vendedor</th>
                 <th>Entrega Esperada</th>
+                <th>Etapa de Produção</th>
                 <th>Adicionado em</th>
                 <th>Adicionado por</th>
                 <th></th>
@@ -410,7 +504,7 @@ if (!$pg && $error === '') {
             </thead>
             <tbody id="p2Tbody">
               <?php if (!$programacao): ?>
-                <tr class="p2-empty-row"><td colspan="10">Nenhum pedido na programação. Clique em "Adicionar Pedido à Programação" para começar.</td></tr>
+                <tr class="p2-empty-row"><td colspan="11">Nenhum pedido na programação. Clique em "Adicionar Pedido à Programação" para começar.</td></tr>
               <?php else: ?>
                 <?php foreach ($programacao as $row): ?>
                   <tr id="p2-row-<?= (int) $row['prg_codigo'] ?>">
@@ -421,6 +515,19 @@ if (!$pg && $error === '') {
                     <td><?= p2Escape(p2FmtDate($row['data_entrega'] ?? '')) ?></td>
                     <td><?= p2Escape(p2FmtDate($row['data_entrega_vendedor'] ?? '')) ?></td>
                     <td><?= p2Escape(p2FmtDate($row['data_entrega_esperada'] ?? '')) ?></td>
+                    <td>
+                      <select class="status-sel"
+                        data-prg="<?= (int) $row['prg_codigo'] ?>"
+                        data-prev="<?= (int) ($row['etp_codigo'] ?? 0) ?>"
+                        onchange="p2AtualizarEtapa(this)">
+                        <option value="">— Selecione —</option>
+                        <?php foreach ($etapasProducao as $etp): ?>
+                        <option value="<?= (int) $etp['ETP_CODIGO'] ?>" <?= (int) ($row['etp_codigo'] ?? 0) === (int) $etp['ETP_CODIGO'] ? 'selected' : '' ?>>
+                          <?= p2Escape($etp['ETP_DESCRICAO']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                      </select>
+                    </td>
                     <td class="td-nowrap"><?= p2Escape(p2FmtDateTime($row['prg_adicionado_em'] ?? '')) ?></td>
                     <td class="td-muted"><?= p2Escape($row['prg_adicionado_por'] ?? '—') ?></td>
                     <td class="td-right">
@@ -534,7 +641,7 @@ function p2Buscar() {
       tbody.innerHTML = ops.map(op => `
         <tr>
           <td class="p2-cod">${p2Esc(op.prod_codigo)}</td>
-          <td>${p2Esc(op.cli_nome || '—')}</td>
+          <td title="${p2Esc(op.cli_nome || '—')}">${p2Esc(op.cli_nome || '—')}</td>
           <td>${p2Esc(op.venda_ref || op.ven_cod_pedido || '—')}</td>
           <td>${p2FmtDate(op.prod_data)}</td>
           <td>${p2FmtDate(op.data_entrega)}</td>
@@ -611,10 +718,38 @@ function p2Finalizar(prgCodigo) {
       if (badge) badge.textContent = Math.max(0, (parseInt(badge.textContent, 10) || 1) - 1);
       const tbody = document.getElementById('p2Tbody');
       if (tbody && !tbody.querySelector('tr:not(.p2-empty-row)')) {
-        tbody.innerHTML = '<tr class="p2-empty-row"><td colspan="10">Nenhum pedido na programação. Clique em "Adicionar Pedido à Programação" para começar.</td></tr>';
+        tbody.innerHTML = '<tr class="p2-empty-row"><td colspan="11">Nenhum pedido na programação. Clique em "Adicionar Pedido à Programação" para começar.</td></tr>';
       }
     })
     .catch(() => alert('Erro ao finalizar o pedido.'));
+}
+
+// ── Atualizar etapa de produção de um pedido programado ───────────────────────
+function p2AtualizarEtapa(sel) {
+  const prgCodigo = sel.dataset.prg;
+  const etpCodigo = sel.value;
+  const anterior = sel.dataset.prev || '';
+  if (!etpCodigo) return;
+  sel.disabled = true;
+  fetch('?action=atualizar_etapa', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+    body: 'action=atualizar_etapa&prg_codigo=' + encodeURIComponent(prgCodigo) + '&etp_codigo=' + encodeURIComponent(etpCodigo),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error || !data.ok) {
+        alert(data.error || 'Não foi possível atualizar a etapa.');
+        sel.value = anterior;
+        return;
+      }
+      sel.dataset.prev = etpCodigo;
+    })
+    .catch(() => {
+      alert('Erro ao atualizar a etapa.');
+      sel.value = anterior;
+    })
+    .finally(() => { sel.disabled = false; });
 }
 </script>
 </body>

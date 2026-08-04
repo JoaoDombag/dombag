@@ -19,6 +19,7 @@ $ultimas_vendas       = [];
 $prod_7dias           = [];
 $top_maquinas         = [];
 $vendas_grupo         = [];
+$etapas_producao      = [];
 
 // ── Preferências de widgets do utilizador ─────────────────────────────
 $_dash_uid = (int)($_SESSION['usu_codigo'] ?? 0);
@@ -36,6 +37,7 @@ $_dash_widgets_default = [
     'kpi_erp','kpi_local',
     'ultimas_vendas','maquinas_hoje',
     'vendas_grupo','prod_7dias',
+    'etapas_producao',
     'trello_geral','trello_atividade',
 ];
 
@@ -74,6 +76,7 @@ $_widget_perm_map = [
     'maquinas_hoje'    => ['/pcp/planejamento',  'producao'],
     'vendas_grupo'     => ['/vendas',      'vendas'],
     'prod_7dias'       => ['/pcp/planejamento',  'producao'],
+    'etapas_producao'  => ['/pcp/reuniao', 'producao'],
     'trello_geral'     => ['/trello',      'trello'],
     'trello_atividade' => ['/trello',      'trello'],
 ];
@@ -165,6 +168,18 @@ try {
         GROUP BY pd.MAQ_CODIGO, m.MAQ_DESCRICAO
         ORDER BY total DESC
         LIMIT 5
+    ')->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException) {}
+
+// Pedidos programados por etapa de produção (tabelas criadas sob demanda em /pcp/reuniao)
+try {
+    $etapas_producao = $pdo->query('
+        SELECT e.ETP_CODIGO, e.ETP_DESCRICAO,
+               COUNT(p.PRG_CODIGO) AS qtd
+        FROM ETAPA_PRODUCAO e
+        LEFT JOIN PCP_PROGRAMACAO p ON p.ETP_CODIGO = e.ETP_CODIGO AND p.PRG_FINALIZADO = 0
+        GROUP BY e.ETP_CODIGO, e.ETP_DESCRICAO
+        ORDER BY e.ETP_CODIGO
     ')->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException) {}
 
@@ -557,7 +572,7 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
               <span class="panel-title">Produção por Máquina — Hoje</span>
               <span class="source-badge src-local">Local</span>
             </div>
-            <a class="panel-action" href="/pcp/quadro">Quadro →</a>
+            <a class="panel-action" href="/pcp/planejamento">Planejamento →</a>
           </div>
           <?php if (empty($top_maquinas)): ?>
           <div class="empty-row">Nenhum apontamento hoje.</div>
@@ -579,6 +594,45 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
         <?php $_w['maquinas_hoje'] = ob_get_clean();
     }
 
+    // ── Etapas de Produção ─────────────────────────────────────────────
+    if (dashW('etapas_producao')) {
+        ob_start();
+        $etp_total = array_sum(array_column($etapas_producao, 'qtd'));
+        $etp_cores = [
+            'Pendente de produção' => '#f59e0b,#fbbf24',
+            'Em produção'          => '#1e4fc9,#2d6aff',
+            'Produção finalizada'  => '#1a6945,#00c9a7',
+        ];
+        ?>
+        <div class="panel">
+          <div class="panel-header">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="panel-title">Etapas de Produção</span>
+              <span class="source-badge src-local">Local</span>
+            </div>
+            <a class="panel-action" href="/pcp/reuniao">Reunião de Planejamento →</a>
+          </div>
+          <?php if (empty($etapas_producao) || $etp_total === 0): ?>
+          <div class="empty-row">Nenhum pedido programado no momento.</div>
+          <?php else: ?>
+          <div class="maq-bar-row">
+            <?php foreach ($etapas_producao as $etp):
+                $pct = $etp_total > 0 ? round((int)$etp['qtd'] / $etp_total * 100) : 0;
+                $cor = $etp_cores[$etp['ETP_DESCRICAO']] ?? '#5a3fc0,#9b6dff'; ?>
+            <div class="maq-bar-item">
+              <div class="maq-bar-label">
+                <span class="maq-bar-name" title="<?= htmlspecialchars($etp['ETP_DESCRICAO']) ?>"><?= htmlspecialchars($etp['ETP_DESCRICAO']) ?></span>
+                <span class="maq-bar-val"><?= (int)$etp['qtd'] ?> ped.</span>
+              </div>
+              <div class="maq-bar-bg"><div class="maq-bar-fill" style="width:<?= $pct ?>%;background:linear-gradient(90deg,<?= $cor ?>);"></div></div>
+            </div>
+            <?php endforeach; ?>
+          </div>
+          <?php endif; ?>
+        </div>
+        <?php $_w['etapas_producao'] = ob_get_clean();
+    }
+
     // ── Vendas por Grupo — Mês ────────────────────────────────────────
     if (dashW('vendas_grupo')) {
         ob_start(); ?>
@@ -598,6 +652,7 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
                 $pct = $max_grupo_qtd > 0 ? round($g['qtd'] / $max_grupo_qtd * 100) : 0; ?>
             <div class="maq-bar-item">
               <div class="maq-bar-label">
+                <span class="maq-bar-name" title="<?= htmlspecialchars($g['grupo']) ?>"><?= htmlspecialchars($g['grupo']) ?></span>
                 <span class="maq-bar-val"><?= (int)$g['qtd'] ?> ped.</span>
               </div>
               <div class="maq-bar-bg"><div class="maq-bar-fill" style="width:<?= $pct ?>%;background:linear-gradient(90deg,#1a6945,#00c9a7);"></div></div>

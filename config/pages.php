@@ -130,6 +130,7 @@ $DOMBAG_PAGINAS = [
     // ── Produção ──────────────────────────────────────────────────────────────
     ['href' => '/pcp/planejamento','label' => 'Planejamento',            'grupo' => 'producao', 'menu' => true,  'publico' => false],
     ['href' => '/pcp/reuniao',     'label' => 'Reunião de Planejamento', 'grupo' => 'producao', 'menu' => true,  'publico' => false],
+    ['href' => '/pcp/etapas',      'label' => 'Etapas de Produção',      'grupo' => 'producao', 'menu' => false, 'publico' => false],
     ['href' => '/pcp/ordens',      'label' => 'Ordens de Produção',      'grupo' => 'producao', 'menu' => true,  'publico' => false],
     ['href' => '/pcp/pdf',         'label' => 'PDF de Produção',         'grupo' => 'producao', 'menu' => false, 'publico' => false],
     ['href' => '/pcp/monitor',     'label' => 'Monitor de Máquinas',     'grupo' => 'producao', 'menu' => true,  'publico' => false],

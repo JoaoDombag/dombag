@@ -34,6 +34,7 @@ $_widget_perm_map = [
     'maquinas_hoje'    => ['/pcp/planejamento',  'producao'],
     'vendas_grupo'     => ['/vendas',      'vendas'],
     'prod_7dias'       => ['/pcp/planejamento',  'producao'],
+    'etapas_producao'  => ['/pcp/reuniao', 'producao'],
     'trello_geral'     => ['/trello',      'trello'],
     'trello_atividade' => ['/trello',      'trello'],
 ];
@@ -86,6 +87,12 @@ $todosWidgets = [
         'label' => 'Produção — 7 Dias',
         'desc'  => 'Gráfico de barras da produção nos últimos 7 dias',
         'icon'  => '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>',
+    ],
+    [
+        'key'   => 'etapas_producao',
+        'label' => 'Etapas de Produção',
+        'desc'  => 'Pedidos programados agrupados por etapa de produção',
+        'icon'  => '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
     ],
     [
         'key'   => 'trello_geral',

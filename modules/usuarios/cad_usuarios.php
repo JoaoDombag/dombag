@@ -48,6 +48,15 @@ try {
 // ── Grupos para o select ─────────────────────────────────────────────────────
 $grupos_usu = $pdo->query('SELECT GRU_CODIGO, GRU_DESCRICAO FROM GRUPO_USUARIO ORDER BY GRU_DESCRICAO')
                   ->fetchAll(PDO::FETCH_ASSOC);
+$grupos_validos = array_column($grupos_usu, 'GRU_CODIGO');
+
+// Valida o grupo enviado pelo formulário contra os grupos que realmente existem
+// (evita violar a FK caso o grupo tenha sido excluído entre a abertura da tela e o envio)
+function sanitizarGrupo($valorPost, array $gruposValidos): ?int
+{
+    $cod = (int) $valorPost;
+    return ($cod && in_array($cod, $gruposValidos, true)) ? $cod : null;
+}
 
 // ── Modo: edição ou criação ───────────────────────────────────────────────────
 $id_editar = isset($_GET['id']) ? (int) $_GET['id'] : 0;
@@ -80,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $f_login  = trim($_POST['login']   ?? '');
         $f_nome   = trim($_POST['nome']    ?? '');
         $f_perfil = in_array($_POST['perfil'] ?? '', ['admin','usuario']) ? $_POST['perfil'] : 'usuario';
-        $f_gru    = (int) ($_POST['gru_codigo'] ?? 0) ?: null;
+        $f_gru    = sanitizarGrupo($_POST['gru_codigo'] ?? 0, $grupos_validos);
         $senha    = $_POST['senha']    ?? '';
         $conf     = $_POST['confirma'] ?? '';
 
@@ -112,9 +121,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: /usuarios');
                 exit;
             } catch (PDOException $e) {
-                $msg = str_contains($e->getMessage(), 'Duplicate')
-                    ? 'Login "' . htmlspecialchars($f_login) . '" já está em uso. Escolha outro.'
-                    : 'Erro ao criar usuário: ' . htmlspecialchars($e->getMessage());
+                if (str_contains($e->getMessage(), 'Duplicate')) {
+                    $msg = 'Login "' . htmlspecialchars($f_login) . '" já está em uso. Escolha outro.';
+                } elseif ($e->getCode() === '23000') {
+                    $msg = 'O grupo selecionado não existe mais. Escolha outro grupo e tente novamente.';
+                } else {
+                    $msg = 'Erro ao criar usuário: ' . htmlspecialchars($e->getMessage());
+                }
                 $msg_tipo = 'err';
             }
         }
@@ -126,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $f_login  = trim($_POST['login']   ?? '');
         $f_nome   = trim($_POST['nome']    ?? '');
         $f_perfil = in_array($_POST['perfil'] ?? '', ['admin','usuario']) ? $_POST['perfil'] : 'usuario';
-        $f_gru    = (int) ($_POST['gru_codigo'] ?? 0) ?: null;
+        $f_gru    = sanitizarGrupo($_POST['gru_codigo'] ?? 0, $grupos_validos);
 
         if (!$cod || !$f_login || !$f_nome) {
             $msg = 'Preencha todos os campos obrigatórios.';
@@ -150,9 +163,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: /usuarios');
                 exit;
             } catch (PDOException $e) {
-                $msg = str_contains($e->getMessage(), 'Duplicate')
-                    ? 'Login "' . htmlspecialchars($f_login) . '" já está em uso.'
-                    : 'Erro ao atualizar: ' . htmlspecialchars($e->getMessage());
+                if (str_contains($e->getMessage(), 'Duplicate')) {
+                    $msg = 'Login "' . htmlspecialchars($f_login) . '" já está em uso.';
+                } elseif ($e->getCode() === '23000') {
+                    $msg = 'O grupo selecionado não existe mais. Escolha outro grupo e tente novamente.';
+                } else {
+                    $msg = 'Erro ao atualizar: ' . htmlspecialchars($e->getMessage());
+                }
                 $msg_tipo = 'err';
             }
         }
