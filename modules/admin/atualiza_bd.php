@@ -34,20 +34,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === 'reset') {
         $resetMsg = ['ok' => false, 'msg' => 'Digite RESETAR para confirmar.'];
     } else {
         try {
+            $todasTabelas = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+            $manter       = array_intersect($_POST['manter'] ?? [], $todasTabelas);
+            $tables       = array_diff($todasTabelas, $manter);
+
             $pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
-            $tables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
             foreach ($tables as $t) {
                 $pdo->exec("DROP TABLE IF EXISTS `{$t}`");
             }
             $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
             unset($_SESSION['mig_ok']);
-            $resetMsg = ['ok' => true, 'msg' => count($tables) . ' tabela(s) removida(s). Faça logout e login para re-rodar as migrations.'];
+            $resetMsg = ['ok' => true, 'msg' => count($tables) . ' tabela(s) removida(s), ' . count($manter) . ' mantida(s). Faça logout e login para re-rodar as migrations.'];
         } catch (Throwable $e) {
             $pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
             $resetMsg = ['ok' => false, 'msg' => $e->getMessage()];
         }
     }
 }
+
+// ── Lista de tabelas para a Zona de Perigo ──────────────────────────────────────
+$tabelasReset = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+sort($tabelasReset);
 
 // ── Console SQL ───────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === '') {
@@ -138,6 +145,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === '') {
 .reset-msg{padding:10px 16px;border-radius:7px;font-size:12.5px;}
 .reset-msg.ok {background:rgba(0,201,167,.1);color:var(--teal);border:1px solid rgba(0,201,167,.2);}
 .reset-msg.err{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+
+.keep-tables{border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:4px;}
+.keep-tables-header{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;font-weight:600;color:var(--text-muted);margin-bottom:10px;}
+.keep-tables-actions a{color:#7db3ff;text-decoration:none;font-weight:600;}
+.keep-tables-actions a:hover{text-decoration:underline;}
+.keep-tables-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:6px 14px;max-height:220px;overflow-y:auto;}
+.keep-table-opt{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text-primary);cursor:pointer;}
+.keep-table-opt input{accent-color:var(--teal);width:14px;height:14px;flex-shrink:0;}
   </style>
 </head>
 <body>
@@ -270,21 +285,45 @@ ALTER TABLE tabela ADD COLUMN coluna VARCHAR(100) NULL;"
             </div>
           <?php endif; ?>
 
-          <form method="POST" class="danger-form" onsubmit="return confirmReset(event)">
+          <form method="POST" id="resetForm" onsubmit="return confirmReset(event)">
             <input type="hidden" name="action" value="reset">
-            <input
-              type="text"
-              name="confirm"
-              class="danger-input"
-              placeholder="Digite RESETAR"
-              autocomplete="off"
-              spellcheck="false"
-              id="resetInput"
-            >
-            <button type="submit" class="btn-danger">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-              Resetar base
-            </button>
+
+            <?php if ($tabelasReset): ?>
+            <div class="keep-tables">
+              <div class="keep-tables-header">
+                <span>Manter estas tabelas (não serão apagadas)</span>
+                <span class="keep-tables-actions">
+                  <a href="#" onclick="toggleTodas(true);return false;">marcar todas</a>
+                  ·
+                  <a href="#" onclick="toggleTodas(false);return false;">desmarcar todas</a>
+                </span>
+              </div>
+              <div class="keep-tables-grid">
+                <?php foreach ($tabelasReset as $t): ?>
+                <label class="keep-table-opt">
+                  <input type="checkbox" name="manter[]" value="<?= htmlspecialchars($t) ?>" class="manter-cb">
+                  <?= htmlspecialchars($t) ?>
+                </label>
+                <?php endforeach; ?>
+              </div>
+            </div>
+            <?php endif; ?>
+
+            <div class="danger-form">
+              <input
+                type="text"
+                name="confirm"
+                class="danger-input"
+                placeholder="Digite RESETAR"
+                autocomplete="off"
+                spellcheck="false"
+                id="resetInput"
+              >
+              <button type="submit" class="btn-danger">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                Resetar base
+              </button>
+            </div>
           </form>
         </div>
       </div>
@@ -307,11 +346,20 @@ document.getElementById('sqlInput').focus();
 const ta = document.getElementById('sqlInput');
 ta.selectionStart = ta.selectionEnd = ta.value.length;
 
+// Marcar/desmarcar todas as tabelas a manter
+function toggleTodas(marcar) {
+  document.querySelectorAll('.manter-cb').forEach(cb => cb.checked = marcar);
+}
+
 // Confirmação extra antes de resetar
 function confirmReset(e) {
   const val = document.getElementById('resetInput').value.trim();
   if (val !== 'RESETAR') return true; // servidor valida também
-  return confirm('Tem certeza? Esta ação apaga TODAS as tabelas e não pode ser desfeita.');
+  const mantidas = document.querySelectorAll('.manter-cb:checked').length;
+  const msg = mantidas > 0
+    ? `Tem certeza? Esta ação apaga todas as tabelas, exceto as ${mantidas} marcada(s) para manter. Não pode ser desfeita.`
+    : 'Tem certeza? Esta ação apaga TODAS as tabelas e não pode ser desfeita.';
+  return confirm(msg);
 }
 </script>
 </body>

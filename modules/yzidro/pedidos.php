@@ -40,11 +40,6 @@ function yzFmtDate(?string $value): string
     return $ts ? date('d/m/Y', $ts) : $value;
 }
 
-function yzFmtMoney($value): string
-{
-    return 'R$ ' . number_format((float) $value, 2, ',', '.');
-}
-
 function yzBaseUrl(): string
 {
     return '/yzidro/pedidos';
@@ -345,13 +340,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             exit;
         }
 
-        $stmtVen = $pdo->prepare("
-            INSERT INTO VENDAS (VEN_CODIGO_YZIDRO,VEN_CLIENTE,VEN_FANTASIA,VEN_CNPJ,
-                VEN_REPRESENTANTE,VEN_UF,VEN_CIDADE,VEN_EMISSAO,VEN_ENTREGA,
-                VEN_TOTAL,VEN_SEGMENTO,VEN_GRUPO_CLIENTES,VEN_OBS,VEN_STATUS)
-            VALUES (:yz,:cli,:fan,:cnpj,:rep,:uf,:cid,:emi,:ent,:tot,:seg,:grp,:obs,:sts)
+        $stmtCli = $pdo->prepare('
+            INSERT INTO CLIENTES (CLI_NOME, CLI_FANTASIA, CLI_CNPJ, CLI_UF, CLI_CIDADE)
+            VALUES (:nome, :fan, :cnpj, :uf, :cid)
             ON DUPLICATE KEY UPDATE
-                VEN_CLIENTE=VALUES(VEN_CLIENTE), VEN_ENTREGA=VALUES(VEN_ENTREGA),
+                CLI_NOME=VALUES(CLI_NOME), CLI_FANTASIA=VALUES(CLI_FANTASIA),
+                CLI_UF=VALUES(CLI_UF), CLI_CIDADE=VALUES(CLI_CIDADE),
+                CLI_CODIGO=LAST_INSERT_ID(CLI_CODIGO)
+        ');
+        $stmtVen = $pdo->prepare("
+            INSERT INTO VENDAS (VEN_CODIGO_YZIDRO,CLI_CODIGO,
+                VEN_REPRESENTANTE,VEN_EMISSAO,VEN_ENTREGA,
+                VEN_TOTAL,VEN_SEGMENTO,VEN_GRUPO_CLIENTES,VEN_OBS,VEN_STATUS)
+            VALUES (:yz,:cli,:rep,:emi,:ent,:tot,:seg,:grp,:obs,:sts)
+            ON DUPLICATE KEY UPDATE
+                CLI_CODIGO=VALUES(CLI_CODIGO), VEN_ENTREGA=VALUES(VEN_ENTREGA),
                 VEN_TOTAL=VALUES(VEN_TOTAL),
                 VEN_OBS=VALUES(VEN_OBS),
                 VEN_STATUS=IF(VALUES(VEN_STATUS)='Urgente' AND VEN_STATUS IS NULL,'Urgente',VEN_STATUS)
@@ -421,17 +424,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
             $getFindV->execute([':yz' => $numPed]);
             $existeVen = $getFindV->fetchColumn();
 
-            $stmtVen->execute([
-                ':yz' => $numPed,
-                ':cli' => $primeiro['cliente_nome'],
+            $stmtCli->execute([
+                ':nome' => $primeiro['cliente_nome'],
                 ':fan' => $primeiro['nome_fantasia'],
-                ':cnpj' => $primeiro['cnpj_cpf'],
-                ':rep' => $primeiro['vendedor_venda'],
+                ':cnpj' => $primeiro['cnpj_cpf'] !== '' ? $primeiro['cnpj_cpf'] : null,
                 ':uf' => $primeiro['uf'],
                 ':cid' => $primeiro['cidade'],
+            ]);
+            $cliCod = (int) $pdo->lastInsertId();
+
+            $stmtVen->execute([
+                ':yz' => $numPed,
+                ':cli' => $cliCod,
+                ':rep' => $primeiro['vendedor_venda'],
                 ':emi' => $emissao,
                 ':ent' => $entrega,
-                ':tot' => (float) ($primeiro['total_pedido_item'] ?? 0),
+                ':tot' => 0.0,
                 ':seg' => $primeiro['segmento'],
                 ':grp' => $primeiro['grupo'],
                 ':obs' => $obsTexto ?: null,
@@ -465,8 +473,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isAjax) {
                     ':ven' => $venCod,
                     ':pro' => $proCod,
                     ':qtd' => (float) ($item['qtd'] ?? 0),
-                    ':vlu' => (float) ($item['valor_unit'] ?? 0),
-                    ':tot' => (float) ($item['total_produto'] ?? 0),
+                    ':vlu' => 0.0,
+                    ':tot' => 0.0,
                     ':uni' => $item['unidade'],
                 ]);
 
@@ -578,9 +586,7 @@ if (!$show_amostras) {
 }
 
 $totalVendas = count($vendas);
-$totalFaturado = array_reduce($vendas, fn ($c, $r) => $c + (float) ($r['total_pedido'] ?? 0), 0.0);
 $totalNovos = count(array_filter($vendas, fn ($r) => !$r['no_mysql']));
-$ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -845,16 +851,6 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
           <div class="kpi-value"><?= number_format($totalVendas - $totalNovos, 0, ',', '.') ?></div>
           <div class="kpi-footer">presentes no MySQL</div>
         </div>
-        <div class="kpi-card blue">
-          <div class="kpi-header">
-            <span class="kpi-label">Valor total</span>
-            <div class="kpi-icon">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            </div>
-          </div>
-          <div class="kpi-value" style="font-size:20px;letter-spacing:-.5px"><?= yzEscape(yzFmtMoney($totalFaturado)) ?></div>
-          <div class="kpi-footer">soma dos pedidos listados</div>
-        </div>
       </div>
 
       <!-- Filtros -->
@@ -943,7 +939,6 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
                 <th>Faturamento</th>
                 <th>Representante</th>
                 <th class="yz-right">Itens</th>
-                <th class="yz-right">Total</th>
                 <th>Tipo</th>
                 <th>Status</th>
               </tr>
@@ -951,7 +946,7 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
             <tbody>
               <?php if (!$vendas): ?>
                 <tr>
-                  <td colspan="10">
+                  <td colspan="9">
                     <div class="yz-empty-state">Nenhuma venda encontrada com os filtros informados.</div>
                   </td>
                 </tr>
@@ -985,7 +980,6 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
                         data-detail-id="<?= yzEscape($detailId) ?>"
                         data-cliente="<?= yzEscape($row['cliente'] ?? '—') ?>"
                         data-rep="<?= yzEscape($row['representante'] ?? '—') ?>"
-                        data-total="<?= yzEscape(yzFmtMoney($row['total_pedido'] ?? 0)) ?>"
                         aria-expanded="false"
                         title="Ver itens"
                       >+</button>
@@ -996,7 +990,6 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
                     <td class="yz-nowrap"><?= yzEscape(yzFmtDate($row['datafatura'] ?? '')) ?></td>
                     <td class="yz-nowrap"><?= yzEscape($row['representante'] ?? '—') ?></td>
                     <td class="yz-num"><?= (int) ($row['qtd_itens'] ?? 0) ?></td>
-                    <td class="yz-money"><?= yzEscape(yzFmtMoney($row['total_pedido'] ?? 0)) ?></td>
                     <td><?= $tipoLabel ? '<span class="tipo-badge ' . $tipoClass . '">' . $tipoLabel . '</span>' : '' ?></td>
                     <td>
                       <?php if ($isNovo): ?>
@@ -1024,14 +1017,13 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
                     </td>
                   </tr>
                   <tr id="<?= yzEscape($detailId) ?>" class="yz-detail-row">
-                    <td colspan="10" class="yz-detail-cell">
+                    <td colspan="9" class="yz-detail-cell">
                       <div class="yz-detail-box">
                         <div class="yz-detail-head">
                           <h3>Itens do pedido <?= yzEscape($pedido) ?></h3>
                           <div class="yz-detail-chips">
                             <span class="yz-chip"><?= yzEscape($row['cliente'] ?? '—') ?></span>
                             <span class="yz-chip"><?= yzEscape($row['representante'] ?? '—') ?></span>
-                            <span class="yz-chip"><?= yzEscape(yzFmtMoney($row['total_pedido'] ?? 0)) ?></span>
                           </div>
                         </div>
                         <div class="yz-detail-content">
@@ -1066,9 +1058,6 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
   const currentParams = new URLSearchParams(window.location.search);
 
   // ── Formatação ──────────────────────────────────────────────────────────────
-  function moneyBR(v) {
-    return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  }
   function qtyBR(v) {
     return Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
   }
@@ -1105,8 +1094,6 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
         </td>
         <td><span class="cat-chip ${catClass(item.categoria)}">${escHtml(item.categoria || '—')}</span></td>
         <td class="yz-right">${qtyBR(item.qtd)} ${escHtml(item.unidade || '')}</td>
-        <td class="yz-right yz-nowrap">${moneyBR(item.valor_unit)}</td>
-        <td class="yz-right yz-nowrap"><strong>${moneyBR(item.total_produto)}</strong></td>
         <td>${escHtml(item.status_pedido || '—')}</td>
         <td class="yz-obs">${escHtml(item.obs || '—')}</td>
       </tr>
@@ -1119,8 +1106,6 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
             <th>Produto</th>
             <th>Categoria PCP</th>
             <th class="yz-right">Qtd.</th>
-            <th class="yz-right">Valor unit.</th>
-            <th class="yz-right">Total</th>
             <th>Status</th>
             <th>Obs.</th>
           </tr>

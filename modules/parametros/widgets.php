@@ -28,16 +28,14 @@ try {
 } catch (Throwable) {}
 
 $_widget_perm_map = [
-    'kpi_erp'          => ['/financeiro',  'financeiro'],
-    'kpi_local'        => ['/pcp/kanban',  'producao'],
-    'kpi_faturamento'  => ['/financeiro',  'financeiro'],
-    'ultimas_vendas'   => ['/financeiro',  'financeiro'],
-    'maquinas_hoje'    => ['/pcp/producao','producao'],
-    'vendas_grupo'     => ['/financeiro',  'financeiro'],
-    'prod_7dias'       => ['/pcp/producao','producao'],
+    'kpi_erp'          => ['/vendas',      'vendas'],
+    'kpi_local'        => ['/pcp/planejamento',  'producao'],
+    'ultimas_vendas'   => ['/vendas',      'vendas'],
+    'maquinas_hoje'    => ['/pcp/planejamento',  'producao'],
+    'vendas_grupo'     => ['/vendas',      'vendas'],
+    'prod_7dias'       => ['/pcp/planejamento',  'producao'],
     'trello_geral'     => ['/trello',      'trello'],
     'trello_atividade' => ['/trello',      'trello'],
-    'financeiro'       => ['/financeiro',  'financeiro'],
 ];
 
 function widgetPermitido(string $key): bool {
@@ -100,18 +98,6 @@ $todosWidgets = [
         'label' => 'Trello — Atividade',
         'desc'  => 'Movimentos recentes de cards entre listas do board',
         'icon'  => '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
-    ],
-    [
-        'key'   => 'kpi_faturamento',
-        'label' => 'KPIs — Faturamento',
-        'desc'  => 'Faturamento bruto do mês e ticket médio por pedido',
-        'icon'  => '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
-    ],
-    [
-        'key'   => 'financeiro',
-        'label' => 'Financeiro',
-        'desc'  => 'Resumo de contas a pagar e a receber com alertas de vencidos',
-        'icon'  => '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
     ],
 ];
 

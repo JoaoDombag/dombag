@@ -126,8 +126,6 @@ $stmt = $pdo->prepare("
     SELECT
         iv.IV_CODIGO,
         iv.IV_QTDE,
-        iv.IV_VLR_UNIT,
-        iv.IV_TOTAL,
         iv.IV_UNIDADE,
         iv.IV_STATUS,
         iv.IV_PRIORIDADE,
@@ -135,12 +133,11 @@ $stmt = $pdo->prepare("
         iv.IV_ATUALIZADO_EM,
         v.VEN_CODIGO,
         v.VEN_CODIGO_YZIDRO,
-        v.VEN_CLIENTE,
-        v.VEN_FANTASIA,
+        c.CLI_NOME     AS VEN_CLIENTE,
+        c.CLI_FANTASIA AS VEN_FANTASIA,
         v.VEN_ENTREGA,
-        v.VEN_TOTAL,
         v.VEN_REPRESENTANTE,
-        v.VEN_UF,
+        c.CLI_UF       AS VEN_UF,
         p.PRO_CODIGO,
         p.PRO_CODIGO_YZ,
         p.PRO_DESCRICAO,
@@ -151,6 +148,7 @@ $stmt = $pdo->prepare("
     FROM ITENS_VENDAS iv
     INNER JOIN VENDAS   v ON v.VEN_CODIGO = iv.VEN_CODIGO
     INNER JOIN PRODUTOS p ON p.PRO_CODIGO = iv.PRO_CODIGO
+    LEFT JOIN CLIENTES  c ON c.CLI_CODIGO = v.CLI_CODIGO
     $where
     ORDER BY
         p.PRO_CATEGORIA,

@@ -3,6 +3,10 @@
 .env.*
 config/db.local.php
 
+# Sessões PHP — nunca commitar
+config/sessions/*
+!config/sessions/.gitkeep
+
 # Uploads de usuários
 uploads/
 

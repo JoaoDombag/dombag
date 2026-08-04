@@ -163,7 +163,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT
             v.VEN_CODIGO_YZIDRO                                               AS pedido,
-            COALESCE(v.VEN_FANTASIA, v.VEN_CLIENTE)                           AS cliente,
+            COALESCE(c.CLI_FANTASIA, c.CLI_NOME)                              AS cliente,
             v.VEN_ENTREGA AS ven_entrega,
             GROUP_CONCAT(DISTINCT p.PRO_DESCRICAO
                 ORDER BY p.PRO_DESCRICAO SEPARATOR ' / ')                     AS produtos,
@@ -174,9 +174,10 @@ try {
         FROM ITENS_VENDAS iv
         JOIN VENDAS v  ON v.VEN_CODIGO  = iv.VEN_CODIGO
         JOIN PRODUTOS p ON p.PRO_CODIGO = iv.PRO_CODIGO
+        LEFT JOIN CLIENTES c ON c.CLI_CODIGO = v.CLI_CODIGO
         WHERE iv.IV_STATUS = 'Finalizado'
           AND DATE(iv.IV_ATUALIZADO_EM) = :data
-        GROUP BY v.VEN_CODIGO, v.VEN_CODIGO_YZIDRO, v.VEN_CLIENTE, v.VEN_FANTASIA, v.VEN_ENTREGA
+        GROUP BY v.VEN_CODIGO, v.VEN_CODIGO_YZIDRO, c.CLI_NOME, c.CLI_FANTASIA, v.VEN_ENTREGA
         ORDER BY v.VEN_CODIGO_YZIDRO
     ");
     $stmt->execute([':data' => $data_sel]);
@@ -188,7 +189,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT
             v.VEN_CODIGO_YZIDRO                                               AS pedido,
-            COALESCE(v.VEN_FANTASIA, v.VEN_CLIENTE)                           AS cliente,
+            COALESCE(c.CLI_FANTASIA, c.CLI_NOME)                              AS cliente,
             v.VEN_ENTREGA AS ven_entrega,
             DATE(iv.IV_ATUALIZADO_EM)                                         AS data_finalizacao,
             GROUP_CONCAT(DISTINCT p.PRO_DESCRICAO
@@ -200,10 +201,11 @@ try {
         FROM ITENS_VENDAS iv
         JOIN VENDAS v  ON v.VEN_CODIGO  = iv.VEN_CODIGO
         JOIN PRODUTOS p ON p.PRO_CODIGO = iv.PRO_CODIGO
+        LEFT JOIN CLIENTES c ON c.CLI_CODIGO = v.CLI_CODIGO
         WHERE iv.IV_STATUS = 'Finalizado'
           AND YEAR(iv.IV_ATUALIZADO_EM)  = YEAR(:data)
           AND MONTH(iv.IV_ATUALIZADO_EM) = MONTH(:data)
-        GROUP BY v.VEN_CODIGO, v.VEN_CODIGO_YZIDRO, v.VEN_CLIENTE, v.VEN_FANTASIA,
+        GROUP BY v.VEN_CODIGO, v.VEN_CODIGO_YZIDRO, c.CLI_NOME, c.CLI_FANTASIA,
                  v.VEN_ENTREGA, DATE(iv.IV_ATUALIZADO_EM)
         ORDER BY data_finalizacao DESC, v.VEN_CODIGO_YZIDRO
     ");

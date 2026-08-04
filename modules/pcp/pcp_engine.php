@@ -89,9 +89,7 @@ function pcpGetPedidosERP(string $dataIni, string $dataFim): array
             COALESCE(VV.CLIENTE,'')                   AS cliente,
             COALESCE(VV.PRODUTO::VARCHAR,'')          AS produto,
             COALESCE(VV.GRUPO_CLIENTES::VARCHAR,'')   AS grupo,
-            COALESCE(VV.QTD,0)                        AS qtd,
-            COALESCE(VV.VALOR_UNIT::FLOAT,0)          AS vlr_unit,
-            COALESCE(VV.TOTAL_PRODUTO,0)              AS total_ped
+            COALESCE(VV.QTD,0)                        AS qtd
         FROM VW_VENDAS VV
         INNER JOIN PRODUTO P ON VV.COD_PRODUTO = P.PRO_CODIGO
         WHERE VV.COD_GRUPO IN (6)
@@ -121,8 +119,6 @@ function pcpGetPedidosERP(string $dataIni, string $dataFim): array
             'produto' => $r['produto'],
             'grupo' => $r['grupo'],
             'qtd' => (float) $r['qtd'],
-            'vlr_unit' => (float) $r['vlr_unit'],
-            'total_ped' => (float) $r['total_ped'],
             'tipo' => '',
             'impressao' => '',
             'valvulado' => '',
@@ -204,18 +200,17 @@ function pcpGetPedidosMySQL(): array
                 DATE_FORMAT(v.VEN_ENTREGA, '%d/%m/%Y')                       AS entrega,
                 ''                                                            AS mes_fat,
                 COALESCE(v.VEN_REPRESENTANTE, '')                            AS rep,
-                COALESCE(NULLIF(v.VEN_FANTASIA,''), v.VEN_CLIENTE, '')       AS fantasia,
-                COALESCE(v.VEN_CLIENTE, '')                                  AS cliente,
+                COALESCE(NULLIF(c.CLI_FANTASIA,''), c.CLI_NOME, '')          AS fantasia,
+                COALESCE(c.CLI_NOME, '')                                     AS cliente,
                 p.PRO_DESCRICAO                                              AS produto,
                 p.PRO_CATEGORIA                                              AS grupo,
                 iv.IV_QTDE                                                   AS qtd,
-                iv.IV_VLR_UNIT                                               AS vlr_unit,
-                iv.IV_TOTAL                                                  AS total_ped,
                 COALESCE(iv.IV_PRIORIDADE, 0)                               AS iv_prioridade,
                 COALESCE(iv.IV_OBS, '')                                      AS obs
             FROM ITENS_VENDAS iv
             JOIN VENDAS   v ON v.VEN_CODIGO = iv.VEN_CODIGO
             JOIN PRODUTOS p ON p.PRO_CODIGO = iv.PRO_CODIGO
+            LEFT JOIN CLIENTES c ON c.CLI_CODIGO = v.CLI_CODIGO
             WHERE iv.IV_STATUS IN ('Pendente de produção','Produção')
             ORDER BY v.VEN_ENTREGA, v.VEN_CODIGO_YZIDRO, p.PRO_DESCRICAO
         ");
@@ -236,8 +231,6 @@ function pcpGetPedidosMySQL(): array
             'produto' => $r['produto'],
             'grupo' => $r['grupo'],
             'qtd' => (float) $r['qtd'],
-            'vlr_unit' => (float) $r['vlr_unit'],
-            'total_ped' => (float) $r['total_ped'],
             'iv_prioridade' => (int) $r['iv_prioridade'],
             'obs' => $r['obs'],
             'tipo' => '',

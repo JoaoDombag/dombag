@@ -10,9 +10,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
 // ── Variáveis iniciais ────────────────────────────────────────────────
 $erp_ok               = false;
 $kpi_pedidos_mes      = 0;
-$kpi_faturado_mes     = 0.0;
 $kpi_pedidos_hoje     = 0;
-$kpi_ticket_medio     = 0.0;
 $kpi_mes_ant          = 0;
 $kpi_pendentes_importar = 0;
 $kpi_finalizados      = 0;
@@ -21,10 +19,6 @@ $ultimas_vendas       = [];
 $prod_7dias           = [];
 $top_maquinas         = [];
 $vendas_grupo         = [];
-$fin_pagar_total      = 0.0;
-$fin_pagar_vencido    = 0.0;
-$fin_receber_total    = 0.0;
-$fin_receber_vencido  = 0.0;
 
 // ── Preferências de widgets do utilizador ─────────────────────────────
 $_dash_uid = (int)($_SESSION['usu_codigo'] ?? 0);
@@ -39,10 +33,10 @@ try {
 }
 // null = sem preferência salva; será preenchido com padrão após carregar permissões
 $_dash_widgets_default = [
-    'kpi_erp','kpi_local','kpi_faturamento',
+    'kpi_erp','kpi_local',
     'ultimas_vendas','maquinas_hoje',
     'vendas_grupo','prod_7dias',
-    'financeiro','trello_geral','trello_atividade',
+    'trello_geral','trello_atividade',
 ];
 
 // ── Permissões e menus activos (para filtrar widgets) ─────────────────
@@ -74,16 +68,14 @@ if ($dashWidgets === null) {
 
 // Mapa: widget → [página_requerida, grupo_de_menu]
 $_widget_perm_map = [
-    'kpi_erp'          => ['/financeiro',  'financeiro'],
-    'kpi_local'        => ['/pcp/kanban',  'producao'],
-    'kpi_faturamento'  => ['/financeiro',  'financeiro'],
-    'ultimas_vendas'   => ['/financeiro',  'financeiro'],
-    'maquinas_hoje'    => ['/pcp/producao','producao'],
-    'vendas_grupo'     => ['/financeiro',  'financeiro'],
-    'prod_7dias'       => ['/pcp/producao','producao'],
+    'kpi_erp'          => ['/vendas',      'vendas'],
+    'kpi_local'        => ['/pcp/planejamento',  'producao'],
+    'ultimas_vendas'   => ['/vendas',      'vendas'],
+    'maquinas_hoje'    => ['/pcp/planejamento',  'producao'],
+    'vendas_grupo'     => ['/vendas',      'vendas'],
+    'prod_7dias'       => ['/pcp/planejamento',  'producao'],
     'trello_geral'     => ['/trello',      'trello'],
     'trello_atividade' => ['/trello',      'trello'],
-    'financeiro'       => ['/financeiro',  'financeiro'],
 ];
 
 function dashW(string $key): bool {
@@ -174,60 +166,6 @@ try {
         ORDER BY total DESC
         LIMIT 5
     ')->fetchAll(PDO::FETCH_ASSOC);
-
-    // financeiro widget: load from ERP if available, fallback to local tables
-    if (dashW('financeiro')) {
-        $fin_pagar_total   = 0.0; $fin_pagar_vencido   = 0.0;
-        $fin_receber_total = 0.0; $fin_receber_vencido = 0.0;
-        $fin_from_erp = false;
-        $pgFin = dbPG();
-        if ($pgFin) {
-            $hj = date('Y-m-d');
-            $resFin = pg_query($pgFin,
-                "SELECT
-                    COALESCE(SUM(COALESCE(CP_SALDO_MP,0)),0) AS total,
-                    COALESCE(SUM(CASE WHEN CP_VENCIMENTO < '$hj' THEN COALESCE(CP_SALDO_MP,0) ELSE 0 END),0) AS vencido
-                 FROM CONTAS_PAGAR
-                 WHERE CP_TIPO='D' AND CP_VINCULO IS NULL AND EMP_CODIGO=1
-                   AND COALESCE(CP_SALDO_MP,0) > 0"
-            );
-            if ($resFin && $rowFin = pg_fetch_assoc($resFin)) {
-                $fin_pagar_total   = (float)$rowFin['total'];
-                $fin_pagar_vencido = (float)$rowFin['vencido'];
-                $fin_from_erp = true;
-            }
-            $resFin = pg_query($pgFin,
-                "SELECT
-                    COALESCE(SUM(COALESCE(CR_SALDO_PARCELA_MP,0)),0) AS total,
-                    COALESCE(SUM(CASE WHEN CR_VENCIMENTO < '$hj' THEN COALESCE(CR_SALDO_PARCELA_MP,0) ELSE 0 END),0) AS vencido
-                 FROM CONTAS_RECEBER
-                 WHERE CR_TIPO='C' AND CR_VINCULO IS NULL AND EMP_CODIGO=1
-                   AND COALESCE(CR_SALDO_PARCELA_MP,0) > 0"
-            );
-            if ($resFin && $rowFin = pg_fetch_assoc($resFin)) {
-                $fin_receber_total   = (float)$rowFin['total'];
-                $fin_receber_vencido = (float)$rowFin['vencido'];
-            }
-        }
-        if (!$fin_from_erp) {
-            // fallback: local MySQL tables
-            $r = $pdo->query(
-                "SELECT COALESCE(SUM(valor - COALESCE(valor_pago,0)),0) AS total,
-                        COALESCE(SUM(CASE WHEN status='VENCIDO' THEN valor - COALESCE(valor_pago,0) ELSE 0 END),0) AS vencido
-                 FROM fin_contas_pagar WHERE status IN ('ABERTO','PARCIAL','VENCIDO')"
-            )->fetch(PDO::FETCH_ASSOC);
-            $fin_pagar_total   = (float)($r['total']   ?? 0);
-            $fin_pagar_vencido = (float)($r['vencido'] ?? 0);
-
-            $r = $pdo->query(
-                "SELECT COALESCE(SUM(valor - COALESCE(valor_pago,0)),0) AS total,
-                        COALESCE(SUM(CASE WHEN status='VENCIDO' THEN valor - COALESCE(valor_pago,0) ELSE 0 END),0) AS vencido
-                 FROM fin_contas_receber WHERE status IN ('ABERTO','PARCIAL','VENCIDO')"
-            )->fetch(PDO::FETCH_ASSOC);
-            $fin_receber_total   = (float)($r['total']   ?? 0);
-            $fin_receber_vencido = (float)($r['vencido'] ?? 0);
-        }
-    }
 } catch (PDOException) {}
 
 // ── Dados ERP (PostgreSQL) ────────────────────────────────────────────
@@ -241,7 +179,7 @@ if ($pg) {
     $hoje        = date('Y-m-d');
 
     $res = pg_query($pg, "
-        SELECT COUNT(DISTINCT PEDIDO) AS qtd_ped, COALESCE(SUM(TOTAL_PRODUTO),0) AS faturado
+        SELECT COUNT(DISTINCT PEDIDO) AS qtd_ped
         FROM VW_VENDAS
         WHERE COD_GRUPO IN (6,24,5) AND OPERACAO_PEDIDO='V'
           AND COD_ESTADO IN ('9') AND EMP_CODIGO=1
@@ -249,7 +187,6 @@ if ($pg) {
     ");
     if ($res && $row = pg_fetch_assoc($res)) {
         $kpi_pedidos_mes  = (int)$row['qtd_ped'];
-        $kpi_faturado_mes = (float)$row['faturado'];
     }
 
     $res = pg_query($pg, "
@@ -262,9 +199,6 @@ if ($pg) {
     if ($res && $row = pg_fetch_assoc($res)) {
         $kpi_pedidos_hoje = (int)$row['qtd'];
     }
-
-    $kpi_ticket_medio = $kpi_pedidos_mes > 0
-        ? round($kpi_faturado_mes / $kpi_pedidos_mes, 2) : 0;
 
     $res = pg_query($pg, "
         SELECT COUNT(DISTINCT PEDIDO) AS qtd
@@ -333,7 +267,6 @@ if ($pg) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────
-function fmtMoeda(float $v): string { return 'R$ ' . number_format($v, 0, ',', '.'); }
 function fmtNum(int $v): string     { return number_format($v, 0, ',', '.'); }
 function variacao(int $atual, int $ant): string {
     if ($ant <= 0) return '';
@@ -381,7 +314,7 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
     @media(max-width:1400px) { .kpi-grid { grid-template-columns:repeat(3,1fr); } }
     @media(max-width:1100px) { .kpi-grid { grid-template-columns:repeat(2,1fr); } }
     @media(max-width:768px)  { .kpi-grid { grid-template-columns:repeat(2,1fr); } }
-    @media(max-width:480px)  { .kpi-grid { grid-template-columns:1fr; } .kpi-faturado { font-size:18px !important; } }
+    @media(max-width:480px)  { .kpi-grid { grid-template-columns:1fr; } }
 
     /* ── Gráfico ───────────────────────────────────── */
     .chart-wrap { position:relative; height:180px; padding:0 16px 12px; }
@@ -416,7 +349,6 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
     .erp-dot       { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
     .erp-dot.on    { background:var(--teal); box-shadow:0 0 6px var(--teal); }
     .erp-dot.off   { background:var(--red); }
-    .kpi-faturado  { font-size:22px !important; letter-spacing:-1px !important; }
     .empty-row     { text-align:center; padding:32px 20px; color:var(--text-muted); font-size:13px; }
     .greeting      { font-size:11.5px; color:var(--text-muted); }
     .greeting strong { color:var(--text-primary); }
@@ -476,7 +408,7 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
     $_w = [];
 
     // ── KPIs (grupo único renderizado uma vez) ────────────────────────
-    if (dashW('kpi_erp') || dashW('kpi_local') || dashW('kpi_faturamento')) {
+    if (dashW('kpi_erp') || dashW('kpi_local')) {
         ob_start(); ?>
         <div class="kpi-grid">
 
@@ -551,7 +483,7 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
             <div class="kpi-value"><?= fmtNum($kpi_finalizados) ?></div>
             <div class="kpi-footer">
               unidades finalizadas
-              &nbsp;<a href="/pcp/kanban" style="color:var(--teal);font-weight:600;text-decoration:none;">Ver →</a>
+              &nbsp;<a href="/pcp/planejamento" style="color:var(--teal);font-weight:600;text-decoration:none;">Ver →</a>
               &nbsp;<span class="source-badge src-local">Local</span>
             </div>
           </div>
@@ -569,46 +501,16 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
             <div class="kpi-value"><?= fmtNum($kpi_a_produzir) ?></div>
             <div class="kpi-footer">
               unidades a produzir
-              &nbsp;<a href="/pcp/kanban" style="color:var(--amber);font-weight:600;text-decoration:none;">Ver →</a>
+              &nbsp;<a href="/pcp/planejamento" style="color:var(--amber);font-weight:600;text-decoration:none;">Ver →</a>
               &nbsp;<span class="source-badge src-local">Local</span>
             </div>
-          </div>
-          <?php endif; ?>
-
-          <?php if (dashW('kpi_faturamento')): ?>
-          <div class="kpi-card blue">
-            <div class="kpi-header">
-              <span class="kpi-label">Faturamento do Mês</span>
-              <div class="kpi-icon">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                  <line x1="12" y1="1" x2="12" y2="23"/>
-                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                </svg>
-              </div>
-            </div>
-            <div class="kpi-value kpi-faturado"><?= fmtMoeda($kpi_faturado_mes) ?></div>
-            <div class="kpi-footer">receita bruta do mês &nbsp;<span class="source-badge src-erp">ERP</span></div>
-          </div>
-
-          <div class="kpi-card teal">
-            <div class="kpi-header">
-              <span class="kpi-label">Ticket Médio</span>
-              <div class="kpi-icon">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                  <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-                  <line x1="7" y1="7" x2="7.01" y2="7"/>
-                </svg>
-              </div>
-            </div>
-            <div class="kpi-value"><?= fmtMoeda($kpi_ticket_medio) ?></div>
-            <div class="kpi-footer">por pedido no mês &nbsp;<span class="source-badge src-erp">ERP</span></div>
           </div>
           <?php endif; ?>
 
         </div>
         <?php
         $_kpi = ob_get_clean();
-        foreach (['kpi_erp', 'kpi_local', 'kpi_faturamento'] as $_k) {
+        foreach (['kpi_erp', 'kpi_local'] as $_k) {
             if (dashW($_k)) { $_w[$_k] = $_kpi; break; }
         }
     }
@@ -716,73 +618,11 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
               <span class="panel-title">Produção — Últimos 7 Dias</span>
               <span class="source-badge src-local">Local</span>
             </div>
-            <a class="panel-action" href="/pcp/producao">Apontamentos →</a>
+            <a class="panel-action" href="/relatorios/producao">Apontamentos →</a>
           </div>
           <div class="chart-wrap"><canvas id="chartProd"></canvas></div>
         </div>
         <?php $_w['prod_7dias'] = ob_get_clean();
-    }
-
-    // ── Financeiro ────────────────────────────────────────────────────
-    if (dashW('financeiro')) {
-        ob_start(); ?>
-        <div class="dash-grid" style="grid-template-columns:1fr 1fr;">
-          <div class="panel">
-            <div class="panel-header">
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span class="panel-title">Contas a Pagar</span>
-                <?php if ($fin_from_erp): ?>
-                <span class="source-badge src-erp">ERP</span>
-                <?php else: ?>
-                <span class="source-badge src-local">Local</span>
-                <?php endif; ?>
-              </div>
-              <a class="panel-action" href="/financeiro/pagar">Ver →</a>
-            </div>
-            <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:12.5px;color:var(--text-muted);">Total em aberto</span>
-                <span style="font-size:16px;font-weight:700;color:var(--text-primary);"><?= fmtMoeda($fin_pagar_total) ?></span>
-              </div>
-              <?php if ($fin_pagar_vencido > 0): ?>
-              <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.15);border-radius:8px;padding:10px 14px;">
-                <span style="font-size:12px;color:var(--red);">Vencidos</span>
-                <span style="font-size:14px;font-weight:700;color:var(--red);"><?= fmtMoeda($fin_pagar_vencido) ?></span>
-              </div>
-              <?php else: ?>
-              <div style="font-size:12px;color:var(--teal);">✓ Nenhum vencido</div>
-              <?php endif; ?>
-            </div>
-          </div>
-          <div class="panel">
-            <div class="panel-header">
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span class="panel-title">Contas a Receber</span>
-                <?php if ($fin_from_erp): ?>
-                <span class="source-badge src-erp">ERP</span>
-                <?php else: ?>
-                <span class="source-badge src-local">Local</span>
-                <?php endif; ?>
-              </div>
-              <a class="panel-action" href="/financeiro/receber">Ver →</a>
-            </div>
-            <div style="padding:20px;display:flex;flex-direction:column;gap:14px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:12.5px;color:var(--text-muted);">Total a receber</span>
-                <span style="font-size:16px;font-weight:700;color:var(--teal);"><?= fmtMoeda($fin_receber_total) ?></span>
-              </div>
-              <?php if ($fin_receber_vencido > 0): ?>
-              <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:10px 14px;">
-                <span style="font-size:12px;color:var(--amber);">Vencidos</span>
-                <span style="font-size:14px;font-weight:700;color:var(--amber);"><?= fmtMoeda($fin_receber_vencido) ?></span>
-              </div>
-              <?php else: ?>
-              <div style="font-size:12px;color:var(--teal);">✓ Nenhum vencido</div>
-              <?php endif; ?>
-            </div>
-          </div>
-        </div>
-        <?php $_w['financeiro'] = ob_get_clean();
     }
 
     // ── Trello — Visão Geral ──────────────────────────────────────────

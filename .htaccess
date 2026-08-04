@@ -53,22 +53,16 @@ RewriteRule ^yzidro/consulta$          modules/yzidro/consulta_vendas.php      [
 RewriteRule ^yzidro/producao$          modules/yzidro/producao.php             [L,QSA]
 
 # PCP — Produção
-RewriteRule ^pcp/kanban$               modules/pcp/kanban.php                  [L,QSA]
 RewriteRule ^pcp/planejamento$         modules/pcp/planejamento.php            [L,QSA]
+RewriteRule ^pcp/reuniao$              modules/pcp/planejamento2.php           [L,QSA]
 RewriteRule ^pcp/ordens$               modules/pcp/pcp_ordens.php              [L,QSA]
-RewriteRule ^pcp/programacao$          modules/pcp/programacao_diaria.php      [L,QSA]
-RewriteRule ^pcp/producao$             modules/pcp/producao.php                [L,QSA]
 RewriteRule ^pcp/fila$                 modules/pcp/fila_maquinas.php           [L,QSA]
 RewriteRule ^pcp/pdf$                  modules/pcp/gerar_pdf.php               [L,QSA]
-RewriteRule ^pcp/reuniao$              modules/pcp/planejamento_dia.php        [L,QSA]
 RewriteRule ^pcp/monitor$              modules/pcp/monitor_maquinas.php        [L,QSA]
-
-# Financeiro
-RewriteRule ^financeiro$               modules/financeiro/index.php            [L,QSA]
-RewriteRule ^financeiro/receber$       modules/financeiro/contas_receber.php   [L,QSA]
-RewriteRule ^financeiro/pagar$         modules/financeiro/contas_pagar.php     [L,QSA]
-RewriteRule ^financeiro/baixas-pagar$  modules/financeiro/baixas_pagar.php     [L,QSA]
-RewriteRule ^financeiro/fluxo$         modules/financeiro/fluxo_caixa.php      [L,QSA]
+RewriteRule ^pcp/tempo-real$           modules/pcp/tempo_real.php               [L,QSA]
+RewriteRule ^pcp/painel-ops$           modules/pcp/painel_ops.php                [L,QSA]
+RewriteRule ^pcp/painel-funcionarios$  modules/pcp/painel_funcionarios.php       [L,QSA]
+RewriteRule ^pcp/painel-funcionarios-pdf$ modules/pcp/painel_funcionarios_pdf.php [L,QSA]
 
 # Relatórios
 RewriteRule ^relatorios/producao$          modules/relatorios/rel_producao.php         [L,QSA]
@@ -77,10 +71,10 @@ RewriteRule ^relatorios/posicao-estoque$       modules/relatorios/rel_posicao_es
 RewriteRule ^relatorios/estoque-futuro/pdf$    modules/relatorios/rel_estoque_futuro_pdf.php  [L,QSA]
 RewriteRule ^relatorios/posicao-estoque/pdf$   modules/relatorios/rel_posicao_estoque_pdf.php [L,QSA]
 RewriteRule ^relatorios/controle-estoque$  modules/relatorios/rel_controle_estoque.php [L,QSA]
+RewriteRule ^relatorios/analise-bag$       modules/relatorios/rel_analise_bag.php      [L,QSA]
 
 # Máquinas
 RewriteRule ^maquinas$                 modules/maquinas/consulta_maquinas.php  [L,QSA]
-RewriteRule ^maquinas/cadastro$        modules/maquinas/cad_maquinas.php       [L,QSA]
 
 # Produtos
 RewriteRule ^produtos$                 modules/produtos/cadastro_produtos.php  [L,QSA]
@@ -101,9 +95,6 @@ RewriteRule ^admin/atualiza-bd$        modules/admin/atualiza_bd.php           [
 RewriteRule ^admin/menus-ativos$       modules/admin/menus_ativos.php          [L,QSA]
 RewriteRule ^admin/migrations$         modules/admin/migrations.php            [L,QSA]
 
-# CRM
-RewriteRule ^crm/leads$                modules/crm/qualificacao_leads.php      [L,QSA]
-RewriteRule ^crm/resultados$           modules/crm/leads_resultados.php        [L,QSA]
 
 # Rota raiz → login
 RewriteRule ^$                         modules/login/login.php                 [L,QSA]

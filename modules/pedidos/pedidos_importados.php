@@ -51,11 +51,6 @@ function piFmtDate(?string $value): string
     return $ts ? date('d/m/Y', $ts) : $value;
 }
 
-function piFmtMoney($value): string
-{
-    return 'R$ ' . number_format((float) $value, 2, ',', '.');
-}
-
 function piBaseUrl(): string
 {
     return '/vendas';
@@ -105,8 +100,6 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'itens') {
                 p.PRO_CATEGORIA  AS categoria,
                 iv.IV_QTDE       AS qtd,
                 iv.IV_UNIDADE    AS unidade,
-                iv.IV_VLR_UNIT   AS valor_unit,
-                iv.IV_TOTAL      AS total_produto,
                 iv.IV_STATUS     AS status,
                 iv.IV_OBS        AS obs
             FROM ITENS_VENDAS iv
@@ -165,7 +158,7 @@ if ($filters['pedido'] !== '') {
     $params[':ped'] = '%' . $filters['pedido'] . '%';
 }
 if ($filters['cliente'] !== '') {
-    $where[] = '(v.VEN_FANTASIA LIKE :cli OR v.VEN_CLIENTE LIKE :cli)';
+    $where[] = '(c.CLI_FANTASIA LIKE :cli OR c.CLI_NOME LIKE :cli)';
     $params[':cli'] = '%' . $filters['cliente'] . '%';
 }
 if ($filters['representante'] !== '') {
@@ -194,11 +187,10 @@ $stmt = $pdo->prepare("
     SELECT
         v.VEN_CODIGO AS ven_codigo,
         v.VEN_CODIGO_YZIDRO                                                      AS pedido,
-        COALESCE(NULLIF(v.VEN_FANTASIA,''), v.VEN_CLIENTE)                       AS cliente,
+        COALESCE(NULLIF(c.CLI_FANTASIA,''), c.CLI_NOME)                          AS cliente,
         v.VEN_REPRESENTANTE                                                      AS representante,
         v.VEN_EMISSAO                                                            AS dataemissao,
         v.VEN_ENTREGA                                                            AS datafatura,
-        v.VEN_TOTAL                                                              AS total_pedido,
         v.VEN_PRAZO_DIAS                                                         AS prazo_dias,
         COUNT(iv.IV_CODIGO)                                                      AS qtd_itens,
         SUM(CASE WHEN iv.IV_STATUS = 'Finalizado'          THEN 1 ELSE 0 END)   AS qtd_fin,
@@ -209,6 +201,7 @@ $stmt = $pdo->prepare("
         MAX(iv.IV_QTDE) AS max_qtde
     FROM VENDAS v
     LEFT JOIN ITENS_VENDAS iv ON iv.VEN_CODIGO = v.VEN_CODIGO
+    LEFT JOIN CLIENTES c ON c.CLI_CODIGO = v.CLI_CODIGO
     WHERE {$whereStr}
     GROUP BY v.VEN_CODIGO
     {$having}
@@ -218,8 +211,6 @@ $stmt->execute($params);
 $vendas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 $totalVendas = count($vendas);
-$totalFaturado = array_reduce($vendas, fn ($c, $r) => $c + (float) ($r['total_pedido'] ?? 0), 0.0);
-$ticketMedio = $totalVendas > 0 ? $totalFaturado / $totalVendas : 0.0;
 $totalFin = count(array_filter($vendas, fn ($r) => (int) $r['qtd_itens'] > 0 && (int) $r['qtd_fin'] === (int) $r['qtd_itens']));
 $totalAndamento = $totalVendas - $totalFin;
 ?>
@@ -427,26 +418,6 @@ $totalAndamento = $totalVendas - $totalFin;
           <div class="kpi-value"><?= number_format($totalVendas, 0, ',', '.') ?></div>
           <div class="kpi-footer">no período filtrado</div>
         </div>
-        <div class="kpi-card teal">
-          <div class="kpi-header">
-            <span class="kpi-label">Valor total</span>
-            <div class="kpi-icon">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            </div>
-          </div>
-          <div class="kpi-value" style="font-size:22px;letter-spacing:-.5px"><?= piEscape(piFmtMoney($totalFaturado)) ?></div>
-          <div class="kpi-footer">soma dos pedidos listados</div>
-        </div>
-        <div class="kpi-card amber">
-          <div class="kpi-header">
-            <span class="kpi-label">Ticket médio</span>
-            <div class="kpi-icon">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            </div>
-          </div>
-          <div class="kpi-value" style="font-size:22px;letter-spacing:-.5px"><?= piEscape(piFmtMoney($ticketMedio)) ?></div>
-          <div class="kpi-footer">por pedido</div>
-        </div>
         <div class="kpi-card green">
           <div class="kpi-header">
             <span class="kpi-label">Finalizados</span>
@@ -545,7 +516,6 @@ $totalAndamento = $totalVendas - $totalFin;
                 <th>Entrega</th>
                 <th>Representante</th>
                 <th class="pi-right">Itens</th>
-                <th class="pi-right">Total</th>
                 <th>Prazo produção</th>
                 <th>Tipo</th>
                 <th>Situação</th>
@@ -554,7 +524,7 @@ $totalAndamento = $totalVendas - $totalFin;
             <tbody>
               <?php if (!$vendas): ?>
                 <tr>
-                  <td colspan="10">
+                  <td colspan="9">
                     <div class="pi-empty-state">Nenhum pedido encontrado. Importe pedidos do ERP primeiro.</div>
                   </td>
                 </tr>
@@ -597,7 +567,6 @@ $totalAndamento = $totalVendas - $totalFin;
                         data-pedido="<?= piEscape($pedido) ?>"
                         data-cliente="<?= piEscape($row['cliente'] ?? '—') ?>"
                         data-rep="<?= piEscape($row['representante'] ?? '—') ?>"
-                        data-total="<?= piEscape(piFmtMoney($row['total_pedido'] ?? 0)) ?>"
                         aria-expanded="false"
                         title="Ver itens"
                       >+</button>
@@ -608,7 +577,6 @@ $totalAndamento = $totalVendas - $totalFin;
                     <td class="pi-nowrap"><?= piEscape(piFmtDate($row['datafatura'] ?? '')) ?></td>
                     <td class="pi-nowrap"><?= piEscape($row['representante'] ?? '—') ?></td>
                     <td class="pi-num"><?= $qtdItens ?></td>
-                    <td class="pi-money"><?= piEscape(piFmtMoney($row['total_pedido'] ?? 0)) ?></td>
                     <td>
                       <?php $prazoDias = $row['prazo_dias'] !== null ? (int) $row['prazo_dias'] : ''; ?>
                       <div class="prazo-wrap">
@@ -629,14 +597,13 @@ $totalAndamento = $totalVendas - $totalFin;
                     <td><span class="sit-badge <?= $sitClass ?>"><?= piEscape($sitLabel) ?></span></td>
                   </tr>
                   <tr id="<?= piEscape($detailId) ?>" class="pi-detail-row">
-                    <td colspan="10" class="pi-detail-cell">
+                    <td colspan="9" class="pi-detail-cell">
                       <div class="pi-detail-box">
                         <div class="pi-detail-head">
                           <h3>Itens do pedido <?= piEscape($pedido) ?></h3>
                           <div class="pi-detail-chips">
                             <span class="pi-chip"><?= piEscape($row['cliente'] ?? '—') ?></span>
                             <span class="pi-chip"><?= piEscape($row['representante'] ?? '—') ?></span>
-                            <span class="pi-chip"><?= piEscape(piFmtMoney($row['total_pedido'] ?? 0)) ?></span>
                           </div>
                         </div>
                         <div class="pi-detail-content">
@@ -660,9 +627,6 @@ $totalAndamento = $totalVendas - $totalFin;
   const baseUrl       = <?= json_encode(piBaseUrl(), JSON_UNESCAPED_SLASHES) ?>;
   const currentParams = new URLSearchParams(window.location.search);
 
-  function moneyBR(v) {
-    return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  }
   function qtyBR(v) {
     return Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 3 });
   }
@@ -715,8 +679,6 @@ $totalAndamento = $totalVendas - $totalFin;
         <td><span class="cat-chip ${catClass(item.categoria)}">${escHtml(item.categoria || '—')}</span></td>
         <td>${tipoBadge(item.qtd)}</td>
         <td class="pi-right">${qtyBR(item.qtd)} ${escHtml(item.unidade || '')}</td>
-        <td class="pi-right pi-nowrap">${moneyBR(item.valor_unit)}</td>
-        <td class="pi-right pi-nowrap"><strong>${moneyBR(item.total_produto)}</strong></td>
         <td><span class="status-chip ${statusClass(item.status)}">${escHtml(item.status || '—')}</span></td>
         <td class="pi-obs">${escHtml(item.obs || '—')}</td>
       </tr>
@@ -730,8 +692,6 @@ $totalAndamento = $totalVendas - $totalFin;
             <th>Categoria PCP</th>
             <th>Tipo</th>
             <th class="pi-right">Qtd.</th>
-            <th class="pi-right">Valor unit.</th>
-            <th class="pi-right">Total</th>
             <th>Status produção</th>
             <th>Obs.</th>
           </tr>

@@ -103,7 +103,6 @@ try {
             // (ex: /pcp/pdf é gerado pelo relatório de produção, não tem entrada própria)
             $__child_coverage = [
                 '/relatorios/producao' => ['/pcp/pdf'],
-                '/pcp/producao'        => ['/pcp/pdf'],
             ];
             foreach ($__child_coverage as $__parent => $__children) {
                 if (in_array($__parent, $__perms_auth, true)) {

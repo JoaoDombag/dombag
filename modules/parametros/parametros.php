@@ -51,9 +51,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($aba === 'aparencia') {
         $tema = in_array($_POST['tema'] ?? '', ['claro', 'escuro']) ? $_POST['tema'] : 'claro';
         setParam($pdo, 'tema_sistema', $tema);
-    } elseif ($aba === 'crm') {
-        $gru_leads = (int)($_POST['gru_leads'] ?? 0);
-        setParam($pdo, 'crm_gru_leads', (string)$gru_leads);
     }
 
     $msg      = 'Parâmetros salvos com sucesso.';
@@ -66,13 +63,9 @@ $trello_key           = getParam($pdo, 'trello_api_key');
 $trello_token         = getParam($pdo, 'trello_token');
 $trello_default_board = getParam($pdo, 'trello_default_board');
 $tema                 = getParam($pdo, 'tema_sistema', 'claro');
-$gru_leads  = (int)getParam($pdo, 'crm_gru_leads', '0');
-
-$grupos_usuario = $pdo->query('SELECT GRU_CODIGO, GRU_NOME FROM GRUPO_USUARIO ORDER BY GRU_NOME')
-                      ->fetchAll(PDO::FETCH_ASSOC);
 
 $aba_ativa  = $_POST['aba'] ?? ($_GET['aba'] ?? 'integracoes');
-if (!in_array($aba_ativa, ['integracoes', 'aparencia', 'crm'])) $aba_ativa = 'integracoes';
+if (!in_array($aba_ativa, ['integracoes', 'aparencia'])) $aba_ativa = 'integracoes';
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -247,13 +240,6 @@ if (!in_array($aba_ativa, ['integracoes', 'aparencia', 'crm'])) $aba_ativa = 'in
             </svg>
             Aparência
           </button>
-          <button class="tab-btn <?= $aba_ativa === 'crm' ? 'active' : '' ?>"
-                  onclick="trocarAba('crm')" type="button">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1.5 7h13M10 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm7 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>
-            </svg>
-            CRM
-          </button>
         </div>
 
         <!-- ── Aba: Integrações ──────────────────────────────────────────── -->
@@ -416,37 +402,6 @@ if (!in_array($aba_ativa, ['integracoes', 'aparencia', 'crm'])) $aba_ativa = 'in
                     </div>
                   </label>
                 </div>
-              </div>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="btn-primary">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                  <polyline points="17 21 17 13 7 13 7 21"/>
-                  <polyline points="7 3 7 8 15 8"/>
-                </svg>
-                Salvar
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <!-- ── Aba: CRM ───────────────────────────────────────────────── -->
-        <div class="tab-pane <?= $aba_ativa === 'crm' ? 'active' : '' ?>" id="pane-crm">
-          <form method="POST">
-            <input type="hidden" name="aba" value="crm">
-            <div class="form-body">
-              <div class="field" style="max-width:360px;">
-                <label>Grupo de usuário para destinar leads</label>
-                <select name="gru_leads">
-                  <option value="0">— Nenhum —</option>
-                  <?php foreach ($grupos_usuario as $g): ?>
-                  <option value="<?= $g['GRU_CODIGO'] ?>"
-                          <?= $gru_leads === (int)$g['GRU_CODIGO'] ? 'selected' : '' ?>>
-                    <?= htmlspecialchars($g['GRU_NOME']) ?>
-                  </option>
-                  <?php endforeach; ?>
-                </select>
               </div>
             </div>
             <div class="form-actions">

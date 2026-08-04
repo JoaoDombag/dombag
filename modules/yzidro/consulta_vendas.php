@@ -34,11 +34,6 @@ function cvFmtDate(?string $value): string
     return $ts ? date('d/m/Y', $ts) : $value;
 }
 
-function cvFmtMoney($value): string
-{
-    return 'R$ ' . number_format((float) $value, 2, ',', '.');
-}
-
 function cvBaseUrl(): string
 {
     return '/yzidro/consulta';
@@ -212,8 +207,6 @@ try {
 pg_close($pg);
 
 $totalVendas = count($vendas);
-$totalFaturado = array_reduce($vendas, fn ($c, $r) => $c + (float) ($r['total_pedido'] ?? 0), 0.0);
-$ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -431,26 +424,6 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
           <div class="kpi-value"><?= number_format($totalVendas, 0, ',', '.') ?></div>
           <div class="kpi-footer">no período filtrado</div>
         </div>
-        <div class="kpi-card teal">
-          <div class="kpi-header">
-            <span class="kpi-label">Valor total exibido</span>
-            <div class="kpi-icon">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            </div>
-          </div>
-          <div class="kpi-value" style="font-size:22px;letter-spacing:-.5px"><?= cvEscape(cvFmtMoney($totalFaturado)) ?></div>
-          <div class="kpi-footer">soma dos pedidos listados</div>
-        </div>
-        <div class="kpi-card amber">
-          <div class="kpi-header">
-            <span class="kpi-label">Ticket médio</span>
-            <div class="kpi-icon">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            </div>
-          </div>
-          <div class="kpi-value" style="font-size:22px;letter-spacing:-.5px"><?= cvEscape(cvFmtMoney($ticketMedio)) ?></div>
-          <div class="kpi-footer">por pedido</div>
-        </div>
       </div>
 
       <!-- Filtros -->
@@ -515,13 +488,12 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
                 <th>Faturamento</th>
                 <th>Representante</th>
                 <th class="cv-right">Itens</th>
-                <th class="cv-right">Total</th>
               </tr>
             </thead>
             <tbody>
               <?php if (!$vendas): ?>
                 <tr>
-                  <td colspan="7">
+                  <td colspan="6">
                     <div class="cv-empty-state">Nenhuma venda encontrada com os filtros informados.</div>
                   </td>
                 </tr>
@@ -547,17 +519,15 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
                     <td class="cv-nowrap"><?= cvEscape(cvFmtDate($row['datafatura'] ?? '')) ?></td>
                     <td class="cv-nowrap"><?= cvEscape($row['representante'] ?? '—') ?></td>
                     <td class="cv-num"><?= (int) ($row['qtd_itens'] ?? 0) ?></td>
-                    <td class="cv-money"><?= cvEscape(cvFmtMoney($row['total_pedido'] ?? 0)) ?></td>
                   </tr>
                   <tr id="<?= cvEscape($detailId) ?>" class="cv-detail-row">
-                    <td colspan="8" class="cv-detail-cell">
+                    <td colspan="7" class="cv-detail-cell">
                       <div class="cv-detail-box">
                         <div class="cv-detail-head">
                           <h3>Itens do pedido <?= cvEscape($pedido) ?></h3>
                           <div class="cv-detail-chips">
                             <span class="cv-chip"><?= cvEscape($row['cliente'] ?? '—') ?></span>
                             <span class="cv-chip"><?= cvEscape($row['representante'] ?? '—') ?></span>
-                            <span class="cv-chip"><?= cvEscape(cvFmtMoney($row['total_pedido'] ?? 0)) ?></span>
                           </div>
                         </div>
                         <div class="cv-detail-content">
@@ -580,10 +550,6 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
 <script>
   const currentParams = new URLSearchParams(window.location.search);
   const baseUrl = <?= json_encode(cvBaseUrl(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
-
-  function moneyBR(value) {
-    return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  }
 
   function qtyBR(value) {
     return Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -624,8 +590,6 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
         <td>${groupBadge(item.grupo, item.produto)}</td>
         <td class="cv-right">${qtyBR(item.qtd)}</td>
         <td>${escapeHtml(item.unidade || '—')}</td>
-        <td class="cv-right nowrap">${moneyBR(item.valor_unit)}</td>
-        <td class="cv-right nowrap"><strong>${moneyBR(item.total_produto)}</strong></td>
         <td>${escapeHtml(item.status_pedido || '—')}</td>
         <td class="cv-obs">${escapeHtml(item.obs || '—')}</td>
       </tr>
@@ -639,8 +603,6 @@ $ticketMedio = $totalVendas > 0 ? ($totalFaturado / $totalVendas) : 0.0;
             <th>Grupo</th>
             <th class="cv-right">Qtd.</th>
             <th>Un.</th>
-            <th class="cv-right">Valor unit.</th>
-            <th class="cv-right">Total</th>
             <th>Status</th>
             <th>Obs.</th>
           </tr>

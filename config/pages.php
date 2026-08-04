@@ -44,18 +44,6 @@ $DOMBAG_GRUPOS = [
         'admin_only' => false,
         'icon'       => '<path d="M11 10.27 7 3.34"/><path d="m11 13.73-4 6.93"/><path d="M12 22v-2"/><path d="M12 2v2"/><path d="M14 12h8"/><path d="m17 20.66-1-1.73"/><path d="m17 3.34-1 1.73"/><path d="M2 12h2"/><path d="m20.66 17-1.73-1"/><path d="m20.66 7-1.73 1"/><path d="m3.34 17 1.73-1"/><path d="m3.34 7 1.73 1"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="12" r="8"/>',
     ],
-    'financeiro' => [
-        'label'      => 'Financeiro',
-        'tooltip'    => 'Financeiro',
-        'admin_only' => false,
-        'icon'       => '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>',
-    ],
-    'crm' => [
-        'label'      => 'CRM',
-        'tooltip'    => 'CRM',
-        'admin_only' => false,
-        'icon'       => '<path d="M13.354 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14v6a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341l1.218-1.348"/><path d="M16 6h6"/><path d="M19 3v6"/>',
-    ],
     'trello' => [
         'label'      => 'Trello',
         'tooltip'    => 'Trello',
@@ -140,30 +128,19 @@ $DOMBAG_PAGINAS = [
     ['href' => '/yzidro/producao',   'label' => 'Produção (por setor)',    'grupo' => 'yzidro', 'menu' => true,  'publico' => false],
 
     // ── Produção ──────────────────────────────────────────────────────────────
-    ['href' => '/pcp/reuniao',     'label' => 'Reunião de Planejamento', 'grupo' => 'producao', 'menu' => true,  'publico' => false],
-    ['href' => '/pcp/kanban',      'label' => 'Kanban de Pedidos',       'grupo' => 'producao', 'menu' => true,  'publico' => false],
     ['href' => '/pcp/planejamento','label' => 'Planejamento',            'grupo' => 'producao', 'menu' => true,  'publico' => false],
+    ['href' => '/pcp/reuniao',     'label' => 'Reunião de Planejamento', 'grupo' => 'producao', 'menu' => true,  'publico' => false],
     ['href' => '/pcp/ordens',      'label' => 'Ordens de Produção',      'grupo' => 'producao', 'menu' => true,  'publico' => false],
-    ['href' => '/pcp/programacao', 'label' => 'Programação Diária',      'grupo' => 'producao', 'menu' => true,  'publico' => false],
-    ['href' => '/pcp/producao',    'label' => 'Produção',                'grupo' => 'producao', 'menu' => true,  'publico' => false],
     ['href' => '/pcp/pdf',         'label' => 'PDF de Produção',         'grupo' => 'producao', 'menu' => false, 'publico' => false],
     ['href' => '/pcp/monitor',     'label' => 'Monitor de Máquinas',     'grupo' => 'producao', 'menu' => true,  'publico' => false],
+    ['href' => '/pcp/tempo-real',  'label' => 'Produção em Tempo Real',  'grupo' => 'producao', 'menu' => true,  'publico' => false],
+    ['href' => '/pcp/painel-ops',  'label' => 'Painel de OPs',           'grupo' => 'producao', 'menu' => true,  'publico' => false],
+    ['href' => '/pcp/painel-funcionarios', 'label' => 'Produção por Funcionário', 'grupo' => 'producao', 'menu' => true, 'publico' => false],
+    ['href' => '/pcp/painel-funcionarios-pdf', 'label' => 'Relatório de Funcionários (PDF)', 'grupo' => 'producao', 'menu' => false, 'publico' => false],
 
     // ── Máquinas ──────────────────────────────────────────────────────────────
     ['href' => '/maquinas',           'label' => 'Máquinas',             'grupo' => 'maquinas', 'menu' => true,  'publico' => false],
-    ['href' => '/maquinas/cadastro',  'label' => 'Cadastro de Máquinas', 'grupo' => 'maquinas', 'menu' => false, 'publico' => false],
     ['href' => '/pcp/fila',           'label' => 'Fila de Máquinas',     'grupo' => 'maquinas', 'menu' => true,  'publico' => false],
-
-    // ── Financeiro ────────────────────────────────────────────────────────────
-    ['href' => '/financeiro',              'label' => 'Dashboard Financeiro', 'grupo' => 'financeiro', 'menu' => true, 'publico' => false],
-    ['href' => '/financeiro/receber',      'label' => 'Contas a Receber',     'grupo' => 'financeiro', 'menu' => true, 'publico' => false],
-    ['href' => '/financeiro/pagar',        'label' => 'Contas a Pagar',       'grupo' => 'financeiro', 'menu' => true, 'publico' => false],
-    ['href' => '/financeiro/baixas-pagar', 'label' => 'Baixas a Pagar',       'grupo' => 'financeiro', 'menu' => true, 'publico' => false],
-    ['href' => '/financeiro/fluxo',        'label' => 'Fluxo de Caixa',       'grupo' => 'financeiro', 'menu' => true, 'publico' => false],
-
-    // ── CRM ───────────────────────────────────────────────────────────────────
-    ['href' => '/crm/leads',      'label' => 'Leads do Webhook',  'grupo' => 'crm', 'menu' => true, 'publico' => false],
-    ['href' => '/crm/resultados', 'label' => 'Prospecção com IA', 'grupo' => 'crm', 'menu' => true, 'publico' => false],
 
     // ── Trello ────────────────────────────────────────────────────────────────
     ['href' => '/trello', 'label' => 'Pedidos', 'grupo' => 'trello', 'menu' => true, 'publico' => false],
@@ -173,6 +150,7 @@ $DOMBAG_PAGINAS = [
     ['href' => '/relatorios/estoque-futuro',   'label' => 'Estoque Futuro',         'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
     ['href' => '/relatorios/posicao-estoque',  'label' => 'Posição de Estoque',     'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
     ['href' => '/relatorios/controle-estoque', 'label' => 'Controle de Estoque',    'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
+    ['href' => '/relatorios/analise-bag',      'label' => 'Análise de Apontamento', 'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
 
     // ── Usuários ──────────────────────────────────────────────────────────────
     ['href' => '/minha-senha',              'label' => 'Minha Senha',          'grupo' => 'usuarios', 'menu' => true,  'publico' => true,  'admin_only' => false],
