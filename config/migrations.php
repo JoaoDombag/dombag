@@ -153,6 +153,71 @@ function removercampotb(string $tabela, string $coluna): void
 }
 
 /**
+ * Adiciona uma chave única à tabela se ela ainda não existir (por nome).
+ *
+ * adicionarchaveunica('clientes', 'uq_cli_cnpj', 'cli_cnpj')
+ */
+function adicionarchaveunica(string $tabela, string $nomeChave, string $colunas): void
+{
+    $pdo = _migCtx('pdo');
+    $log = _migCtx('log');
+
+    $st = $pdo->prepare(
+        'SELECT COUNT(*) FROM information_schema.STATISTICS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?'
+    );
+    $st->execute([$tabela, $nomeChave]);
+
+    $sql = "ALTER TABLE `{$tabela}` ADD UNIQUE KEY `{$nomeChave}` ({$colunas})";
+
+    if ((int) $st->fetchColumn() > 0) {
+        $log[] = ['status' => 'skip', 'sql' => $sql, 'msg' => 'chave única já existe'];
+    } else {
+        $pdo->exec($sql);
+        $log[] = ['status' => 'ok', 'sql' => $sql, 'msg' => ''];
+    }
+
+    _migCtx('log', $log);
+}
+
+/**
+ * Adiciona uma foreign key à tabela se ela ainda não existir (por nome).
+ *
+ * adicionarfk('vendas', 'fk_ven_cliente', 'cli_codigo', 'clientes', 'cli_codigo', 'SET NULL', 'CASCADE')
+ */
+function adicionarfk(
+    string $tabela,
+    string $nomeFk,
+    string $coluna,
+    string $tabelaRef,
+    string $colunaRef,
+    string $onDelete = 'RESTRICT',
+    string $onUpdate = 'CASCADE'
+): void {
+    $pdo = _migCtx('pdo');
+    $log = _migCtx('log');
+
+    $st = $pdo->prepare(
+        'SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND CONSTRAINT_NAME = ?'
+    );
+    $st->execute([$tabela, $nomeFk]);
+
+    $sql = "ALTER TABLE `{$tabela}` ADD CONSTRAINT `{$nomeFk}` "
+         . "FOREIGN KEY (`{$coluna}`) REFERENCES `{$tabelaRef}` (`{$colunaRef}`) "
+         . "ON DELETE {$onDelete} ON UPDATE {$onUpdate}";
+
+    if ((int) $st->fetchColumn() > 0) {
+        $log[] = ['status' => 'skip', 'sql' => $sql, 'msg' => 'foreign key já existe'];
+    } else {
+        $pdo->exec($sql);
+        $log[] = ['status' => 'ok', 'sql' => $sql, 'msg' => ''];
+    }
+
+    _migCtx('log', $log);
+}
+
+/**
  * Executa SQL livre (CREATE TABLE, INSERT de dados iniciais, etc.).
  * Não verifica idempotência — use IF NOT EXISTS ou lógica própria.
  *
