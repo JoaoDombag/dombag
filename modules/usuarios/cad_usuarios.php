@@ -46,7 +46,7 @@ try {
 } catch (Throwable) {}
 
 // ── Grupos para o select ─────────────────────────────────────────────────────
-$grupos_usu = $pdo->query('SELECT GRU_CODIGO, GRU_DESCRICAO FROM GRUPO_USUARIO ORDER BY GRU_DESCRICAO')
+$grupos_usu = $pdo->query("SELECT GRU_CODIGO, COALESCE(GRU_DESCRICAO, GRU_NOME) AS GRU_DESCRICAO FROM GRUPO_USUARIO ORDER BY GRU_DESCRICAO")
                   ->fetchAll(PDO::FETCH_ASSOC);
 $grupos_validos = array_column($grupos_usu, 'GRU_CODIGO');
 

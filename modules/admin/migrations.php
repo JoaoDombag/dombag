@@ -21,13 +21,13 @@ define('MIGRATIONS_DIR', $_SERVER['DOCUMENT_ROOT'] . '/migrations');
 $registros = [];
 try {
     $st = $pdo->query('
-        SELECT m.mig_id, m.mig_executado_em, s.mig_sql
+        SELECT m.MIG_ID, m.MIG_EXECUTADO_EM, s.MIG_SQL
         FROM DB_MIGRATIONS m
-        LEFT JOIN DB_MIGRATIONS_SQL s ON s.mig_id = m.mig_id
-        ORDER BY m.mig_executado_em
+        LEFT JOIN DB_MIGRATIONS_SQL s ON s.MIG_ID = m.MIG_ID
+        ORDER BY m.MIG_EXECUTADO_EM
     ');
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $registros[$r['mig_id']] = $r;
+        $registros[$r['MIG_ID']] = $r;
     }
 } catch (Throwable) {}
 
