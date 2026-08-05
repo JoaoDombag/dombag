@@ -167,11 +167,18 @@ function executarsql(string $sql): void
         $pdo->exec($sql);
         $log[] = ['status' => 'ok', 'sql' => $sql, 'msg' => ''];
     } catch (PDOException $e) {
+        $mysqlErrno = $e->errorInfo[1] ?? null;
+
         // MySQL 5.7/InnoDB bug: CREATE TABLE IF NOT EXISTS lança 1022 quando o nome
         // de uma FK constraint já existe no schema — tratar como skip, não como erro fatal.
         $isCreateIfNotExists = stripos($sql, 'CREATE TABLE IF NOT EXISTS') !== false
                             || stripos($sql, 'CREATE INDEX IF NOT EXISTS') !== false;
-        if ($isCreateIfNotExists && $e->getCode() === '23000') {
+
+        // ADD (UNIQUE) KEY/INDEX não tem sintaxe "IF NOT EXISTS" no MySQL: se o nome
+        // da chave já existe (1061), é sempre seguro tratar como skip idempotente.
+        $isDuplicateKeyName = $mysqlErrno === 1061;
+
+        if (($isCreateIfNotExists && $e->getCode() === '23000') || $isDuplicateKeyName) {
             $log[] = ['status' => 'skip', 'sql' => $sql, 'msg' => 'objeto já existe: ' . $e->getMessage()];
         } else {
             throw $e;
