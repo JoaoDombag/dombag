@@ -80,4 +80,19 @@ if (!function_exists('dbPDO')) {
 
         return $conn;
     }
+
+    // Tema visual do sistema (claro/escuro), configurado em Parâmetros do Sistema
+    // e aplicado globalmente — vale para todos os usuários.
+    function dombagTema(): string
+    {
+        static $tema = null;
+        if ($tema === null) {
+            $tema = 'escuro';
+            try {
+                $v = dbPDO()->query("SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = 'tema_sistema'")->fetchColumn();
+                if (in_array($v, ['claro', 'escuro'], true)) $tema = $v;
+            } catch (Throwable) {}
+        }
+        return $tema;
+    }
 }

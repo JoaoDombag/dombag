@@ -138,6 +138,9 @@ $DOMBAG_PAGINAS = [
     ['href' => '/pcp/painel-ops',  'label' => 'Painel de OPs',           'grupo' => 'producao', 'menu' => true,  'publico' => false],
     ['href' => '/pcp/painel-funcionarios', 'label' => 'Produção por Funcionário', 'grupo' => 'producao', 'menu' => true, 'publico' => false],
     ['href' => '/pcp/painel-funcionarios-pdf', 'label' => 'Relatório de Funcionários (PDF)', 'grupo' => 'producao', 'menu' => false, 'publico' => false],
+    ['href' => '/pcp/bi',                  'label' => 'BI da Produção',           'grupo' => 'producao', 'menu' => true,  'publico' => false],
+    ['href' => '/pcp/bi-celulas',          'label' => 'BI Células',               'grupo' => 'producao', 'menu' => true,  'publico' => false],
+    ['href' => '/pcp/celulas',             'label' => 'Cadastro de Células',      'grupo' => 'producao', 'menu' => true,  'publico' => false],
 
     // ── Máquinas ──────────────────────────────────────────────────────────────
     ['href' => '/maquinas',           'label' => 'Máquinas',             'grupo' => 'maquinas', 'menu' => true,  'publico' => false],

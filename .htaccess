@@ -64,6 +64,9 @@ RewriteRule ^pcp/tempo-real$           modules/pcp/tempo_real.php               
 RewriteRule ^pcp/painel-ops$           modules/pcp/painel_ops.php                [L,QSA]
 RewriteRule ^pcp/painel-funcionarios$  modules/pcp/painel_funcionarios.php       [L,QSA]
 RewriteRule ^pcp/painel-funcionarios-pdf$ modules/pcp/painel_funcionarios_pdf.php [L,QSA]
+RewriteRule ^pcp/bi$                   modules/pcp/bi_producao.php              [L,QSA]
+RewriteRule ^pcp/bi-celulas$           modules/pcp/bi_celulas.php                [L,QSA]
+RewriteRule ^pcp/celulas$              modules/pcp/celulas.php                  [L,QSA]
 
 # Relatórios
 RewriteRule ^relatorios/producao$          modules/relatorios/rel_producao.php         [L,QSA]
