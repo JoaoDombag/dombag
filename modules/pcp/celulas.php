@@ -5,7 +5,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  DOMBAG — Cadastro de Células de Produção
-//  Cada célula agrupa funcionários (ERP) para exibir a produção somada no BI.
+//  Cada célula agrupa centros de trabalho (ERP) para exibir a produção somada no BI.
 // ══════════════════════════════════════════════════════════════════════════════
 
 const CEL_META_CHAVE = 'meta_diaria_celula';
@@ -15,9 +15,9 @@ $pg  = dbPG();
 $msg = '';
 $msg_tipo = '';
 
-function celFuncionariosDaCelula(PDO $pdo, int $cel): array
+function celCentrosDaCelula(PDO $pdo, int $cel): array
 {
-    $st = $pdo->prepare('SELECT FU_CODIGO FROM CELULA_FUNCIONARIO WHERE CEL_CODIGO = :c');
+    $st = $pdo->prepare('SELECT CT_CODIGO FROM CELULA_CENTRO_TRABALHO WHERE CEL_CODIGO = :c');
     $st->execute([':c' => $cel]);
     return array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
 }
@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($acao === 'criar' || $acao === 'editar') {
         $cod  = (int) ($_POST['cod'] ?? 0);
         $nome = trim($_POST['nome'] ?? '');
-        $funcionarios = array_map('intval', $_POST['funcionarios'] ?? []);
+        $centros = array_map('intval', $_POST['centros'] ?? []);
 
         if (!$nome) {
             $msg = 'Informe o nome da célula.';
@@ -66,11 +66,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ->execute([':n' => $nome, ':c' => $cod]);
                 }
 
-                $pdo->prepare('DELETE FROM CELULA_FUNCIONARIO WHERE CEL_CODIGO = :c')->execute([':c' => $cod]);
-                if ($funcionarios) {
-                    $ins = $pdo->prepare('INSERT INTO CELULA_FUNCIONARIO (CEL_CODIGO, FU_CODIGO) VALUES (:c, :f)');
-                    foreach (array_unique($funcionarios) as $fu) {
-                        $ins->execute([':c' => $cod, ':f' => $fu]);
+                $pdo->prepare('DELETE FROM CELULA_CENTRO_TRABALHO WHERE CEL_CODIGO = :c')->execute([':c' => $cod]);
+                if ($centros) {
+                    $ins = $pdo->prepare('INSERT INTO CELULA_CENTRO_TRABALHO (CEL_CODIGO, CT_CODIGO) VALUES (:c, :t)');
+                    foreach (array_unique($centros) as $ct) {
+                        $ins->execute([':c' => $cod, ':t' => $ct]);
                     }
                 }
 
@@ -79,9 +79,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $msg_tipo = 'ok';
             } catch (PDOException $e) {
                 $pdo->rollBack();
-                $msg = $e->getCode() === '23000'
-                    ? 'Já existe uma célula com esse nome.'
-                    : 'Erro ao salvar célula: ' . $e->getMessage();
+                if ($e->getCode() === '23000') {
+                    $msg = str_contains($e->getMessage(), 'UQ_CELCT_CT')
+                        ? 'Um dos centros de trabalho selecionados já pertence a outra célula.'
+                        : 'Já existe uma célula com esse nome.';
+                } else {
+                    $msg = 'Erro ao salvar célula: ' . $e->getMessage();
+                }
                 $msg_tipo = 'err';
             }
         }
@@ -111,30 +115,46 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $metaDiaria = celFetchMeta($pdo);
 
-// ── Lista de funcionários do ERP (para o multi-select) ────────────────────────
-$funcionariosErp = [];
+// ── Lista de centros de trabalho do ERP (para o multi-select) ─────────────────
+$centrosErp = [];
 if ($pg) {
-    $res = @pg_query($pg, 'SELECT FU_CODIGO, FU_NOME FROM FUNCIONARIO ORDER BY FU_NOME');
+    $res = @pg_query($pg, "
+        SELECT CT_CODIGO, CT_DESCRICAO
+          FROM CENTRO_TRABALHO
+         WHERE CT_DESCRICAO ILIKE '%analise%'
+            OR CT_DESCRICAO ILIKE '%análise%'
+         ORDER BY CT_DESCRICAO
+    ");
     if ($res) {
-        $funcionariosErp = pg_fetch_all($res) ?: [];
+        $centrosErp = pg_fetch_all($res) ?: [];
         pg_free_result($res);
     }
 }
 $nomesPorCodigo = [];
-foreach ($funcionariosErp as $f) {
-    $nomesPorCodigo[(int) $f['fu_codigo']] = $f['fu_nome'];
+foreach ($centrosErp as $f) {
+    $nomesPorCodigo[(int) $f['ct_codigo']] = $f['ct_descricao'];
 }
 
-// ── Lista de células com seus funcionários ─────────────────────────────────────
+// ── Lista de células com seus centros de trabalho ─────────────────────────────
 try {
     $celulas = $pdo->query('SELECT CEL_CODIGO, CEL_NOME FROM CELULA_PRODUCAO ORDER BY CEL_NOME')->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable) {
     $celulas = [];
 }
 foreach ($celulas as &$c) {
-    $c['funcionarios'] = celFuncionariosDaCelula($pdo, (int) $c['CEL_CODIGO']);
+    $c['centros'] = celCentrosDaCelula($pdo, (int) $c['CEL_CODIGO']);
 }
 unset($c);
+
+// ── Mapa CT_CODIGO → célula dona (um CT só pode estar em uma célula) ──────────
+$ctDonoCel  = [];  // CT_CODIGO => CEL_CODIGO
+$ctDonoNome = [];  // CT_CODIGO => CEL_NOME
+foreach ($celulas as $c) {
+    foreach ($c['centros'] as $ct) {
+        $ctDonoCel[$ct]  = (int) $c['CEL_CODIGO'];
+        $ctDonoNome[$ct] = $c['CEL_NOME'];
+    }
+}
 
 $total = count($celulas);
 ?>
@@ -199,6 +219,10 @@ $total = count($celulas);
 .func-picker-item:has(input:checked){background:rgba(45,106,255,.1);}
 .func-picker-item:has(input:checked) span{color:var(--text-primary);font-weight:600;}
 .func-picker-empty{font-size:12px;color:var(--text-muted);text-align:center;padding:16px 0;}
+.func-item-dono{font-size:10.5px;color:var(--text-muted);font-style:normal;white-space:nowrap;flex-shrink:0;}
+.func-picker-item.is-locked{opacity:.5;cursor:not-allowed;}
+.func-picker-item.is-locked input{cursor:not-allowed;}
+.func-picker-item.is-locked .func-item-dono{color:#fbbf24;}
 </style>
 </head>
 <body>
@@ -210,7 +234,7 @@ $total = count($celulas);
       <div class="topbar-left">
         <div class="page-title">
           <h1>Cadastro de Células</h1>
-          <p>Agrupe funcionários em células para acompanhar a produção somada no BI</p>
+          <p>Agrupe centros de trabalho em células para acompanhar a produção somada no BI</p>
         </div>
       </div>
       <div class="topbar-actions">
@@ -245,7 +269,7 @@ $total = count($celulas);
       <?php if (!$pg): ?>
       <div class="alert-error">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        Não foi possível conectar ao banco de dados do ERP (PostgreSQL) para listar os funcionários.
+        Não foi possível conectar ao banco de dados do ERP (PostgreSQL) para listar os centros de trabalho.
       </div>
       <?php endif; ?>
 
@@ -284,7 +308,7 @@ $total = count($celulas);
               <tr>
                 <th>Código</th>
                 <th>Nome</th>
-                <th>Funcionários</th>
+                <th>Centros de Trabalho</th>
                 <th>Operações</th>
               </tr>
             </thead>
@@ -294,12 +318,12 @@ $total = count($celulas);
               <td class="td-muted">#<?= (int) $c['CEL_CODIGO'] ?></td>
               <td style="font-weight:600;"><?= htmlspecialchars($c['CEL_NOME']) ?></td>
               <td>
-                <?php if (empty($c['funcionarios'])): ?>
-                  <span class="func-chip-empty">Nenhum funcionário</span>
+                <?php if (empty($c['centros'])): ?>
+                  <span class="func-chip-empty">Nenhum centro de trabalho</span>
                 <?php else: ?>
                   <div class="func-chip-list">
-                    <?php foreach ($c['funcionarios'] as $fu): ?>
-                      <span class="func-chip"><?= htmlspecialchars($nomesPorCodigo[$fu] ?? ('#' . $fu)) ?></span>
+                    <?php foreach ($c['centros'] as $ct): ?>
+                      <span class="func-chip"><?= htmlspecialchars($nomesPorCodigo[$ct] ?? ('#' . $ct)) ?></span>
                     <?php endforeach; ?>
                   </div>
                 <?php endif; ?>
@@ -307,7 +331,7 @@ $total = count($celulas);
               <td>
                 <div class="td-actions">
                   <button class="btn-sm btn-sm-edit"
-                          onclick='abrirModalEditar(<?= (int) $c['CEL_CODIGO'] ?>, <?= json_encode($c['CEL_NOME']) ?>, <?= json_encode($c['funcionarios']) ?>)'>
+                          onclick='abrirModalEditar(<?= (int) $c['CEL_CODIGO'] ?>, <?= json_encode($c['CEL_NOME']) ?>, <?= json_encode($c['centros']) ?>)'>
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     Editar
                   </button>
@@ -334,7 +358,7 @@ $total = count($celulas);
 <div class="modal-overlay" id="modalForm">
   <div class="modal-box">
     <h3 id="modalFormTitulo">Nova Célula</h3>
-    <p>Dê um nome à célula e marque os funcionários que fazem parte dela.</p>
+    <p>Dê um nome à célula e marque os centros de trabalho que fazem parte dela.</p>
     <form method="POST" id="frmForm" onsubmit="return validarForm()">
       <input type="hidden" name="acao" id="frmAcao" value="criar">
       <input type="hidden" name="cod" id="frmCod" value="">
@@ -345,17 +369,21 @@ $total = count($celulas);
                maxlength="100" required autocomplete="off">
       </div>
       <div class="field" style="margin-top:14px;">
-        <label>Funcionários</label>
-        <input type="text" class="func-picker-search" id="funcSearch" placeholder="Buscar funcionário..." autocomplete="off">
-        <div class="func-picker-count"><strong id="funcSelectedCount">0</strong> funcionário(s) selecionado(s)</div>
+        <label>Centros de Trabalho</label>
+        <input type="text" class="func-picker-search" id="funcSearch" placeholder="Buscar centro de trabalho..." autocomplete="off">
+        <div class="func-picker-count"><strong id="funcSelectedCount">0</strong> centro(s) de trabalho selecionado(s)</div>
         <div class="func-picker" id="funcPicker">
-          <?php if (empty($funcionariosErp)): ?>
-            <div class="func-picker-empty">Nenhum funcionário encontrado no ERP.</div>
+          <?php if (empty($centrosErp)): ?>
+            <div class="func-picker-empty">Nenhum centro de trabalho encontrado no ERP.</div>
           <?php else: ?>
-            <?php foreach ($funcionariosErp as $f): ?>
-              <label class="func-picker-item" data-nome="<?= htmlspecialchars(mb_strtolower($f['fu_nome'])) ?>">
-                <input type="checkbox" name="funcionarios[]" value="<?= (int) $f['fu_codigo'] ?>" class="func-checkbox">
-                <span><?= htmlspecialchars($f['fu_nome']) ?></span>
+            <?php foreach ($centrosErp as $f): $ctc = (int) $f['ct_codigo']; ?>
+              <label class="func-picker-item"
+                     data-nome="<?= htmlspecialchars(mb_strtolower($f['ct_descricao'])) ?>"
+                     data-dono="<?= (int) ($ctDonoCel[$ctc] ?? 0) ?>"
+                     data-dono-nome="<?= htmlspecialchars($ctDonoNome[$ctc] ?? '') ?>">
+                <input type="checkbox" name="centros[]" value="<?= $ctc ?>" class="func-checkbox">
+                <span><?= htmlspecialchars($f['ct_descricao']) ?></span>
+                <em class="func-item-dono"></em>
               </label>
             <?php endforeach; ?>
           <?php endif; ?>
@@ -405,6 +433,21 @@ document.getElementById('funcPicker').addEventListener('change', e => {
   if (e.target.classList.contains('func-checkbox')) atualizarContadorFuncionarios();
 });
 
+// ── Bloqueia centros de trabalho que já pertencem a outra célula ────────────
+function aplicarBloqueioCentros(celAtual) {
+  celAtual = Number(celAtual) || 0;
+  document.querySelectorAll('#funcPicker .func-picker-item').forEach(item => {
+    const dono = Number(item.dataset.dono) || 0;
+    const cb = item.querySelector('.func-checkbox');
+    const tag = item.querySelector('.func-item-dono');
+    const bloqueado = dono !== 0 && dono !== celAtual;
+    item.classList.toggle('is-locked', bloqueado);
+    cb.disabled = bloqueado;
+    if (bloqueado) { cb.checked = false; tag.textContent = '● ' + (item.dataset.donoNome || 'outra célula'); }
+    else { tag.textContent = ''; }
+  });
+}
+
 function abrirModalCriar() {
   document.getElementById('modalFormTitulo').textContent = 'Nova Célula';
   document.getElementById('frmAcao').value = 'criar';
@@ -412,6 +455,7 @@ function abrirModalCriar() {
   document.getElementById('frmNome').value = '';
   document.getElementById('funcSearch').value = '';
   limparSelecaoFuncionarios();
+  aplicarBloqueioCentros(0);
   filtrarFuncionarios();
   document.getElementById('modalForm').classList.add('open');
   document.getElementById('frmNome').focus();
@@ -424,6 +468,7 @@ function abrirModalEditar(cod, nome, funcionarios) {
   document.getElementById('frmNome').value = nome;
   document.getElementById('funcSearch').value = '';
   limparSelecaoFuncionarios();
+  aplicarBloqueioCentros(cod);
   const set = new Set((funcionarios || []).map(Number));
   document.querySelectorAll('.func-checkbox').forEach(cb => {
     cb.checked = set.has(Number(cb.value));

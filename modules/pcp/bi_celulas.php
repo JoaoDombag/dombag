@@ -25,7 +25,7 @@ function bicFetchMeta(PDO $pdo): float
     }
 }
 
-// ── Células cadastradas e seus funcionários (MySQL local) ────────────────────
+// ── Células cadastradas e seus centros de trabalho (MySQL local) ─────────────
 function bicFetchCelulas(PDO $pdo): array
 {
     try {
@@ -33,25 +33,34 @@ function bicFetchCelulas(PDO $pdo): array
     } catch (Throwable) {
         return [];
     }
-    $st = $pdo->prepare('SELECT FU_CODIGO FROM CELULA_FUNCIONARIO WHERE CEL_CODIGO = :c');
+    $st = $pdo->prepare('SELECT CT_CODIGO FROM CELULA_CENTRO_TRABALHO WHERE CEL_CODIGO = :c');
     foreach ($celulas as &$c) {
         $st->execute([':c' => (int) $c['CEL_CODIGO']]);
-        $c['funcionarios'] = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+        $c['centros'] = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
     }
     unset($c);
     return $celulas;
 }
 
-// ── Quantidade produzida hoje, por funcionário ───────────────────────────────
-function bicFetchFuncionariosHoje($pg): array
+// ── Produção e funcionários de hoje, por centro de trabalho ──────────────────
+//  Traz um par (CT, funcionário) por linha pra que a célula possa somar a
+//  produção dos seus CTs e contar os funcionários distintos que apontaram
+//  neles hoje.
+function bicFetchCentrosHoje($pg): array
 {
     $sql = "
-        SELECT FU_CODIGO, COALESCE(SUM(OIAP_QTD_PRODUZIDA), 0) AS QTD_PRODUZIDA
-          FROM OP_ITENS_ATIVIDADES_APONTADAS
-         WHERE NOT OIAP_EXCLUIDO
-           AND TRIM(OIAP_STATUS) <> 'C'
-           AND OIAP_DATA_HORA_INICIO::date = CURRENT_DATE
-         GROUP BY FU_CODIGO
+        SELECT IAA.CT_CODIGO
+              ,IAA.FU_CODIGO
+              ,CT.CT_DESCRICAO
+              ,F.FU_NOME
+              ,COALESCE(SUM(IAA.OIAP_QTD_PRODUZIDA), 0) AS QTD_PRODUZIDA
+          FROM OP_ITENS_ATIVIDADES_APONTADAS IAA
+          LEFT JOIN CENTRO_TRABALHO CT ON CT.CT_CODIGO = IAA.CT_CODIGO
+          LEFT JOIN FUNCIONARIO     F  ON F.FU_CODIGO  = IAA.FU_CODIGO
+         WHERE NOT IAA.OIAP_EXCLUIDO
+           AND TRIM(IAA.OIAP_STATUS) <> 'C'
+           AND IAA.OIAP_DATA_HORA_INICIO::date = CURRENT_DATE
+         GROUP BY IAA.CT_CODIGO, IAA.FU_CODIGO, CT.CT_DESCRICAO, F.FU_NOME
     ";
     $res = @pg_query($pg, $sql);
     if (!$res) {
@@ -62,29 +71,140 @@ function bicFetchFuncionariosHoje($pg): array
     return $rows;
 }
 
-// ── Produção de hoje agrupada por célula (soma dos funcionários da célula) ───
+// ── OPs com apontamento hoje, por centro de trabalho ────────────────────────
+//  EM_PRODUCAO = existe apontamento em aberto (sem data/hora fim) hoje.
+function bicFetchOpsHoje($pg): array
+{
+    $sql = "
+        SELECT IAA.CT_CODIGO
+              ,IAA.PROD_CODIGO
+              ,IAA.PRO_CODIGO
+              ,P.PRO_DESCRICAO
+              ,BOOL_OR(IAA.OIAP_DATA_HORA_FIM IS NULL) AS EM_PRODUCAO
+              ,COALESCE(SUM(IAA.OIAP_QTD_PRODUZIDA), 0) AS QTD_PRODUZIDA
+          FROM OP_ITENS_ATIVIDADES_APONTADAS IAA
+          LEFT JOIN PRODUTO P ON P.PRO_CODIGO = IAA.PRO_CODIGO
+         WHERE NOT IAA.OIAP_EXCLUIDO
+           AND TRIM(IAA.OIAP_STATUS) <> 'C'
+           AND IAA.OIAP_DATA_HORA_INICIO::date = CURRENT_DATE
+         GROUP BY IAA.CT_CODIGO, IAA.PROD_CODIGO, IAA.PRO_CODIGO, P.PRO_DESCRICAO
+    ";
+    $res = @pg_query($pg, $sql);
+    if (!$res) {
+        return [];
+    }
+    $rows = pg_fetch_all($res) ?: [];
+    pg_free_result($res);
+    return $rows;
+}
+
+// ── Descrição de todos os centros de trabalho (para listar CTs ociosos) ──────
+function bicFetchCentroNomes($pg): array
+{
+    $res = @pg_query($pg, 'SELECT CT_CODIGO, CT_DESCRICAO FROM CENTRO_TRABALHO');
+    if (!$res) {
+        return [];
+    }
+    $map = [];
+    foreach (pg_fetch_all($res) ?: [] as $r) {
+        $map[(int) $r['ct_codigo']] = $r['ct_descricao'];
+    }
+    pg_free_result($res);
+    return $map;
+}
+
+// ── Produção de hoje agrupada por célula (soma dos centros de trabalho) ──────
 function bicFetchProducaoPorCelula(PDO $pdo, $pg): array
 {
     $celulas = bicFetchCelulas($pdo);
     if (!$celulas) {
         return [];
     }
-    $qtdPorFu = [];
-    foreach (bicFetchFuncionariosHoje($pg) as $f) {
-        $qtdPorFu[(int) $f['fu_codigo']] = (float) $f['qtd_produzida'];
+    $nomesCt = bicFetchCentroNomes($pg);
+
+    // OPs com apontamento hoje, indexadas por CT.
+    $opsPorCt = [];
+    foreach (bicFetchOpsHoje($pg) as $o) {
+        $ct = (int) $o['ct_codigo'];
+        $opsPorCt[$ct][] = [
+            'prod_codigo'  => (int) $o['prod_codigo'],
+            'pro_codigo'   => (int) $o['pro_codigo'],
+            'descricao'    => $o['pro_descricao'] ?: '',
+            'em_producao'  => in_array($o['em_producao'], ['t', true, 1, '1'], true),
+            'qtd'          => (float) $o['qtd_produzida'],
+        ];
+    }
+
+    // Agrupa os apontamentos de hoje por CT: quantidade total e, dentro dele,
+    // a quantidade por funcionário — usado no detalhamento de cada card.
+    $porCt = [];
+    foreach (bicFetchCentrosHoje($pg) as $f) {
+        $ct = (int) $f['ct_codigo'];
+        $qtd = (float) $f['qtd_produzida'];
+        if (!isset($porCt[$ct])) {
+            $porCt[$ct] = ['nome' => $f['ct_descricao'] ?: ('CT ' . $ct), 'qtd' => 0.0, 'funcs' => []];
+        }
+        $porCt[$ct]['qtd'] += $qtd;
+        if ($f['fu_codigo'] !== null && $f['fu_codigo'] !== '') {
+            $fu = (int) $f['fu_codigo'];
+            if (!isset($porCt[$ct]['funcs'][$fu])) {
+                $porCt[$ct]['funcs'][$fu] = ['nome' => $f['fu_nome'] ?: ('#' . $fu), 'qtd' => 0.0];
+            }
+            $porCt[$ct]['funcs'][$fu]['qtd'] += $qtd;
+        }
     }
 
     $resultado = [];
     foreach ($celulas as $c) {
         $total = 0.0;
-        foreach ($c['funcionarios'] as $fu) {
-            $total += $qtdPorFu[$fu] ?? 0.0;
+        $funcs = [];               // fu_codigo => ['nome','qtd'] (somado entre CTs da célula)
+        $ops   = [];               // "prod|pro" => ['op','descricao','qtd','em_producao']
+        $centrosDetalhe = [];
+        foreach ($c['centros'] as $ct) {
+            foreach ($opsPorCt[$ct] ?? [] as $o) {
+                $k = $o['prod_codigo'] . '|' . $o['pro_codigo'];
+                if (!isset($ops[$k])) {
+                    $ops[$k] = [
+                        'op'          => $o['prod_codigo'],
+                        'descricao'   => $o['descricao'],
+                        'qtd'         => 0.0,
+                        'em_producao' => false,
+                    ];
+                }
+                $ops[$k]['qtd'] += $o['qtd'];
+                $ops[$k]['em_producao'] = $ops[$k]['em_producao'] || $o['em_producao'];
+            }
+            $info = $porCt[$ct] ?? null;
+            $qtdCt = $info['qtd'] ?? 0.0;
+            $total += $qtdCt;
+            $centrosDetalhe[] = [
+                'nome' => $info['nome'] ?? ($nomesCt[$ct] ?? ('CT ' . $ct)),
+                'qtd'  => $qtdCt,
+            ];
+            foreach ($info['funcs'] ?? [] as $fu => $fdata) {
+                if (!isset($funcs[$fu])) {
+                    $funcs[$fu] = ['nome' => $fdata['nome'], 'qtd' => 0.0];
+                }
+                $funcs[$fu]['qtd'] += $fdata['qtd'];
+            }
         }
+
+        usort($centrosDetalhe, static fn ($a, $b) => $b['qtd'] <=> $a['qtd']);
+        $funcsDetalhe = array_values($funcs);
+        usort($funcsDetalhe, static fn ($a, $b) => $b['qtd'] <=> $a['qtd']);
+        $opsDetalhe = array_values($ops);
+        // Em produção agora primeiro; depois por quantidade produzida hoje.
+        usort($opsDetalhe, static fn ($a, $b) => ($b['em_producao'] <=> $a['em_producao']) ?: ($b['qtd'] <=> $a['qtd']));
+
         $resultado[] = [
-            'cel_codigo'       => (int) $c['CEL_CODIGO'],
-            'cel_nome'         => $c['CEL_NOME'],
-            'qtd_produzida'    => $total,
-            'qtd_funcionarios' => count($c['funcionarios']),
+            'cel_codigo'         => (int) $c['CEL_CODIGO'],
+            'cel_nome'           => $c['CEL_NOME'],
+            'qtd_produzida'      => $total,
+            'qtd_centros'        => count($c['centros']),
+            'qtd_funcionarios'   => count($funcs),
+            'centros_detalhe'    => $centrosDetalhe,
+            'funcionarios_detalhe' => $funcsDetalhe,
+            'ops_detalhe'        => $opsDetalhe,
         ];
     }
     return $resultado;
@@ -192,6 +312,31 @@ if (!$pg) {
   .biz-cel-card { border: 1px solid var(--biz-border); border-radius: 14px; padding: 20px 22px; background: var(--biz-card2); display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; transition: border-color .15s, background .2s, box-shadow .2s; }
   .biz-cel-card:hover { border-color: rgba(88,214,201,.35); }
 
+  /* ── Poucas células: o card vira duas colunas — anel à esquerda e um painel
+     de detalhamento à direita (centros de trabalho e funcionários que
+     produziram hoje), aproveitando o espaço que antes ficava vazio. ── */
+  .biz-cel-card.has-detail { flex-direction: row; align-items: stretch; gap: 26px; padding: 22px 26px; }
+  .biz-cel-card.has-detail .biz-cel-left { flex: 0 0 44%; min-width: 0; display: flex; flex-direction: column; }
+  .biz-cel-left { display: contents; }
+
+  .biz-cel-detail { display: none; }
+  .biz-cel-card.has-detail .biz-cel-detail {
+    display: flex; flex-direction: column; gap: 18px; flex: 1 1 0; min-width: 0;
+    border-left: 1px solid var(--biz-border); padding-left: 26px; overflow: hidden;
+  }
+  .biz-cel-detail-sec { display: flex; flex-direction: column; min-height: 0; }
+  .biz-cel-detail-sec h4 { font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--biz-muted); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--biz-border); }
+  .biz-detail-list { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+  .biz-detail-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 2px; font-size: 15px; border-bottom: 1px solid rgba(255,255,255,.04); }
+  .biz-detail-row:last-child { border-bottom: 0; }
+  .biz-detail-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--biz-text); }
+  .biz-detail-row strong { flex: 0 0 auto; color: var(--biz-teal); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .biz-detail-empty { font-size: 13px; color: var(--biz-muted); padding: 6px 2px; }
+
+  .biz-op-row span { flex: 1 1 auto; }
+  .biz-op-live { flex: 0 0 auto; font-style: normal; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--biz-teal); display: inline-flex; align-items: center; gap: 5px; }
+  .biz-op-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--biz-teal); box-shadow: 0 0 0 0 rgba(88,214,201,.6); animation: bizPulse 1.8s infinite; }
+
   .biz-cel-head { text-align: center; flex: 0 0 auto; }
   .biz-cel-name { font-size: clamp(18px, 1.4vw, 26px); font-weight: 700; color: var(--biz-text); overflow-wrap: anywhere; }
   .biz-cel-sub { font-size: 14px; color: var(--biz-muted); margin-top: 2px; }
@@ -204,9 +349,9 @@ if (!$pg) {
   .biz-cel-ring-shape svg { width: 100%; height: 100%; display: block; overflow: visible; }
 
   .biz-cel-foot { flex: 0 0 auto; text-align: center; }
-  .biz-cel-nums { font-size: 15px; color: var(--biz-muted); }
+  .biz-cel-nums { font-size: 21px; color: var(--biz-muted); }
   .biz-cel-nums strong { color: var(--biz-text); font-weight: 700; font-variant-numeric: tabular-nums; }
-  .biz-cel-msg { margin-top: 6px; font-size: 14.5px; font-weight: 700; }
+  .biz-cel-msg { margin-top: 8px; font-size: 20px; font-weight: 700; }
   .biz-cel-msg.msg-hit    { color: #7db3ff; }
   .biz-cel-msg.msg-behind { color: var(--biz-muted); font-weight: 500; }
 
@@ -288,7 +433,7 @@ if (!$pg) {
 
       <div id="bizDashboard">
 
-        <!-- Produção por Célula — soma dos funcionários de cada célula, vs meta diária
+        <!-- Produção por Célula — soma dos centros de trabalho de cada célula, vs meta diária
              (a meta é definida em Cadastro de Células, não aqui — este painel é só leitura) -->
         <div class="biz-card" style="flex:1 1 auto; display:flex; flex-direction:column; min-height:0;">
           <div class="biz-card-head">
@@ -346,8 +491,8 @@ function biRenderGauge(svg, pct, hit) {
     </defs>
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="${sw}"/>
     ${fgCircle}
-    <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="#eef2f7" font-size="42" font-weight="800">${biFmt(pct, 0)}%</text>
-    <text x="${cx}" y="${cy + 26}" text-anchor="middle" fill="#8fa0b3" font-size="13" font-weight="600" letter-spacing="1">HOJE</text>
+    <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="#eef2f7" font-size="46" font-weight="800">${biFmt(pct, 0)}%</text>
+    <text x="${cx}" y="${cy + 26}" text-anchor="middle" fill="#8fa0b3" font-size="17" font-weight="700" letter-spacing="1.5">HOJE</text>
   `;
 }
 
@@ -366,21 +511,29 @@ function biRenderCelulas(celulas) {
     grid.innerHTML = '<div class="biz-empty-msg">Nenhuma célula cadastrada. Crie células em Cadastro de Células.</div>';
     return;
   }
-  grid.style.gridTemplateColumns = `repeat(${biCelulasCols(celulas.length)}, 1fr)`;
+  const cols = biCelulasCols(celulas.length);
+  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  // Até 2 colunas de cards (ou seja, até 4 células) os cards são largos o
+  // bastante pra mostrar o painel de detalhamento ao lado do anel; com mais
+  // colunas ficaria apertado demais.
+  const comDetalhe = cols <= 2;
   grid.innerHTML = celulas.map(c => {
     const hit = biMetaAtual > 0 && c.qtd_produzida >= biMetaAtual;
     const msg = biCelulaMensagem(c.qtd_produzida, hit);
     return `
-    <div class="biz-cel-card${hit ? ' biz-cel-hit' : ''}">
-      <div class="biz-cel-head">
-        <div class="biz-cel-name">${biEsc(c.cel_nome)}</div>
-        <div class="biz-cel-sub">${c.qtd_funcionarios} funcionário(s)</div>
+    <div class="biz-cel-card${hit ? ' biz-cel-hit' : ''}${comDetalhe ? ' has-detail' : ''}">
+      <div class="biz-cel-left">
+        <div class="biz-cel-head">
+          <div class="biz-cel-name">${biEsc(c.cel_nome)}</div>
+          <div class="biz-cel-sub">${c.qtd_funcionarios} funcionário(s) hoje</div>
+        </div>
+        <div class="biz-cel-ring-wrap"><div class="biz-cel-ring-shape"><svg class="biz-gauge"></svg></div></div>
+        <div class="biz-cel-foot">
+          <div class="biz-cel-nums">Produzido <strong>${biFmt(c.qtd_produzida, 0)}</strong> / Meta <strong>${biFmt(biMetaAtual, 0)}</strong></div>
+          ${msg ? `<div class="biz-cel-msg ${hit ? 'msg-hit' : 'msg-behind'}">${msg}</div>` : ''}
+        </div>
       </div>
-      <div class="biz-cel-ring-wrap"><div class="biz-cel-ring-shape"><svg class="biz-gauge"></svg></div></div>
-      <div class="biz-cel-foot">
-        <div class="biz-cel-nums">Produzido <strong>${biFmt(c.qtd_produzida, 0)}</strong> / Meta <strong>${biFmt(biMetaAtual, 0)}</strong></div>
-        ${msg ? `<div class="biz-cel-msg ${hit ? 'msg-hit' : 'msg-behind'}">${msg}</div>` : ''}
-      </div>
+      ${comDetalhe ? biCelulaDetalhe(c) : ''}
     </div>
   `;
   }).join('');
@@ -391,6 +544,48 @@ function biRenderCelulas(celulas) {
     const hit = biMetaAtual > 0 && c.qtd_produzida >= biMetaAtual;
     biRenderGauge(svgs[i], pct, hit);
   });
+}
+
+// ── Painel de detalhamento do card (só quando há espaço): produção de hoje
+// por centro de trabalho e por funcionário da célula. ──────────────────────
+function biCelulaLista(itens) {
+  if (!itens || !itens.length) {
+    return '<div class="biz-detail-empty">Sem apontamentos hoje.</div>';
+  }
+  return '<div class="biz-detail-list">' + itens.map(it => `
+    <div class="biz-detail-row"><span>${biEsc(it.nome)}</span><strong>${biFmt(it.qtd, 0)}</strong></div>
+  `).join('') + '</div>';
+}
+
+// ── Lista de OPs em produção / apontadas hoje na célula ─────────────────────
+function biCelulaOps(ops) {
+  if (!ops || !ops.length) {
+    return '<div class="biz-detail-empty">Nenhuma OP apontada hoje.</div>';
+  }
+  return '<div class="biz-detail-list">' + ops.map(o => {
+    const nome = 'OP ' + biFmt(o.op, 0) + (o.descricao ? ' — ' + o.descricao : '');
+    const tag = o.em_producao
+      ? '<em class="biz-op-live"><span class="biz-op-live-dot"></span>em produção</em>'
+      : '';
+    return `<div class="biz-detail-row biz-op-row">
+      <span>${biEsc(nome)}</span>${tag}<strong>${biFmt(o.qtd, 0)}</strong>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function biCelulaDetalhe(c) {
+  return `
+    <div class="biz-cel-detail">
+      <div class="biz-cel-detail-sec">
+        <h4>OPs na célula hoje</h4>
+        ${biCelulaOps(c.ops_detalhe)}
+      </div>
+      <div class="biz-cel-detail-sec">
+        <h4>Funcionários hoje</h4>
+        ${biCelulaLista(c.funcionarios_detalhe)}
+      </div>
+    </div>
+  `;
 }
 
 // ── Mensagem de incentivo: quanto falta pra bater a meta, ou o quanto passou

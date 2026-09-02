@@ -150,28 +150,6 @@ function biFetchHorasProdutivasMes($pg, int $ano, int $mes): float
     return (float) ($row['seg_produtivo'] ?? 0) / 3600;
 }
 
-// ── Quantidade produzida hoje, por funcionário (visão simples, tempo real) ───
-function biFetchFuncionariosHoje($pg): array
-{
-    $sql = "
-        SELECT F.FU_CODIGO, F.FU_NOME, COALESCE(SUM(IAA.OIAP_QTD_PRODUZIDA), 0) AS QTD_PRODUZIDA
-          FROM OP_ITENS_ATIVIDADES_APONTADAS IAA
-         INNER JOIN FUNCIONARIO F ON F.FU_CODIGO = IAA.FU_CODIGO
-         WHERE NOT IAA.OIAP_EXCLUIDO
-           AND TRIM(IAA.OIAP_STATUS) <> 'C'
-           AND IAA.OIAP_DATA_HORA_INICIO::date = CURRENT_DATE
-         GROUP BY F.FU_CODIGO, F.FU_NOME
-         ORDER BY QTD_PRODUZIDA DESC
-    ";
-    $res = @pg_query($pg, $sql);
-    if (!$res) {
-        return [];
-    }
-    $rows = pg_fetch_all($res) ?: [];
-    pg_free_result($res);
-    return $rows;
-}
-
 // ── Indicadores agregados do dia (funcionários, produção, tempos, pausas) ────
 function biFetchIndicadoresHoje($pg): array
 {
@@ -232,7 +210,7 @@ function biFetchIndicadoresHoje($pg): array
     ];
 }
 
-// ── Células cadastradas e seus funcionários (MySQL local) ────────────────────
+// ── Células cadastradas e seus centros de trabalho (MySQL local) ─────────────
 function biFetchCelulas(PDO $pdo): array
 {
     try {
@@ -240,38 +218,66 @@ function biFetchCelulas(PDO $pdo): array
     } catch (Throwable) {
         return [];
     }
-    $st = $pdo->prepare('SELECT FU_CODIGO FROM CELULA_FUNCIONARIO WHERE CEL_CODIGO = :c');
+    $st = $pdo->prepare('SELECT CT_CODIGO FROM CELULA_CENTRO_TRABALHO WHERE CEL_CODIGO = :c');
     foreach ($celulas as &$c) {
         $st->execute([':c' => (int) $c['CEL_CODIGO']]);
-        $c['funcionarios'] = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+        $c['centros'] = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
     }
     unset($c);
     return $celulas;
 }
 
-// ── Produção de hoje agrupada por célula (soma dos funcionários da célula) ───
-function biFetchProducaoPorCelula(PDO $pdo, array $funcionariosHoje): array
+// ── Quantidade produzida hoje, por centro de trabalho ────────────────────────
+function biFetchCentrosHoje($pg): array
+{
+    $sql = "
+        SELECT CT_CODIGO, FU_CODIGO, COALESCE(SUM(OIAP_QTD_PRODUZIDA), 0) AS QTD_PRODUZIDA
+          FROM OP_ITENS_ATIVIDADES_APONTADAS
+         WHERE NOT OIAP_EXCLUIDO
+           AND TRIM(OIAP_STATUS) <> 'C'
+           AND OIAP_DATA_HORA_INICIO::date = CURRENT_DATE
+         GROUP BY CT_CODIGO, FU_CODIGO
+    ";
+    $res = @pg_query($pg, $sql);
+    if (!$res) {
+        return [];
+    }
+    $rows = pg_fetch_all($res) ?: [];
+    pg_free_result($res);
+    return $rows;
+}
+
+// ── Produção de hoje agrupada por célula (soma dos centros de trabalho) ──────
+function biFetchProducaoPorCelula(PDO $pdo, array $centrosHoje): array
 {
     $celulas = biFetchCelulas($pdo);
     if (!$celulas) {
         return [];
     }
-    $qtdPorFu = [];
-    foreach ($funcionariosHoje as $f) {
-        $qtdPorFu[(int) $f['fu_codigo']] = (float) $f['qtd_produzida'];
+    $qtdPorCt   = [];
+    $funcsPorCt = [];
+    foreach ($centrosHoje as $f) {
+        $ct = (int) $f['ct_codigo'];
+        $qtdPorCt[$ct] = ($qtdPorCt[$ct] ?? 0.0) + (float) $f['qtd_produzida'];
+        if ($f['fu_codigo'] !== null && $f['fu_codigo'] !== '') {
+            $funcsPorCt[$ct][(int) $f['fu_codigo']] = true;
+        }
     }
 
     $resultado = [];
     foreach ($celulas as $c) {
         $total = 0.0;
-        foreach ($c['funcionarios'] as $fu) {
-            $total += $qtdPorFu[$fu] ?? 0.0;
+        $funcs = [];
+        foreach ($c['centros'] as $ct) {
+            $total += $qtdPorCt[$ct] ?? 0.0;
+            $funcs += $funcsPorCt[$ct] ?? [];
         }
         $resultado[] = [
             'cel_codigo' => (int) $c['CEL_CODIGO'],
             'cel_nome'   => $c['CEL_NOME'],
             'qtd_produzida' => $total,
-            'qtd_funcionarios' => count($c['funcionarios']),
+            'qtd_centros' => count($c['centros']),
+            'qtd_funcionarios' => count($funcs),
         ];
     }
     usort($resultado, static fn ($a, $b) => $b['qtd_produzida'] <=> $a['qtd_produzida']);
@@ -285,7 +291,7 @@ function biBuildPayload($pg, PDO $pdo): array
 
     $mesProduzido = biFetchProducaoMes($pg, $anoAtual, $mesAtual);
     $horasProdutivas = biFetchHorasProdutivasMes($pg, $anoAtual, $mesAtual);
-    $funcionariosHoje = biFetchFuncionariosHoje($pg);
+    $centrosHoje = biFetchCentrosHoje($pg);
 
     return [
         'ops_ativas'        => biFetchOpsAtivas($pg),
@@ -293,7 +299,7 @@ function biBuildPayload($pg, PDO $pdo): array
         'meta'              => biFetchMeta($pdo),
         'mes_nome'          => ucfirst(BI_MESES[$mesAtual]),
         'media_bags_hora'   => $horasProdutivas > 0 ? round($mesProduzido / $horasProdutivas, 1) : 0.0,
-        'celulas'           => biFetchProducaoPorCelula($pdo, $funcionariosHoje),
+        'celulas'           => biFetchProducaoPorCelula($pdo, $centrosHoje),
         'mensal'            => array_values(biFetchMonthly($pg, $anoAtual)),
         'meses'             => array_values(BI_MESES),
         'indicadores'       => biFetchIndicadoresHoje($pg),
@@ -843,7 +849,7 @@ function biRenderCelulas(celulas) {
     <div class="biz-func-card">
       <div>
         <div class="biz-func-name">${biEsc(c.cel_nome)}</div>
-        <div class="biz-op-sub">${c.qtd_funcionarios} funcionário(s)</div>
+        <div class="biz-op-sub">${c.qtd_funcionarios} funcionário(s) hoje</div>
       </div>
       <div class="biz-func-qtd">${Number(c.qtd_produzida || 0).toLocaleString('pt-BR')}</div>
     </div>
