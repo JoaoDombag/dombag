@@ -76,6 +76,8 @@ RewriteRule ^relatorios/estoque-futuro/pdf$    modules/relatorios/rel_estoque_fu
 RewriteRule ^relatorios/posicao-estoque/pdf$   modules/relatorios/rel_posicao_estoque_pdf.php [L,QSA]
 RewriteRule ^relatorios/controle-estoque$  modules/relatorios/rel_controle_estoque.php [L,QSA]
 RewriteRule ^relatorios/analise-bag$       modules/relatorios/rel_analise_bag.php      [L,QSA]
+RewriteRule ^relatorios/historico-faturamento$     modules/relatorios/rel_historico_faturamento.php     [L,QSA]
+RewriteRule ^relatorios/historico-faturamento/pdf$ modules/relatorios/rel_historico_faturamento_pdf.php [L,QSA]
 
 # Máquinas
 RewriteRule ^maquinas$                 modules/maquinas/consulta_maquinas.php  [L,QSA]

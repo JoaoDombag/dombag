@@ -155,6 +155,7 @@ $DOMBAG_PAGINAS = [
     ['href' => '/relatorios/posicao-estoque',  'label' => 'Posição de Estoque',     'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
     ['href' => '/relatorios/controle-estoque', 'label' => 'Controle de Estoque',    'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
     ['href' => '/relatorios/analise-bag',      'label' => 'Análise de Apontamento', 'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
+    ['href' => '/relatorios/historico-faturamento', 'label' => 'Histórico de Faturamento', 'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
 
     // ── Usuários ──────────────────────────────────────────────────────────────
     ['href' => '/minha-senha',              'label' => 'Minha Senha',          'grupo' => 'usuarios', 'menu' => true,  'publico' => true,  'admin_only' => false],
