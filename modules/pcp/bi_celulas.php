@@ -302,7 +302,7 @@ if (!$pg) {
      abaixo) e o JS (biApplyScale) calcula um único fator de escala pra
      cobrir o espaço disponível, aplicado via transform:scale() — a
      aparência fica idêntica em qualquer tamanho de tela, só menor/maior. */
-  .content { display: flex; align-items: center; justify-content: center; overflow: hidden; min-width: 0; padding: 0; }
+  .content { display: flex; align-items: flex-start; justify-content: center; overflow-x: hidden; overflow-y: auto; min-width: 0; padding: 0; }
   @media (max-width: 768px) {
     .app-wrapper { height: 100vh !important; overflow: hidden !important; flex-direction: row !important; }
     .main { height: 100vh !important; overflow: hidden !important; }
@@ -316,7 +316,7 @@ if (!$pg) {
     background: var(--biz-bg); border-width: 0; border-radius: 0;
     padding: 26px 28px; color: var(--biz-text); font-family: 'Segoe UI', sans-serif;
     box-shadow: none; box-sizing: border-box;
-    flex-shrink: 0; transform-origin: center center;
+    flex-shrink: 0; transform-origin: top center;
   }
 
   .biz-card { background: var(--biz-card); border: 1px solid var(--biz-border); border-radius: 14px; padding: 16px 20px 18px; box-shadow: 0 10px 24px -16px rgba(0,0,0,.5); min-width: 0; }
@@ -372,8 +372,8 @@ if (!$pg) {
   .biz-cel-ring-shape svg { width: 100%; height: 100%; display: block; overflow: visible; }
 
   .biz-cel-foot { flex: 0 0 auto; text-align: center; }
-  .biz-cel-nums { font-size: 24px; font-weight: 700; color: var(--biz-text); }
-  .biz-cel-nums strong { color: var(--biz-teal); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .biz-cel-nums { font-size: 20px; font-weight: 700; color: var(--biz-muted); }
+  .biz-cel-nums strong { font-size: 50px; color: white; font-weight: 900; font-variant-numeric: tabular-nums; }
   .biz-cel-msg { margin-top: 8px; font-size: 24px; font-weight: 800; }
   .biz-cel-msg.msg-hit    { color: #7db3ff; }
   .biz-cel-msg.msg-behind { color: var(--biz-text); font-weight: 700; }
@@ -409,6 +409,13 @@ if (!$pg) {
     color: var(--biz-text); font: inherit; font-size: 12px; padding: 4px 8px; color-scheme: dark;
   }
   .biz-date-filter input[type="date"]:hover { border-color: rgba(88,214,201,.35); }
+  .biz-date-nav {
+    display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
+    background: var(--biz-card2); border: 1px solid var(--biz-border); border-radius: 8px;
+    color: var(--biz-text); cursor: pointer; padding: 0;
+  }
+  .biz-date-nav:hover:not(:disabled) { border-color: rgba(88,214,201,.35); color: var(--biz-teal); }
+  .biz-date-nav:disabled { opacity: .35; cursor: default; }
   .biz-date-reset { color: var(--biz-teal); text-decoration: none; font-weight: 600; }
   .biz-date-reset[hidden] { display: none; }
 
@@ -428,7 +435,7 @@ if (!$pg) {
 
   html:fullscreen .app-wrapper, body.biz-fs-fallback .app-wrapper { height: 100vh !important; overflow: hidden; }
   html:fullscreen .main,        body.biz-fs-fallback .main        { height: 100vh !important; overflow: hidden; }
-  html:fullscreen .content,     body.biz-fs-fallback .content     { height: 100vh; padding: 0; }
+  html:fullscreen .content,     body.biz-fs-fallback .content     { height: 100vh; padding: 0; align-items: center; overflow: hidden; }
 </style>
 </head>
 <body>
@@ -446,7 +453,13 @@ if (!$pg) {
       <div class="topbar-actions">
         <span class="biz-live"><span class="biz-live-dot"></span>Ao vivo</span>
         <span class="biz-date-filter">
+          <button type="button" class="biz-date-nav" id="biDataPrev" title="Dia anterior" aria-label="Dia anterior">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
           <input type="date" id="biDataFiltro" value="<?= bicEscape($payload['dia']) ?>" max="<?= date('Y-m-d') ?>" title="Ver produção de outro dia">
+          <button type="button" class="biz-date-nav" id="biDataNext" title="Próximo dia" aria-label="Próximo dia"<?= $dia === date('Y-m-d') ? ' disabled' : '' ?>>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
           <a href="/pcp/bi-celulas" class="biz-date-reset" id="biDataReset"<?= $dia === date('Y-m-d') ? ' hidden' : '' ?>>Hoje</a>
         </span>
         <span class="last-update">Atualizado às <span id="biUpdatedAt"><?= bicEscape($payload['atualizado_em']) ?></span></span>
@@ -506,13 +519,22 @@ const biDiaAtual = <?= json_encode($payload['dia']) ?>;
 // ── Filtro de data: recarrega a página com ?data=YYYY-MM-DD (ou volta pra
 // hoje). O padrão é sempre hoje — sem parâmetro na URL. ─────────────────────
 const biDataInput = document.getElementById('biDataFiltro');
-if (biDataInput) {
-  biDataInput.addEventListener('change', () => {
-    const v = biDataInput.value;
-    const hoje = biDataInput.max;
-    window.location.href = (!v || v === hoje) ? '/pcp/bi-celulas' : '/pcp/bi-celulas?data=' + encodeURIComponent(v);
-  });
+function biIrParaData(v) {
+  const hoje = biDataInput ? biDataInput.max : '';
+  window.location.href = (!v || v === hoje) ? '/pcp/bi-celulas' : '/pcp/bi-celulas?data=' + encodeURIComponent(v);
 }
+function biDeslocaDia(dias) {
+  const d = new Date(biDiaAtual + 'T00:00:00');
+  d.setDate(d.getDate() + dias);
+  const iso = d.toISOString().slice(0, 10);
+  if (biDataInput && iso > biDataInput.max) return; // não navega pro futuro
+  biIrParaData(iso);
+}
+if (biDataInput) {
+  biDataInput.addEventListener('change', () => biIrParaData(biDataInput.value));
+}
+document.getElementById('biDataPrev')?.addEventListener('click', () => biDeslocaDia(-1));
+document.getElementById('biDataNext')?.addEventListener('click', () => biDeslocaDia(1));
 
 // ── Anel de progresso em círculo cheio (em vez do semicírculo do BI da
 // Produção): ocupa toda a área quadrada disponível no card e fica mais fácil
@@ -547,8 +569,7 @@ function biRenderGauge(svg, pct, hit) {
     </defs>
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="${sw}"/>
     ${fgCircle}
-    <text x="${cx}" y="${cy - 2}" text-anchor="middle" fill="#eef2f7" font-size="44" font-weight="900">${biFmt(pct, 0)}%</text>
-    <text x="${cx}" y="${cy + 30}" text-anchor="middle" fill="#b9c6d4" font-size="20" font-weight="800" letter-spacing="2">${biEsc(biDiaLabel).toUpperCase()}</text>
+    <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" fill="#eef2f7" font-size="48" font-weight="900">${biFmt(pct, 0)}%</text>
   `;
 }
 
@@ -585,8 +606,8 @@ function biRenderCelulas(celulas) {
         </div>
         <div class="biz-cel-ring-wrap"><div class="biz-cel-ring-shape"><svg class="biz-gauge"></svg></div></div>
         <div class="biz-cel-foot">
-          <div class="biz-cel-nums">Produzido <strong>${biFmt(c.qtd_produzida, 0)}</strong> / Meta <strong>${biFmt(biMetaAtual, 0)}</strong></div>
-          ${msg ? `<div class="biz-cel-msg ${hit ? 'msg-hit' : 'msg-behind'}">${msg}</div>` : ''}
+          <div class="biz-cel-msg${hit ? ' msg-hit' : ' msg-behind'}">Produzido x Meta</div>
+          <div class="biz-cel-nums"> <strong>${biFmt(c.qtd_produzida, 0)}</strong> / <strong>${biFmt(biMetaAtual, 0)}</strong></div>
         </div>
       </div>
       ${comDetalhe ? biCelulaDetalhe(c) : ''}
@@ -686,9 +707,18 @@ function biApplyScale() {
   const natH = stage.offsetHeight;
   if (!natW || !natH) return;
 
-  let scale = Math.max(availW / natW, availH / natH);
+  // Em tela cheia (TV/kiosk) o painel COBRE o espaço — o eixo que sobra é
+  // cortado. Fora da tela cheia ele preenche a LARGURA disponível e cresce em
+  // altura o quanto precisar (a .content rola na vertical), sem bordas laterais.
+  const kiosk = document.body.classList.contains('biz-fs-fallback') || !!biFsElement();
+  let scale = kiosk
+    ? Math.max(availW / natW, availH / natH)
+    : availW / natW;
   scale = Math.max(BI_SCALE_MIN, Math.min(BI_SCALE_MAX, scale));
   stage.style.transform = `scale(${scale})`;
+  // transform:scale() não altera o tamanho de layout — sem isso a área
+  // rolável não enxerga a altura escalada e os últimos cards ficam cortados.
+  stage.style.marginBottom = kiosk ? '' : Math.max(0, natH * scale - natH) + 'px';
 }
 window.addEventListener('resize', biApplyScale);
 
