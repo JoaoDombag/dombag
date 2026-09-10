@@ -302,7 +302,15 @@ if (!$pg) {
      abaixo) e o JS (biApplyScale) calcula um único fator de escala pra
      cobrir o espaço disponível, aplicado via transform:scale() — a
      aparência fica idêntica em qualquer tamanho de tela, só menor/maior. */
-  .content { display: flex; align-items: flex-start; justify-content: center; overflow-x: hidden; overflow-y: auto; min-width: 0; padding: 0; }
+  .content { display: flex; align-items: flex-start; justify-content: center; overflow: hidden; min-width: 0; padding: 0; }
+
+  /* ── Fora da tela cheia: o painel preenche a largura E cabe na altura
+     visível (JS fixa a altura em px). min-height some pra que a grade e os
+     anéis encolham em vez de empurrar o conteúdo pra fora do painel. ── */
+  body.bi-fit .content { overflow: hidden; }
+  body.bi-fit #bizDashboard { min-height: 0; }
+  body.bi-fit .biz-func-grid { min-height: 0; }
+  body.bi-fit .biz-cel-card { overflow: hidden; }
   @media (max-width: 768px) {
     .app-wrapper { height: 100vh !important; overflow: hidden !important; flex-direction: row !important; }
     .main { height: 100vh !important; overflow: hidden !important; }
@@ -695,6 +703,25 @@ function biApplyScale() {
   const availH = wrap.clientHeight;
   if (!availW || !availH) return;
 
+  const kiosk = document.body.classList.contains('biz-fs-fallback') || !!biFsElement();
+
+  // Fora da tela cheia: sem transform. O painel ocupa 100% da largura real e
+  // tem a altura fixada no espaço visível abaixo da topbar — os cards ficam
+  // mais largos e a grade/anéis encolhem pra tudo caber sem rolagem.
+  if (!kiosk) {
+    document.body.classList.add('bi-fit');
+    stage.style.transform = 'none';
+    stage.style.marginBottom = '';
+    stage.style.width = availW + 'px';
+    stage.style.height = availH + 'px';   // .content já é só o espaço abaixo da topbar
+    wrap.scrollTop = 0;
+    return;
+  }
+  document.body.classList.remove('bi-fit');
+
+  // Tela cheia (TV/kiosk): desenha numa largura de referência e escala com
+  // transform pra COBRIR todo o espaço — o eixo que sobra é cortado.
+  stage.style.height = '';
   stage.style.width = '';
   const baseH = stage.offsetHeight;
   if (!baseH) return;
@@ -707,18 +734,10 @@ function biApplyScale() {
   const natH = stage.offsetHeight;
   if (!natW || !natH) return;
 
-  // Em tela cheia (TV/kiosk) o painel COBRE o espaço — o eixo que sobra é
-  // cortado. Fora da tela cheia ele preenche a LARGURA disponível e cresce em
-  // altura o quanto precisar (a .content rola na vertical), sem bordas laterais.
-  const kiosk = document.body.classList.contains('biz-fs-fallback') || !!biFsElement();
-  let scale = kiosk
-    ? Math.max(availW / natW, availH / natH)
-    : availW / natW;
+  let scale = Math.max(availW / natW, availH / natH);
   scale = Math.max(BI_SCALE_MIN, Math.min(BI_SCALE_MAX, scale));
   stage.style.transform = `scale(${scale})`;
-  // transform:scale() não altera o tamanho de layout — sem isso a área
-  // rolável não enxerga a altura escalada e os últimos cards ficam cortados.
-  stage.style.marginBottom = kiosk ? '' : Math.max(0, natH * scale - natH) + 'px';
+  stage.style.marginBottom = '';
 }
 window.addEventListener('resize', biApplyScale);
 
