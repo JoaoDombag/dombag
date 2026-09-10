@@ -15,6 +15,24 @@ function bicEscape($value): string
     return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 }
 
+// ── Dia selecionado no filtro (?data=YYYY-MM-DD). Padrão: hoje. ──────────────
+function bicDia(): string
+{
+    $d = trim((string) ($_GET['data'] ?? ''));
+    if ($d !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $d)) {
+        $t = DateTime::createFromFormat('Y-m-d', $d);
+        if ($t && $t->format('Y-m-d') === $d) {
+            return $d;
+        }
+    }
+    return date('Y-m-d');
+}
+
+function bicDiaLabel(string $dia): string
+{
+    return $dia === date('Y-m-d') ? 'HOJE' : date('d/m', strtotime($dia));
+}
+
 function bicFetchMeta(PDO $pdo): float
 {
     try {
@@ -46,8 +64,9 @@ function bicFetchCelulas(PDO $pdo): array
 //  Traz um par (CT, funcionário) por linha pra que a célula possa somar a
 //  produção dos seus CTs e contar os funcionários distintos que apontaram
 //  neles hoje.
-function bicFetchCentrosHoje($pg): array
+function bicFetchCentrosHoje($pg, string $dia): array
 {
+    $diaLit = pg_escape_literal($pg, $dia);
     $sql = "
         SELECT IAA.CT_CODIGO
               ,IAA.FU_CODIGO
@@ -59,7 +78,7 @@ function bicFetchCentrosHoje($pg): array
           LEFT JOIN FUNCIONARIO     F  ON F.FU_CODIGO  = IAA.FU_CODIGO
          WHERE NOT IAA.OIAP_EXCLUIDO
            AND TRIM(IAA.OIAP_STATUS) <> 'C'
-           AND IAA.OIAP_DATA_HORA_INICIO::date = CURRENT_DATE
+           AND IAA.OIAP_DATA_HORA_INICIO::date = {$diaLit}::date
          GROUP BY IAA.CT_CODIGO, IAA.FU_CODIGO, CT.CT_DESCRICAO, F.FU_NOME
     ";
     $res = @pg_query($pg, $sql);
@@ -73,8 +92,9 @@ function bicFetchCentrosHoje($pg): array
 
 // ── OPs com apontamento hoje, por centro de trabalho ────────────────────────
 //  EM_PRODUCAO = existe apontamento em aberto (sem data/hora fim) hoje.
-function bicFetchOpsHoje($pg): array
+function bicFetchOpsHoje($pg, string $dia): array
 {
+    $diaLit = pg_escape_literal($pg, $dia);
     $sql = "
         SELECT IAA.CT_CODIGO
               ,IAA.PROD_CODIGO
@@ -86,7 +106,7 @@ function bicFetchOpsHoje($pg): array
           LEFT JOIN PRODUTO P ON P.PRO_CODIGO = IAA.PRO_CODIGO
          WHERE NOT IAA.OIAP_EXCLUIDO
            AND TRIM(IAA.OIAP_STATUS) <> 'C'
-           AND IAA.OIAP_DATA_HORA_INICIO::date = CURRENT_DATE
+           AND IAA.OIAP_DATA_HORA_INICIO::date = {$diaLit}::date
          GROUP BY IAA.CT_CODIGO, IAA.PROD_CODIGO, IAA.PRO_CODIGO, P.PRO_DESCRICAO
     ";
     $res = @pg_query($pg, $sql);
@@ -114,7 +134,7 @@ function bicFetchCentroNomes($pg): array
 }
 
 // ── Produção de hoje agrupada por célula (soma dos centros de trabalho) ──────
-function bicFetchProducaoPorCelula(PDO $pdo, $pg): array
+function bicFetchProducaoPorCelula(PDO $pdo, $pg, string $dia): array
 {
     $celulas = bicFetchCelulas($pdo);
     if (!$celulas) {
@@ -124,7 +144,7 @@ function bicFetchProducaoPorCelula(PDO $pdo, $pg): array
 
     // OPs com apontamento hoje, indexadas por CT.
     $opsPorCt = [];
-    foreach (bicFetchOpsHoje($pg) as $o) {
+    foreach (bicFetchOpsHoje($pg, $dia) as $o) {
         $ct = (int) $o['ct_codigo'];
         $opsPorCt[$ct][] = [
             'prod_codigo'  => (int) $o['prod_codigo'],
@@ -138,7 +158,7 @@ function bicFetchProducaoPorCelula(PDO $pdo, $pg): array
     // Agrupa os apontamentos de hoje por CT: quantidade total e, dentro dele,
     // a quantidade por funcionário — usado no detalhamento de cada card.
     $porCt = [];
-    foreach (bicFetchCentrosHoje($pg) as $f) {
+    foreach (bicFetchCentrosHoje($pg, $dia) as $f) {
         $ct = (int) $f['ct_codigo'];
         $qtd = (float) $f['qtd_produzida'];
         if (!isset($porCt[$ct])) {
@@ -210,17 +230,20 @@ function bicFetchProducaoPorCelula(PDO $pdo, $pg): array
     return $resultado;
 }
 
-function bicBuildPayload($pg, PDO $pdo): array
+function bicBuildPayload($pg, PDO $pdo, string $dia): array
 {
     return [
         'meta'          => bicFetchMeta($pdo),
-        'celulas'       => bicFetchProducaoPorCelula($pdo, $pg),
+        'celulas'       => bicFetchProducaoPorCelula($pdo, $pg, $dia),
+        'dia'           => $dia,
+        'dia_label'     => bicDiaLabel($dia),
         'atualizado_em' => date('H:i:s'),
     ];
 }
 
 $pdo = dbPDO();
 $pg  = dbPG();
+$dia = bicDia();
 
 // ── AJAX: atualizar dados (polling em tempo real) ─────────────────────────────
 if (($_GET['action'] ?? '') === 'refresh') {
@@ -230,7 +253,7 @@ if (($_GET['action'] ?? '') === 'refresh') {
         exit;
     }
     try {
-        echo json_encode(bicBuildPayload($pg, $pdo), JSON_UNESCAPED_UNICODE);
+        echo json_encode(bicBuildPayload($pg, $pdo, $dia), JSON_UNESCAPED_UNICODE);
     } catch (Throwable $e) {
         echo json_encode(['error' => $e->getMessage()]);
     }
@@ -238,12 +261,12 @@ if (($_GET['action'] ?? '') === 'refresh') {
 }
 
 $error = '';
-$payload = ['meta' => 0, 'celulas' => [], 'atualizado_em' => date('H:i:s')];
+$payload = ['meta' => 0, 'celulas' => [], 'dia' => $dia, 'dia_label' => bicDiaLabel($dia), 'atualizado_em' => date('H:i:s')];
 if (!$pg) {
     $error = 'Não foi possível conectar ao banco de dados do ERP (PostgreSQL).';
 } else {
     try {
-        $payload = bicBuildPayload($pg, $pdo);
+        $payload = bicBuildPayload($pg, $pdo, $dia);
     } catch (Throwable $e) {
         $error = $e->getMessage();
     }
@@ -298,10 +321,10 @@ if (!$pg) {
 
   .biz-card { background: var(--biz-card); border: 1px solid var(--biz-border); border-radius: 14px; padding: 16px 20px 18px; box-shadow: 0 10px 24px -16px rgba(0,0,0,.5); min-width: 0; }
   .biz-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--biz-border); }
-  .biz-card-head h2 { font-size: 12.5px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--biz-muted); }
-  .biz-count-badge { font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 20px; background: rgba(88,214,201,.12); color: var(--biz-teal); }
+  .biz-card-head h2 { font-size: 16px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--biz-text); }
+  .biz-count-badge { font-size: 13px; font-weight: 800; padding: 3px 11px; border-radius: 20px; background: rgba(88,214,201,.18); color: var(--biz-teal); }
 
-  .biz-empty-msg { text-align: center; color: var(--biz-muted); font-size: 13px; padding: 40px 0; }
+  .biz-empty-msg { text-align: center; color: var(--biz-text); font-size: 16px; font-weight: 700; padding: 40px 0; }
 
   /* ── Grade de células: um card por célula, ocupando 100% da célula da
      grade (largura e altura) — o anel de progresso cresce pra preencher
@@ -325,21 +348,21 @@ if (!$pg) {
     border-left: 1px solid var(--biz-border); padding-left: 26px; overflow: hidden;
   }
   .biz-cel-detail-sec { display: flex; flex-direction: column; min-height: 0; }
-  .biz-cel-detail-sec h4 { font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--biz-muted); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--biz-border); }
+  .biz-cel-detail-sec h4 { font-size: 14px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--biz-teal); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--biz-border); }
   .biz-detail-list { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
-  .biz-detail-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 2px; font-size: 15px; border-bottom: 1px solid rgba(255,255,255,.04); }
+  .biz-detail-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 2px; font-size: 18px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,.07); }
   .biz-detail-row:last-child { border-bottom: 0; }
   .biz-detail-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--biz-text); }
-  .biz-detail-row strong { flex: 0 0 auto; color: var(--biz-teal); font-weight: 700; font-variant-numeric: tabular-nums; }
-  .biz-detail-empty { font-size: 13px; color: var(--biz-muted); padding: 6px 2px; }
+  .biz-detail-row strong { flex: 0 0 auto; color: var(--biz-teal); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .biz-detail-empty { font-size: 16px; font-weight: 700; color: var(--biz-muted); padding: 6px 2px; }
 
   .biz-op-row span { flex: 1 1 auto; }
-  .biz-op-live { flex: 0 0 auto; font-style: normal; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--biz-teal); display: inline-flex; align-items: center; gap: 5px; }
-  .biz-op-live-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--biz-teal); box-shadow: 0 0 0 0 rgba(88,214,201,.6); animation: bizPulse 1.8s infinite; }
+  .biz-op-live { flex: 0 0 auto; font-style: normal; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--biz-teal); display: inline-flex; align-items: center; gap: 5px; }
+  .biz-op-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--biz-teal); box-shadow: 0 0 0 0 rgba(88,214,201,.6); animation: bizPulse 1.8s infinite; }
 
   .biz-cel-head { text-align: center; flex: 0 0 auto; }
-  .biz-cel-name { font-size: clamp(18px, 1.4vw, 26px); font-weight: 700; color: var(--biz-text); overflow-wrap: anywhere; }
-  .biz-cel-sub { font-size: 14px; color: var(--biz-muted); margin-top: 2px; }
+  .biz-cel-name { font-size: clamp(22px, 1.7vw, 32px); font-weight: 800; color: var(--biz-text); overflow-wrap: anywhere; }
+  .biz-cel-sub { font-size: 17px; font-weight: 700; color: var(--biz-text); margin-top: 3px; }
 
   /* O SVG do anel é sempre quadrado (aspect-ratio) e cresce até o limite do
      espaço disponível (altura OU largura, o que for menor) — assim ele
@@ -349,11 +372,11 @@ if (!$pg) {
   .biz-cel-ring-shape svg { width: 100%; height: 100%; display: block; overflow: visible; }
 
   .biz-cel-foot { flex: 0 0 auto; text-align: center; }
-  .biz-cel-nums { font-size: 21px; color: var(--biz-muted); }
-  .biz-cel-nums strong { color: var(--biz-text); font-weight: 700; font-variant-numeric: tabular-nums; }
-  .biz-cel-msg { margin-top: 8px; font-size: 20px; font-weight: 700; }
+  .biz-cel-nums { font-size: 24px; font-weight: 700; color: var(--biz-text); }
+  .biz-cel-nums strong { color: var(--biz-teal); font-weight: 800; font-variant-numeric: tabular-nums; }
+  .biz-cel-msg { margin-top: 8px; font-size: 24px; font-weight: 800; }
   .biz-cel-msg.msg-hit    { color: #7db3ff; }
-  .biz-cel-msg.msg-behind { color: var(--biz-muted); font-weight: 500; }
+  .biz-cel-msg.msg-behind { color: var(--biz-text); font-weight: 700; }
 
   /* ── Célula que bateu a meta diária: destaque azul no card inteiro ── */
   .biz-cel-card.biz-cel-hit { border-color: rgba(45,106,255,.5); background: rgba(45,106,255,.1); box-shadow: 0 0 0 1px rgba(45,106,255,.3), 0 0 32px -8px rgba(45,106,255,.35); }
@@ -372,6 +395,22 @@ if (!$pg) {
   }
 
   .biz-fullscreen-btn { display: flex; align-items: center; gap: 7px; }
+
+  /* ── Topbar mais legível de longe (o painel fica numa TV) ── */
+  .page-title h1 { font-size: 22px; font-weight: 800; }
+  .page-title p { font-size: 14px; font-weight: 600; color: var(--biz-text); }
+  .biz-live { font-size: 13px !important; font-weight: 800 !important; }
+  .last-update { font-size: 14px; font-weight: 700; }
+
+  /* ── Filtro de data discreto: parece parte da topbar, some quando é hoje ── */
+  .biz-date-filter { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--biz-muted); }
+  .biz-date-filter input[type="date"] {
+    background: var(--biz-card2); border: 1px solid var(--biz-border); border-radius: 8px;
+    color: var(--biz-text); font: inherit; font-size: 12px; padding: 4px 8px; color-scheme: dark;
+  }
+  .biz-date-filter input[type="date"]:hover { border-color: rgba(88,214,201,.35); }
+  .biz-date-reset { color: var(--biz-teal); text-decoration: none; font-weight: 600; }
+  .biz-date-reset[hidden] { display: none; }
 
   /* ── Indicador "ao vivo" ── */
   .biz-live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--biz-teal); }
@@ -406,6 +445,10 @@ if (!$pg) {
       </div>
       <div class="topbar-actions">
         <span class="biz-live"><span class="biz-live-dot"></span>Ao vivo</span>
+        <span class="biz-date-filter">
+          <input type="date" id="biDataFiltro" value="<?= bicEscape($payload['dia']) ?>" max="<?= date('Y-m-d') ?>" title="Ver produção de outro dia">
+          <a href="/pcp/bi-celulas" class="biz-date-reset" id="biDataReset"<?= $dia === date('Y-m-d') ? ' hidden' : '' ?>>Hoje</a>
+        </span>
         <span class="last-update">Atualizado às <span id="biUpdatedAt"><?= bicEscape($payload['atualizado_em']) ?></span></span>
         <a href="/pcp/celulas" class="btn-secondary">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
@@ -457,6 +500,19 @@ function biEsc(v) {
   return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 let biMetaAtual = <?= (float) $payload['meta'] ?>;
+let biDiaLabel = <?= json_encode($payload['dia_label'], JSON_UNESCAPED_UNICODE) ?>;
+const biDiaAtual = <?= json_encode($payload['dia']) ?>;
+
+// ── Filtro de data: recarrega a página com ?data=YYYY-MM-DD (ou volta pra
+// hoje). O padrão é sempre hoje — sem parâmetro na URL. ─────────────────────
+const biDataInput = document.getElementById('biDataFiltro');
+if (biDataInput) {
+  biDataInput.addEventListener('change', () => {
+    const v = biDataInput.value;
+    const hoje = biDataInput.max;
+    window.location.href = (!v || v === hoje) ? '/pcp/bi-celulas' : '/pcp/bi-celulas?data=' + encodeURIComponent(v);
+  });
+}
 
 // ── Anel de progresso em círculo cheio (em vez do semicírculo do BI da
 // Produção): ocupa toda a área quadrada disponível no card e fica mais fácil
@@ -465,7 +521,7 @@ let biMetaAtual = <?= (float) $payload['meta'] ?>;
 function biRenderGauge(svg, pct, hit) {
   const clamped = Math.max(0, Math.min(100, pct));
   const gradId = 'biGrad' + Math.random().toString(36).slice(2);
-  const r = 84, cx = 100, cy = 100, sw = 20;
+  const r = 82, cx = 100, cy = 100, sw = 26;
   const circ = 2 * Math.PI * r;
   const dash = circ * (clamped / 100);
   const colorFrom = hit ? '#2d6aff' : '#3aa7ff';
@@ -491,8 +547,8 @@ function biRenderGauge(svg, pct, hit) {
     </defs>
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="${sw}"/>
     ${fgCircle}
-    <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="#eef2f7" font-size="46" font-weight="800">${biFmt(pct, 0)}%</text>
-    <text x="${cx}" y="${cy + 26}" text-anchor="middle" fill="#8fa0b3" font-size="17" font-weight="700" letter-spacing="1.5">HOJE</text>
+    <text x="${cx}" y="${cy - 2}" text-anchor="middle" fill="#eef2f7" font-size="44" font-weight="900">${biFmt(pct, 0)}%</text>
+    <text x="${cx}" y="${cy + 30}" text-anchor="middle" fill="#b9c6d4" font-size="20" font-weight="800" letter-spacing="2">${biEsc(biDiaLabel).toUpperCase()}</text>
   `;
 }
 
@@ -638,6 +694,7 @@ window.addEventListener('resize', biApplyScale);
 
 function biRenderAll(data) {
   biMetaAtual = Number(data.meta || 0);
+  if (data.dia_label) biDiaLabel = data.dia_label;
   biRenderCelulas(data.celulas || []);
 
   const upd = document.getElementById('biUpdatedAt');
@@ -653,7 +710,7 @@ biRenderAll(BI_INITIAL);
 
 // ── Atualização periódica (tempo real) ────────────────────────────────────────
 function biRefresh() {
-  fetch('?action=refresh', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+  fetch('?action=refresh&data=' + encodeURIComponent(biDiaAtual), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
     .then(r => r.json())
     .then(data => {
       if (data.error) return;
