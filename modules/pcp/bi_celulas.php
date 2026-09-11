@@ -324,21 +324,31 @@ if (!$pg) {
     background: var(--biz-bg); border-width: 0; border-radius: 0;
     padding: 26px 28px; color: var(--biz-text); font-family: 'Segoe UI', sans-serif;
     box-shadow: none; box-sizing: border-box;
-    flex-shrink: 0; transform-origin: top center;
+    flex-shrink: 0; transform-origin: center center;
+    /* center (não "top"): fora da tela cheia não há transform (JS usa
+       width/height fixos), então isso só importa pra tela cheia, onde o
+       painel é centralizado por flex ANTES da escala — com origem no topo,
+       o excesso de altura "crescia" sempre pra cima e ficava fora da tela. */
+    /* As fontes dos cards usam cqw (abaixo) em vez de vw: precisam ser
+       relativas à LARGURA DESENHADA do próprio painel, não à janela real —
+       na tela cheia o painel é desenhado numa largura de referência quase
+       fixa e depois escalado por transform, então vw ficaria errado
+       (baseado na janela real) e quebraria o tamanho consistente da TV. */
+    container-type: inline-size;
   }
 
   .biz-card { background: var(--biz-card); border: 1px solid var(--biz-border); border-radius: 14px; padding: 16px 20px 18px; box-shadow: 0 10px 24px -16px rgba(0,0,0,.5); min-width: 0; }
   .biz-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--biz-border); }
-  .biz-card-head h2 { font-size: 16px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--biz-text); }
-  .biz-count-badge { font-size: 13px; font-weight: 800; padding: 3px 11px; border-radius: 20px; background: rgba(88,214,201,.18); color: var(--biz-teal); }
+  .biz-card-head h2 { font-size: clamp(12px, .9cqw, 16px); font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--biz-text); }
+  .biz-count-badge { font-size: clamp(11px, .8cqw, 13px); font-weight: 800; padding: 3px 11px; border-radius: 20px; background: rgba(88,214,201,.18); color: var(--biz-teal); }
 
-  .biz-empty-msg { text-align: center; color: var(--biz-text); font-size: 16px; font-weight: 700; padding: 40px 0; }
+  .biz-empty-msg { text-align: center; color: var(--biz-text); font-size: clamp(12px, 1cqw, 16px); font-weight: 700; padding: 40px 0; }
 
   /* ── Grade de células: um card por célula, ocupando 100% da célula da
      grade (largura e altura) — o anel de progresso cresce pra preencher
      todo o espaço vertical sobrando, em vez de ficar pequeno e centralizado
      numa área grande vazia. ── */
-  .biz-func-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); grid-auto-rows: 1fr; gap: 20px; flex: 1 1 auto; min-height: 760px; }
+  .biz-func-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); grid-auto-rows: 1fr; gap: 20px; flex: 1 1 auto; min-height: 760px; }
 
   .biz-cel-card { border: 1px solid var(--biz-border); border-radius: 14px; padding: 20px 22px; background: var(--biz-card2); display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; transition: border-color .15s, background .2s, box-shadow .2s; }
   .biz-cel-card:hover { border-color: rgba(88,214,201,.35); }
@@ -356,21 +366,21 @@ if (!$pg) {
     border-left: 1px solid var(--biz-border); padding-left: 26px; overflow: hidden;
   }
   .biz-cel-detail-sec { display: flex; flex-direction: column; min-height: 0; }
-  .biz-cel-detail-sec h4 { font-size: 14px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--biz-teal); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--biz-border); }
+  .biz-cel-detail-sec h4 { font-size: clamp(10px, .8cqw, 14px); font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--biz-teal); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--biz-border); }
   .biz-detail-list { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
-  .biz-detail-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 2px; font-size: 18px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .biz-detail-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 2px; font-size: clamp(12px, 1.1cqw, 18px); font-weight: 700; border-bottom: 1px solid rgba(255,255,255,.07); }
   .biz-detail-row:last-child { border-bottom: 0; }
   .biz-detail-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--biz-text); }
   .biz-detail-row strong { flex: 0 0 auto; color: var(--biz-teal); font-weight: 800; font-variant-numeric: tabular-nums; }
-  .biz-detail-empty { font-size: 16px; font-weight: 700; color: var(--biz-muted); padding: 6px 2px; }
+  .biz-detail-empty { font-size: clamp(12px, 1cqw, 16px); font-weight: 700; color: var(--biz-muted); padding: 6px 2px; }
 
   .biz-op-row span { flex: 1 1 auto; }
-  .biz-op-live { flex: 0 0 auto; font-style: normal; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--biz-teal); display: inline-flex; align-items: center; gap: 5px; }
+  .biz-op-live { flex: 0 0 auto; font-style: normal; font-size: clamp(10px, .8cqw, 13px); font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--biz-teal); display: inline-flex; align-items: center; gap: 5px; }
   .biz-op-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--biz-teal); box-shadow: 0 0 0 0 rgba(88,214,201,.6); animation: bizPulse 1.8s infinite; }
 
   .biz-cel-head { text-align: center; flex: 0 0 auto; }
-  .biz-cel-name { font-size: clamp(22px, 1.7vw, 32px); font-weight: 800; color: var(--biz-text); overflow-wrap: anywhere; }
-  .biz-cel-sub { font-size: 17px; font-weight: 700; color: var(--biz-text); margin-top: 3px; }
+  .biz-cel-name { font-size: clamp(18px, 1.7cqw, 32px); font-weight: 800; color: var(--biz-text); overflow-wrap: anywhere; }
+  .biz-cel-sub { font-size: clamp(12px, 1cqw, 17px); font-weight: 700; color: var(--biz-text); margin-top: 3px; }
 
   /* O SVG do anel é sempre quadrado (aspect-ratio) e cresce até o limite do
      espaço disponível (altura OU largura, o que for menor) — assim ele
@@ -380,9 +390,9 @@ if (!$pg) {
   .biz-cel-ring-shape svg { width: 100%; height: 100%; display: block; overflow: visible; }
 
   .biz-cel-foot { flex: 0 0 auto; text-align: center; }
-  .biz-cel-nums { font-size: 20px; font-weight: 700; color: var(--biz-muted); }
-  .biz-cel-nums strong { font-size: 50px; color: white; font-weight: 900; font-variant-numeric: tabular-nums; }
-  .biz-cel-msg { margin-top: 8px; font-size: 24px; font-weight: 800; }
+  .biz-cel-nums { font-size: clamp(13px, 1.1cqw, 20px); font-weight: 700; color: var(--biz-muted); }
+  .biz-cel-nums strong { font-size: clamp(26px, 2.8cqw, 50px); color: white; font-weight: 900; font-variant-numeric: tabular-nums; }
+  .biz-cel-msg { margin-top: 8px; font-size: clamp(15px, 1.4cqw, 24px); font-weight: 800; }
   .biz-cel-msg.msg-hit    { color: #7db3ff; }
   .biz-cel-msg.msg-behind { color: var(--biz-text); font-weight: 700; }
 
@@ -789,6 +799,10 @@ function biSetFsState(active) {
   document.body.classList.toggle('biz-fs-fallback', active);
   biFsLabel.textContent = active ? 'Sair da tela cheia' : 'Tela cheia';
   requestAnimationFrame(biApplyScale);
+  // A transição da API nativa de tela cheia (animação do SO) pode demorar
+  // mais que um frame — reaplica de novo um pouco depois pra pegar o
+  // tamanho final da janela.
+  setTimeout(biApplyScale, 300);
 }
 
 biFsBtn.addEventListener('click', () => {
@@ -803,7 +817,15 @@ biFsBtn.addEventListener('click', () => {
 });
 ['fullscreenchange', 'webkitfullscreenchange', 'MSFullscreenChange'].forEach(ev => {
   document.addEventListener(ev, () => {
-    if (!biFsElement()) biSetFsState(false);
+    // Dispara nas duas pontas: ao SAIR (inclusive via Esc, sem passar pelo
+    // botão) e ao ENTRAR — a troca de dimensões da API nativa só termina
+    // depois do clique, então precisa recalcular a escala aqui também, e não
+    // só uma vez (via requestAnimationFrame) logo no clique.
+    if (!biFsElement()) {
+      biSetFsState(false);
+    } else {
+      requestAnimationFrame(biApplyScale);
+    }
   });
 });
 </script>
