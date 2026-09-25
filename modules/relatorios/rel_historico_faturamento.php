@@ -6,13 +6,13 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/pcp_engine.php';
 
 // ══════════════════════════════════════════════════════════════
 //  DOMBAG — Histórico de Faturamento (ERP Yzidro)
-//  Fonte: PRODUCAO + VENDAS + CLIENTES + REPRESENTANTES (PostgreSQL)
+//  Fonte: VENDAS + CLIENTES + REPRESENTANTES (PostgreSQL)
 //  Conexão: 004703consulta
 //
-//  Mostra quais pedidos "saíram" da produção dentro do intervalo
-//  do filtro — pela PRODUCAO.DATA_FINALIZA (uma linha por pedido,
-//  data de saída = maior DATA_FINALIZA entre as OPs do pedido).
-//  Sem valores monetários.
+//  Mostra os pedidos "saídos" (faturados) dentro do intervalo do
+//  filtro — pela VENDAS.DATA_FINALIZA, restrito a EST_CODIGO = 14
+//  (finalizado) e excluindo os modelos de venda 2, 3, 9, 10, 11 e 12
+//  (orçamento/amostra/etc, não são saída real).
 // ══════════════════════════════════════════════════════════════
 
 function hfEscape($value): string
@@ -43,6 +43,11 @@ function hfFmtDate(?string $value): string
 function hfQty($value): string
 {
     return number_format((float) $value, 0, ',', '.');
+}
+
+function hfMoney($value): string
+{
+    return 'R$ ' . number_format((float) $value, 2, ',', '.');
 }
 
 function hfBaseUrl(): string
@@ -111,15 +116,15 @@ function hfBuildWhere(array $filters, array &$params): string
 {
     $extras = [];
 
-    // "Saiu na data" = OP finalizada dentro do intervalo (PRODUCAO.DATA_FINALIZA)
+    // "Saiu na data" = venda finalizada dentro do intervalo (VENDAS.DATA_FINALIZA)
     $params[] = $filters['data_ini'];
-    $extras[] = 'PR.DATA_FINALIZA >= $' . count($params);
+    $extras[] = 'V.DATA_FINALIZA >= $' . count($params);
     $params[] = $filters['data_fim'];
-    $extras[] = 'PR.DATA_FINALIZA <= $' . count($params);
+    $extras[] = 'V.DATA_FINALIZA <= $' . count($params);
 
     if ($filters['pedido'] !== '') {
         $params[] = '%' . $filters['pedido'] . '%';
-        $extras[] = 'PR.VENDA_REF::TEXT ILIKE $' . count($params);
+        $extras[] = 'V.VEN_COD_PEDIDO::TEXT ILIKE $' . count($params);
     }
     if ($filters['cliente'] !== '') {
         $params[] = '%' . $filters['cliente'] . '%';
@@ -131,50 +136,50 @@ function hfBuildWhere(array $filters, array &$params): string
         $extras[] = 'R.RE_NOME ILIKE $' . count($params);
     }
 
-    return "PR.EMP_CODIGO = 1
-          AND TRIM(PR.VENDA_REF) ~ '^[0-9]+$'
+    return "V.EMP_CODIGO = 1
+          AND V.EST_CODIGO IN (14)
+          AND V.VEN_MODELO_VENDA NOT IN (2, 3, 9, 10, 11, 12)
           AND " . implode("\n          AND ", $extras);
 }
 
-// ── Lista de pedidos que saíram da produção no período ──────────────────────
-// Uma linha por pedido; data de saída = maior DATA_FINALIZA entre as OPs.
-// VENDA_REF é texto livre no ERP (às vezes vazio ou com lixo tipo "AMOSTRA"),
-// por isso o filtro/limpeza acima antes de convertê-lo para o pedido numérico.
+// ── Lista de pedidos que saíram (faturados) no período ───────────────────────
+// Uma linha por pedido (VEN_COD_PEDIDO já é único em VENDAS).
 function hfFetchPedidos($pg, array $filters): array
 {
     $params = [];
     $where  = hfBuildWhere($filters, $params);
 
     $sql = "
-        SELECT
-             TRIM(PR.VENDA_REF)                                                   AS pedido
-            ,TO_CHAR(MAX(PR.DATA_FINALIZA), 'YYYY-MM-DD')                         AS data_finaliza
-            ,MIN(COALESCE(LPAD(V.VEN_NUMERO_DFE::VARCHAR, 9, '0'), ''))           AS numeracao
-            ,MIN(COALESCE(LPAD(V.VEN_SERIE_DFE, 3, '0'), ''))                     AS serie
-            ,MIN(COALESCE(V.VEN_STATUS, 'V'))                                     AS status
-            ,MIN(COALESCE(V.VEN_QUANTIDADE, 0))                                   AS quantidade
-            ,MIN(IIF(COALESCE(C.CLI_NOME_FANTASIA, '') = ''
-                    ,COALESCE(C.CLI_NOME, '')
-                    ,C.CLI_NOME_FANTASIA))                                        AS cliente_fantasia
-            ,MIN(COALESCE(C.CLI_CIDADE, ''))                                      AS cidade
-            ,MIN(COALESCE(R.RE_NOME, ''))                                         AS representante
-        FROM      PRODUCAO       PR
-        LEFT JOIN VENDAS         V ON V.VEN_COD_PEDIDO = TRIM(PR.VENDA_REF)::INTEGER AND V.EMP_CODIGO = 1
-        LEFT JOIN CLIENTES       C ON C.CLI_CODIGO     = COALESCE(V.CLI_CODIGO, PR.CLI_CODIGO)
-        LEFT JOIN REPRESENTANTES R ON R.RE_CODIGO      = V.RE_CODIGO
+        SELECT DISTINCT
+             V.VEN_COD_PEDIDO::TEXT                                              AS pedido
+            ,TO_CHAR(V.DATA_FINALIZA, 'YYYY-MM-DD')                              AS data_finaliza
+            ,COALESCE(LPAD(V.VEN_NUMERO_DFE::VARCHAR, 9, '0'), '')               AS numeracao
+            ,COALESCE(LPAD(V.VEN_SERIE_DFE, 3, '0'), '')                         AS serie
+            ,COALESCE(V.VEN_STATUS, 'V')                                        AS status
+            ,COALESCE(V.VEN_QUANTIDADE, 0)                                       AS quantidade
+            ,COALESCE(V.VEN_TOTAL, 0)                                            AS valor
+            ,IIF(COALESCE(C.CLI_NOME_FANTASIA, '') = ''
+                ,COALESCE(C.CLI_NOME, '')
+                ,C.CLI_NOME_FANTASIA)                                            AS cliente_fantasia
+            ,COALESCE(C.CLI_CIDADE, '')                                          AS cidade
+            ,COALESCE(R.RE_NOME, '')                                             AS representante
+        FROM      VENDAS         V
+        LEFT JOIN CLIENTES       C ON C.CLI_CODIGO = V.CLI_CODIGO
+        LEFT JOIN REPRESENTANTES R ON R.RE_CODIGO  = V.RE_CODIGO
         WHERE {$where}
-        GROUP BY TRIM(PR.VENDA_REF)
         ORDER BY data_finaliza DESC, pedido DESC
     ";
 
     $res = @pg_query_params($pg, $sql, $params);
     if (!$res) {
-        throw new RuntimeException('Não foi possível consultar a produção do ERP: ' . pg_last_error($pg));
+        throw new RuntimeException('Não foi possível consultar as vendas do ERP: ' . pg_last_error($pg));
     }
 
     $rows = [];
     while ($row = pg_fetch_assoc($res)) {
-        $row['quantidade'] = ((string) $row['status'] === 'D' ? -1 : 1) * (float) $row['quantidade'];
+        $sinal = ((string) $row['status'] === 'D') ? -1 : 1;
+        $row['quantidade'] = $sinal * (float) $row['quantidade'];
+        $row['valor']      = $sinal * (float) $row['valor'];
         $rows[] = $row;
     }
     pg_free_result($res);
@@ -242,6 +247,8 @@ $totalPedidos  = count($pedidos);
 $totalPecas    = array_sum(array_map(fn($r) => (float) ($r['quantidade'] ?? 0), $pedidos));
 $totalBag      = array_sum(array_map(fn($r) => (float) ($r['qtd_bag'] ?? 0), $pedidos));
 $totalSacaria  = array_sum(array_map(fn($r) => (float) ($r['qtd_sac'] ?? 0), $pedidos));
+$totalValor    = array_sum(array_map(fn($r) => (float) ($r['valor'] ?? 0), $pedidos));
+$ticketMedio   = $totalPedidos > 0 ? $totalValor / $totalPedidos : 0.0;
 
 $qsPdf = http_build_query(array_filter([
     'data_ini'      => $filters['data_ini'],
@@ -330,7 +337,7 @@ $qsPdf = http_build_query(array_filter([
       <div class="topbar-left">
         <div class="page-title">
           <h1>Histórico de Faturamento</h1>
-          <p>Pedidos que saíram da produção no período — pela data de finalização da OP. Somente leitura.</p>
+          <p>Pedidos que saíram (faturados) no período — pela data de finalização da venda. Somente leitura.</p>
         </div>
       </div>
       <div class="topbar-actions">
@@ -408,12 +415,20 @@ $qsPdf = http_build_query(array_filter([
           <div class="tot-lbl">Pedidos</div>
           <div class="tot-val"><?= hfQty($totalPedidos) ?></div>
         </div>
+        <div class="tot-card">
+          <div class="tot-lbl">Valor total</div>
+          <div class="tot-val"><?= hfMoney($totalValor) ?></div>
+        </div>
+        <div class="tot-card">
+          <div class="tot-lbl">Ticket médio</div>
+          <div class="tot-val"><?= hfMoney($ticketMedio) ?></div>
+        </div>
       </div>
 
       <!-- Pedidos -->
       <div class="panel-table">
         <div class="panel-header">
-          <span class="panel-title">Pedidos que saíram da produção</span>
+          <span class="panel-title">Pedidos que saíram</span>
           <span class="source-badge src-erp">ERP</span>
         </div>
         <div class="table-wrap">
@@ -430,11 +445,12 @@ $qsPdf = http_build_query(array_filter([
                 <th class="hf-right">Bag</th>
                 <th class="hf-right">Sacaria</th>
                 <th class="hf-right">Peças</th>
+                <th class="hf-right">Valor</th>
               </tr>
             </thead>
             <tbody>
               <?php if (!$pedidos): ?>
-                <tr><td colspan="10"><div class="hf-empty-state">Nenhum pedido finalizado com os filtros informados.</div></td></tr>
+                <tr><td colspan="11"><div class="hf-empty-state">Nenhum pedido finalizado com os filtros informados.</div></td></tr>
               <?php else: foreach ($pedidos as $row):
                   $isDev = ($row['status'] ?? 'V') === 'D';
                   $doc   = trim(($row['numeracao'] ?? '') . ($row['serie'] ? ' / ' . $row['serie'] : ''));
@@ -453,6 +469,7 @@ $qsPdf = http_build_query(array_filter([
                   <td class="hf-num"><?= ((float) ($row['qtd_bag'] ?? 0)) != 0.0 ? hfQty($row['qtd_bag']) : '—' ?></td>
                   <td class="hf-num"><?= ((float) ($row['qtd_sac'] ?? 0)) != 0.0 ? hfQty($row['qtd_sac']) : '—' ?></td>
                   <td class="hf-num"><?= hfQty($row['quantidade'] ?? 0) ?></td>
+                  <td class="hf-num"><?= hfMoney($row['valor'] ?? 0) ?></td>
                 </tr>
               <?php endforeach; endif; ?>
             </tbody>
@@ -464,6 +481,7 @@ $qsPdf = http_build_query(array_filter([
                 <td class="hf-right" style="font-weight:700;border-top:2px solid var(--border);"><?= hfQty($totalBag) ?></td>
                 <td class="hf-right" style="font-weight:700;border-top:2px solid var(--border);"><?= hfQty($totalSacaria) ?></td>
                 <td class="hf-right" style="font-weight:700;border-top:2px solid var(--border);"><?= hfQty($totalPecas) ?></td>
+                <td class="hf-right" style="font-weight:700;border-top:2px solid var(--border);"><?= hfMoney($totalValor) ?></td>
               </tr>
             </tfoot>
             <?php endif; ?>
