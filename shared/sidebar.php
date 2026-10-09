@@ -595,21 +595,49 @@ unset($_pag, $gkey, $item);
     <span><?= htmlspecialchars($_spm['label']) ?></span>
   </a>
   <?php endforeach; unset($_spm); ?>
-  <?php foreach ($grupos as $id => $grupo):
-    $itens_mob = array_filter($grupo['itens'], fn($i) => sb_can($i['href']));
+  <?php
+  $_mob_grupos = [];
+  foreach ($grupos as $id => $grupo):
+    if (!empty($grupo['admin_only']) && !$_sb_admin) continue;
+    if (!sb_ativo('grupo:' . $id)) continue;
+    $itens_mob = array_values(array_filter($grupo['itens'], fn($i) =>
+        (empty($i['admin_only']) || $_sb_admin) && sb_can($i['href']) && sb_ativo($i['href'])
+    ));
     if (empty($itens_mob)) continue;
-    $firstHref = array_values($itens_mob)[0]['href'];
+    $_mob_grupos[$id] = ['label' => $grupo['label'], 'itens' => $itens_mob];
     $hrefs = array_column($itens_mob, 'href');
     $isActive = group_open($hrefs) ? 'active' : '';
     ?>
-  <a class="mob-item <?= $isActive ?>" href="<?= htmlspecialchars($firstHref) ?>" title="<?= htmlspecialchars($grupo['label']) ?>">
+  <button type="button" class="mob-item <?= $isActive ?>" data-mob-group="<?= $id ?>" title="<?= htmlspecialchars($grupo['label']) ?>">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <?= $grupo['icon'] ?>
     </svg>
     <span><?= htmlspecialchars($grupo['label']) ?></span>
-  </a>
+  </button>
   <?php endforeach; ?>
 </nav>
+
+<!-- Setas de rolagem da topbar mobile (com mouse não há como rolar na horizontal) -->
+<button type="button" class="mob-scroll mob-scroll-l" id="mobScrollL" aria-label="Rolar menu para a esquerda">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+</button>
+<button type="button" class="mob-scroll mob-scroll-r" id="mobScrollR" aria-label="Rolar menu para a direita">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+</button>
+
+<!-- Painéis de subitens da topbar mobile (fora da nav para não serem cortados pelo overflow) -->
+<div class="mob-sub-backdrop" id="mobSubBackdrop"></div>
+<?php foreach ($_mob_grupos as $id => $mg): ?>
+<div class="mob-sub" id="mob-sub-<?= $id ?>">
+  <div class="mob-sub-title"><?= htmlspecialchars($mg['label']) ?></div>
+  <?php foreach ($mg['itens'] as $item): ?>
+  <a class="nav-sub-item <?= nav_active($item['href']) ?>" href="<?= htmlspecialchars($item['href']) ?>">
+    <span class="nav-dot"></span>
+    <span class="nav-sub-text"><?= htmlspecialchars($item['label']) ?></span>
+  </a>
+  <?php endforeach; ?>
+</div>
+<?php endforeach; unset($_mob_grupos, $mg, $item); ?>
 
 <style>
 /* ── Mobile Topbar ────────────────────────────────── */
@@ -637,7 +665,7 @@ unset($_pag, $gkey, $item);
   align-items: center;
   justify-content: center;
   gap: 3px;
-  padding: 6px 14px;
+  padding: 6px 10px;
   color: var(--text-muted);
   text-decoration: none;
   font-size: 10px;
@@ -645,14 +673,76 @@ unset($_pag, $gkey, $item);
   height: 52px;
   white-space: nowrap;
   transition: color .15s, background .15s;
-  flex-shrink: 0;
+  flex: 1 0 auto;
 }
+/* Esmaece as bordas quando há itens escondidos para rolar */
+.mobile-topbar.fade-r { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
+.mobile-topbar.fade-l { -webkit-mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }
+.mobile-topbar.fade-l.fade-r { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
 .mob-item svg { flex-shrink: 0; }
 .mob-item:hover { color: var(--text-primary); background: rgba(255,255,255,.05); }
 .mob-item.active { color: #cfe0ff; background: rgba(79,123,255,.12); }
+button.mob-item { border: none; background: transparent; font-family: inherit; cursor: pointer; }
+button.mob-item.open { color: var(--text-primary); background: rgba(255,255,255,.08); }
+
+/* Setas nas bordas: aparecem só quando há itens escondidos daquele lado */
+.mob-scroll {
+  display: none;
+  position: fixed;
+  top: 0;
+  width: 28px; height: 52px;
+  border: none; padding: 0;
+  color: var(--text-primary);
+  background: var(--blue-mid);
+  align-items: center; justify-content: center;
+  cursor: pointer;
+  z-index: 102;
+}
+.mob-scroll-l { left: 0;  box-shadow: 6px 0 10px -4px rgba(0,0,0,.45); }
+.mob-scroll-r { right: 0; box-shadow: -6px 0 10px -4px rgba(0,0,0,.45); }
+.mob-scroll:hover { background: #17305a; }
+@media (max-width: 768px) {
+  .mob-scroll.show { display: flex; }
+}
+
+/* Painel de subitens (dropdown da topbar mobile) */
+.mob-sub {
+  display: none;
+  position: fixed;
+  top: 52px; left: 0; right: 0;
+  max-height: calc(100vh - 72px);
+  overflow-y: auto;
+  padding: 10px 10px 8px;
+  background: var(--blue-mid);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 12px 28px rgba(0,0,0,.45);
+  z-index: 101;
+}
+.mob-sub.open { display: block; }
+.mob-sub .nav-sub-item { margin-left: 0; padding: 11px 12px; font-size: 13px; }
+.mob-sub .nav-sub-text { max-width: none; }
+.mob-sub-title {
+  padding: 2px 12px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.mob-sub-backdrop {
+  display: none;
+  position: fixed;
+  inset: 52px 0 0 0;
+  background: rgba(0,0,0,.35);
+  z-index: 99;
+}
+.mob-sub-backdrop.open { display: block; }
 
 @media (max-width: 768px) {
   .mobile-topbar { display: flex; }
+}
+@media (min-width: 769px) {
+  .mob-sub, .mob-sub-backdrop { display: none !important; }
 }
 </style>
 
@@ -725,6 +815,62 @@ unset($_pag, $gkey, $item);
       const collapsed = sidebar.classList.toggle('collapsed');
       localStorage.setItem(SIDEBAR_KEY, collapsed ? 'true' : 'false');
     });
+  }
+
+  /* ── Dropdowns da topbar mobile ── */
+  const mobBackdrop = document.getElementById('mobSubBackdrop');
+  function closeMobSub() {
+    document.querySelectorAll('.mob-sub.open').forEach(function (p) { p.classList.remove('open'); });
+    document.querySelectorAll('.mob-item.open').forEach(function (b) { b.classList.remove('open'); });
+    if (mobBackdrop) mobBackdrop.classList.remove('open');
+  }
+  document.querySelectorAll('[data-mob-group]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      const panel = document.getElementById('mob-sub-' + b.dataset.mobGroup);
+      const wasOpen = panel && panel.classList.contains('open');
+      closeMobSub();
+      if (!panel || wasOpen) return;
+      panel.classList.add('open');
+      b.classList.add('open');
+      if (mobBackdrop) mobBackdrop.classList.add('open');
+      b.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+    });
+  });
+  if (mobBackdrop) mobBackdrop.addEventListener('click', closeMobSub);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMobSub(); });
+  const mobBar = document.getElementById('mobileTopbar');
+  function updateMobFade() {
+    if (!mobBar) return;
+    const max = mobBar.scrollWidth - mobBar.clientWidth;
+    const temEsq = mobBar.scrollLeft > 4;
+    const temDir = mobBar.scrollLeft < max - 4;
+    mobBar.classList.toggle('fade-l', temEsq);
+    mobBar.classList.toggle('fade-r', temDir);
+    if (mobScrollL) mobScrollL.classList.toggle('show', temEsq);
+    if (mobScrollR) mobScrollR.classList.toggle('show', temDir);
+  }
+  const mobScrollL = document.getElementById('mobScrollL');
+  const mobScrollR = document.getElementById('mobScrollR');
+  if (mobBar) {
+    mobBar.addEventListener('scroll', updateMobFade, { passive: true });
+    if (mobScrollL) mobScrollL.addEventListener('click', function () {
+      mobBar.scrollBy({ left: -mobBar.clientWidth * 0.7, behavior: 'smooth' });
+    });
+    if (mobScrollR) mobScrollR.addEventListener('click', function () {
+      mobBar.scrollBy({ left: mobBar.clientWidth * 0.7, behavior: 'smooth' });
+    });
+    /* Rodinha do mouse (vertical) rola a barra na horizontal */
+    mobBar.addEventListener('wheel', function (e) {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      if (mobBar.scrollWidth <= mobBar.clientWidth) return;
+      e.preventDefault();
+      mobBar.scrollLeft += e.deltaY;
+    }, { passive: false });
+    window.addEventListener('resize', updateMobFade);
+    /* Abre já mostrando o item ativo */
+    const act = mobBar.querySelector('.mob-item.active');
+    if (act) mobBar.scrollLeft = act.offsetLeft - (mobBar.clientWidth - act.offsetWidth) / 2;
+    updateMobFade();
   }
 
   /* ── Atalho Alt+B ── */

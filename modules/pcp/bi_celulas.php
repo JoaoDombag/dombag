@@ -47,9 +47,14 @@ function bicFetchMeta(PDO $pdo): float
 function bicFetchCelulas(PDO $pdo): array
 {
     try {
-        $celulas = $pdo->query('SELECT CEL_CODIGO, CEL_NOME FROM CELULA_PRODUCAO ORDER BY CEL_NOME')->fetchAll(PDO::FETCH_ASSOC);
+        $celulas = $pdo->query('SELECT CEL_CODIGO, CEL_NOME, CEL_META_DIARIA FROM CELULA_PRODUCAO ORDER BY CEL_NOME')->fetchAll(PDO::FETCH_ASSOC);
     } catch (Throwable) {
-        return [];
+        // Migration da meta individual ainda não rodou nesta sessão
+        try {
+            $celulas = $pdo->query('SELECT CEL_CODIGO, CEL_NOME, NULL AS CEL_META_DIARIA FROM CELULA_PRODUCAO ORDER BY CEL_NOME')->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Throwable) {
+            return [];
+        }
     }
     $st = $pdo->prepare('SELECT CT_CODIGO FROM CELULA_CENTRO_TRABALHO WHERE CEL_CODIGO = :c');
     foreach ($celulas as &$c) {
@@ -219,6 +224,8 @@ function bicFetchProducaoPorCelula(PDO $pdo, $pg, string $dia): array
         $resultado[] = [
             'cel_codigo'         => (int) $c['CEL_CODIGO'],
             'cel_nome'           => $c['CEL_NOME'],
+            // null = usa a meta padrão (payload.meta)
+            'meta'               => $c['CEL_META_DIARIA'] !== null ? (float) $c['CEL_META_DIARIA'] : null,
             'qtd_produzida'      => $total,
             'qtd_centros'        => count($c['centros']),
             'qtd_funcionarios'   => count($funcs),
@@ -314,7 +321,8 @@ if (!$pg) {
   @media (max-width: 768px) {
     .app-wrapper { height: 100vh !important; overflow: hidden !important; flex-direction: row !important; }
     .main { height: 100vh !important; overflow: hidden !important; }
-    .content { padding: 0 !important; overflow: hidden !important; height: 100vh !important; flex: 1 1 auto !important; display: flex !important; }
+    /* altura = o que sobra abaixo das barras (que agora podem ter 2-3 linhas) */
+    .content { padding: 0 !important; overflow: hidden !important; height: auto !important; min-height: 0; flex: 1 1 auto !important; display: flex !important; }
   }
 
   #bizDashboard {
@@ -403,16 +411,63 @@ if (!$pg) {
   /* ── Topbar desta página: badge "Ao vivo" + hora + botões de texto não
      cabem numa única linha em telas de celular — mesma regra do BI da
      Produção. ── */
-  @media (max-width: 640px) {
+  .biz-btn-short { display: none; }
+  @media (max-width: 768px) {
     .topbar { flex-wrap: wrap; row-gap: 8px; }
-    .topbar-actions { flex-wrap: wrap; row-gap: 6px; }
+    .topbar-left { width: 100%; }
+    .topbar-actions { width: 100%; flex-wrap: wrap; row-gap: 8px; column-gap: 8px; }
     .last-update { display: none; }
-  }
-  @media (max-width: 360px) {
-    .biz-fullscreen-btn span { display: none; }
+    /* Linha 1: ao vivo + data. Linha 2: os três botões dividindo a largura */
+    .biz-date-filter { margin-left: auto; }
+    .topbar-actions .btn-secondary {
+      flex: 1 1 0; min-width: 0; justify-content: center;
+      padding: 8px 10px; font-size: 12px; white-space: nowrap; overflow: hidden;
+    }
+    .biz-btn-long { display: none; }
+    .biz-btn-short { display: inline; }
   }
 
+  /* ── Celular (fora da tela cheia): em vez de espremer tudo na altura da
+     tela, vira uma lista rolável — uma célula por linha, com anel de tamanho
+     fixo e o detalhamento (OPs/funcionários) abaixo dele. JS: biApplyScale. ── */
+  body.bi-mobile .content { overflow-y: auto !important; overflow-x: hidden !important; display: block !important; -webkit-overflow-scrolling: touch; }
+  body.bi-mobile #bizDashboard { width: 100% !important; min-width: 0; min-height: 0; padding: 12px; transform: none !important; }
+  body.bi-mobile .biz-card { padding: 14px; }
+  body.bi-mobile .biz-func-grid { grid-template-columns: 1fr !important; grid-auto-rows: auto; min-height: 0; gap: 14px; }
+  body.bi-mobile .biz-cel-card,
+  body.bi-mobile .biz-cel-card.has-detail { flex-direction: column; height: auto; padding: 16px; gap: 14px; }
+  body.bi-mobile .biz-cel-card .biz-cel-left { display: flex; flex-direction: column; flex: none; }
+  body.bi-mobile .biz-cel-ring-wrap { flex: none; }
+  body.bi-mobile .biz-cel-ring-shape { width: 150px; height: 150px; }
+  body.bi-mobile .biz-cel-name { font-size: 20px; }
+  body.bi-mobile .biz-cel-sub { font-size: 13px; }
+  body.bi-mobile .biz-cel-nums strong { font-size: 28px; }
+  body.bi-mobile .biz-cel-msg { font-size: 15px; }
+  body.bi-mobile .biz-cel-card .biz-cel-detail {
+    display: flex; flex-direction: column; gap: 14px;
+    border-left: 0; padding-left: 0; border-top: 1px solid var(--biz-border); padding-top: 12px; overflow: visible;
+  }
+  body.bi-mobile .biz-detail-list { overflow: visible; }
+  body.bi-mobile .biz-cel-detail-sec h4 { font-size: 11px; }
+  body.bi-mobile .biz-detail-row { font-size: 13px; }
+  body.bi-mobile .biz-detail-empty { font-size: 13px; }
+  body.bi-mobile .biz-op-live { font-size: 10px; }
+
   .biz-fullscreen-btn { display: flex; align-items: center; gap: 7px; }
+
+  /* Botão flutuante para sair da tela cheia quando o navegador não tem a API
+     nativa (iPhone/fallback): a topbar some e não há Esc no celular. */
+  .biz-fs-exit {
+    display: none; position: fixed; top: 10px; right: 10px; z-index: 1000;
+    width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255,255,255,.15);
+    background: rgba(15,32,64,.75); color: #e8edf5; cursor: pointer;
+    align-items: center; justify-content: center; opacity: .55;
+  }
+  .biz-fs-exit:hover, .biz-fs-exit:active { opacity: 1; }
+  html:not(:fullscreen) body.biz-fs-fallback .biz-fs-exit { display: flex; }
+  @media (max-width: 768px) {
+    body.biz-fs-fallback .biz-fs-exit { display: flex; }
+  }
 
   /* ── Topbar mais legível de longe (o painel fica numa TV) ── */
   .page-title h1 { font-size: 22px; font-weight: 800; }
@@ -450,6 +505,11 @@ if (!$pg) {
      JS (biApplyScale) escalar o painel — mesma técnica do BI da Produção. ── */
   html:fullscreen .sidebar, body.biz-fs-fallback .sidebar,
   html:fullscreen .topbar,  body.biz-fs-fallback .topbar { display: none !important; }
+  html:fullscreen .mobile-topbar, body.biz-fs-fallback .mobile-topbar,
+  html:fullscreen .mob-sub,       body.biz-fs-fallback .mob-sub,
+  html:fullscreen .mob-scroll,    body.biz-fs-fallback .mob-scroll,
+  html:fullscreen .mob-sub-backdrop, body.biz-fs-fallback .mob-sub-backdrop { display: none !important; }
+  html:fullscreen .main, body.biz-fs-fallback .main { padding-top: 0 !important; }
 
   html:fullscreen .app-wrapper, body.biz-fs-fallback .app-wrapper { height: 100vh !important; overflow: hidden; }
   html:fullscreen .main,        body.biz-fs-fallback .main        { height: 100vh !important; overflow: hidden; }
@@ -483,11 +543,11 @@ if (!$pg) {
         <span class="last-update">Atualizado às <span id="biUpdatedAt"><?= bicEscape($payload['atualizado_em']) ?></span></span>
         <a href="/pcp/celulas" class="btn-secondary">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-          Cadastro de Células
+          <span class="biz-btn-long">Cadastro de Células</span><span class="biz-btn-short">Células</span>
         </a>
         <a href="/pcp/bi" class="btn-secondary">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
-          BI da Produção
+          <span class="biz-btn-long">BI da Produção</span><span class="biz-btn-short">BI Produção</span>
         </a>
         <button type="button" class="btn-secondary biz-fullscreen-btn" id="biFullscreenBtn">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
@@ -495,6 +555,10 @@ if (!$pg) {
         </button>
       </div>
     </header>
+
+    <button type="button" class="biz-fs-exit" id="biFsExit" title="Sair da tela cheia" aria-label="Sair da tela cheia">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+    </button>
 
     <div class="content">
 
@@ -531,6 +595,11 @@ function biEsc(v) {
   return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 let biMetaAtual = <?= (float) $payload['meta'] ?>;
+let biUltimasCelulas = [];
+const biMqMobile = window.matchMedia('(max-width: 768px)');
+function biIsKiosk() {
+  return document.body.classList.contains('biz-fs-fallback') || !!biFsElement();
+}
 let biDiaLabel = <?= json_encode($payload['dia_label'], JSON_UNESCAPED_UNICODE) ?>;
 const biDiaAtual = <?= json_encode($payload['dia']) ?>;
 
@@ -611,10 +680,12 @@ function biRenderCelulas(celulas) {
   // Até 2 colunas de cards (ou seja, até 4 células) os cards são largos o
   // bastante pra mostrar o painel de detalhamento ao lado do anel; com mais
   // colunas ficaria apertado demais.
-  const comDetalhe = cols <= 2;
+  // No celular (lista de uma coluna) o detalhamento vai abaixo do anel, então
+  // cabe sempre, qualquer que seja a quantidade de células.
+  const comDetalhe = cols <= 2 || (biMqMobile.matches && !biIsKiosk());
   grid.innerHTML = celulas.map(c => {
-    const hit = biMetaAtual > 0 && c.qtd_produzida >= biMetaAtual;
-    const msg = biCelulaMensagem(c.qtd_produzida, hit);
+    const meta = biMetaCelula(c);
+    const hit = meta > 0 && c.qtd_produzida >= meta;
     return `
     <div class="biz-cel-card${hit ? ' biz-cel-hit' : ''}${comDetalhe ? ' has-detail' : ''}">
       <div class="biz-cel-left">
@@ -625,7 +696,7 @@ function biRenderCelulas(celulas) {
         <div class="biz-cel-ring-wrap"><div class="biz-cel-ring-shape"><svg class="biz-gauge"></svg></div></div>
         <div class="biz-cel-foot">
           <div class="biz-cel-msg${hit ? ' msg-hit' : ' msg-behind'}">Produzido x Meta</div>
-          <div class="biz-cel-nums"> <strong>${biFmt(c.qtd_produzida, 0)}</strong> / <strong>${biFmt(biMetaAtual, 0)}</strong></div>
+          <div class="biz-cel-nums"> <strong>${biFmt(c.qtd_produzida, 0)}</strong> / <strong>${biFmt(meta, 0)}</strong></div>
         </div>
       </div>
       ${comDetalhe ? biCelulaDetalhe(c) : ''}
@@ -635,8 +706,9 @@ function biRenderCelulas(celulas) {
 
   const svgs = grid.querySelectorAll('.biz-gauge');
   celulas.forEach((c, i) => {
-    const pct = biMetaAtual > 0 ? (c.qtd_produzida / biMetaAtual) * 100 : 0;
-    const hit = biMetaAtual > 0 && c.qtd_produzida >= biMetaAtual;
+    const meta = biMetaCelula(c);
+    const pct = meta > 0 ? (c.qtd_produzida / meta) * 100 : 0;
+    const hit = meta > 0 && c.qtd_produzida >= meta;
     biRenderGauge(svgs[i], pct, hit);
   });
 }
@@ -683,15 +755,20 @@ function biCelulaDetalhe(c) {
   `;
 }
 
+// ── Meta da célula: a própria (Cadastro de Células) ou, sem ela, a padrão ────
+function biMetaCelula(c) {
+  return c.meta !== null && c.meta !== undefined ? Number(c.meta) : biMetaAtual;
+}
+
 // ── Mensagem de incentivo: quanto falta pra bater a meta, ou o quanto passou
 // dela — dá um retorno mais direto do que só o número da meta. ──────────────
-function biCelulaMensagem(qtdProduzida, hit) {
-  if (biMetaAtual <= 0) return '';
+function biCelulaMensagem(qtdProduzida, hit, meta) {
+  if (meta <= 0) return '';
   if (hit) {
-    const acima = qtdProduzida - biMetaAtual;
+    const acima = qtdProduzida - meta;
     return acima > 0 ? `Meta batida — ${biFmt(acima, 0)} acima!` : 'Meta batida!';
   }
-  const falta = biMetaAtual - qtdProduzida;
+  const falta = meta - qtdProduzida;
   return `Faltam ${biFmt(falta, 0)} para a meta`;
 }
 
@@ -713,7 +790,19 @@ function biApplyScale() {
   const availH = wrap.clientHeight;
   if (!availW || !availH) return;
 
-  const kiosk = document.body.classList.contains('biz-fs-fallback') || !!biFsElement();
+  const kiosk = biIsKiosk();
+
+  // Celular fora da tela cheia: lista rolável, sem escala nem altura fixa
+  // (não zera o scroll — a atualização a cada 15s não pode pular pro topo).
+  const mobile = !kiosk && biMqMobile.matches;
+  document.body.classList.toggle('bi-mobile', mobile);
+  if (mobile) {
+    document.body.classList.remove('bi-fit');
+    stage.style.transform = 'none';
+    stage.style.width = '';
+    stage.style.height = '';
+    return;
+  }
 
   // Fora da tela cheia: sem transform. O painel ocupa 100% da largura real e
   // tem a altura fixada no espaço visível abaixo da topbar — os cards ficam
@@ -750,11 +839,18 @@ function biApplyScale() {
   stage.style.marginBottom = '';
 }
 window.addEventListener('resize', biApplyScale);
+// Ao cruzar o breakpoint (girar o celular, redimensionar), o card muda de
+// formato (detalhamento sempre visível no celular) — redesenha.
+biMqMobile.addEventListener('change', () => {
+  biRenderCelulas(biUltimasCelulas);
+  biApplyScale();
+});
 
 function biRenderAll(data) {
   biMetaAtual = Number(data.meta || 0);
   if (data.dia_label) biDiaLabel = data.dia_label;
-  biRenderCelulas(data.celulas || []);
+  biUltimasCelulas = data.celulas || [];
+  biRenderCelulas(biUltimasCelulas);
 
   const upd = document.getElementById('biUpdatedAt');
   if (upd) upd.textContent = data.atualizado_em || '';
@@ -798,6 +894,8 @@ function biExitFs() {
 function biSetFsState(active) {
   document.body.classList.toggle('biz-fs-fallback', active);
   biFsLabel.textContent = active ? 'Sair da tela cheia' : 'Tela cheia';
+  // No celular o card muda de formato entre lista e painel de TV
+  if (biMqMobile.matches) biRenderCelulas(biUltimasCelulas);
   requestAnimationFrame(biApplyScale);
   // A transição da API nativa de tela cheia (animação do SO) pode demorar
   // mais que um frame — reaplica de novo um pouco depois pra pegar o
@@ -814,6 +912,10 @@ biFsBtn.addEventListener('click', () => {
     biSetFsState(false);
     if (biFsElement()) biExitFs().catch(() => {});
   }
+});
+document.getElementById('biFsExit').addEventListener('click', () => {
+  biSetFsState(false);
+  if (biFsElement()) biExitFs().catch(() => {});
 });
 ['fullscreenchange', 'webkitfullscreenchange', 'MSFullscreenChange'].forEach(ev => {
   document.addEventListener(ev, () => {

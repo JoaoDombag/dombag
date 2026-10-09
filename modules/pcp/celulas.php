@@ -45,11 +45,23 @@ function celSaveMeta(PDO $pdo, float $valor): void
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $acao = $_POST['acao'] ?? '';
 
+    // Sessões abertas antes da migration da meta individual ainda não a rodaram
+    try {
+        $pdo->query('SELECT CEL_META_DIARIA FROM CELULA_PRODUCAO LIMIT 0');
+    } catch (Throwable) {
+        unset($_SESSION['mig_ok']);
+        require_once $_SERVER['DOCUMENT_ROOT'] . '/config/migrations.php';
+        rodarMigrations();
+    }
+
     // ── Criar / Editar célula (nome + funcionários) ─────────────────────────────
     if ($acao === 'criar' || $acao === 'editar') {
         $cod  = (int) ($_POST['cod'] ?? 0);
         $nome = trim($_POST['nome'] ?? '');
         $centros = array_map('intval', $_POST['centros'] ?? []);
+        // Vazio = usa a meta padrão; senão, meta própria da célula
+        $metaRaw = trim(str_replace(',', '.', (string) ($_POST['meta_cel'] ?? '')));
+        $metaCel = $metaRaw === '' ? null : max(0.0, (float) $metaRaw);
 
         if (!$nome) {
             $msg = 'Informe o nome da célula.';
@@ -59,11 +71,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->beginTransaction();
 
                 if ($acao === 'criar') {
-                    $pdo->prepare('INSERT INTO CELULA_PRODUCAO (CEL_NOME) VALUES (:n)')->execute([':n' => $nome]);
+                    $pdo->prepare('INSERT INTO CELULA_PRODUCAO (CEL_NOME, CEL_META_DIARIA) VALUES (:n, :m)')
+                        ->execute([':n' => $nome, ':m' => $metaCel]);
                     $cod = (int) $pdo->lastInsertId();
                 } else {
-                    $pdo->prepare('UPDATE CELULA_PRODUCAO SET CEL_NOME = :n WHERE CEL_CODIGO = :c')
-                        ->execute([':n' => $nome, ':c' => $cod]);
+                    $pdo->prepare('UPDATE CELULA_PRODUCAO SET CEL_NOME = :n, CEL_META_DIARIA = :m WHERE CEL_CODIGO = :c')
+                        ->execute([':n' => $nome, ':m' => $metaCel, ':c' => $cod]);
                 }
 
                 $pdo->prepare('DELETE FROM CELULA_CENTRO_TRABALHO WHERE CEL_CODIGO = :c')->execute([':c' => $cod]);
@@ -108,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $valor = 0.0;
         }
         celSaveMeta($pdo, $valor);
-        $msg = 'Meta diária atualizada com sucesso.';
+        $msg = 'Meta padrão atualizada com sucesso.';
         $msg_tipo = 'ok';
     }
 }
@@ -137,9 +150,14 @@ foreach ($centrosErp as $f) {
 
 // ── Lista de células com seus centros de trabalho ─────────────────────────────
 try {
-    $celulas = $pdo->query('SELECT CEL_CODIGO, CEL_NOME FROM CELULA_PRODUCAO ORDER BY CEL_NOME')->fetchAll(PDO::FETCH_ASSOC);
+    $celulas = $pdo->query('SELECT CEL_CODIGO, CEL_NOME, CEL_META_DIARIA FROM CELULA_PRODUCAO ORDER BY CEL_NOME')->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable) {
-    $celulas = [];
+    // Migration da meta individual ainda não rodou nesta sessão
+    try {
+        $celulas = $pdo->query('SELECT CEL_CODIGO, CEL_NOME, NULL AS CEL_META_DIARIA FROM CELULA_PRODUCAO ORDER BY CEL_NOME')->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable) {
+        $celulas = [];
+    }
 }
 foreach ($celulas as &$c) {
     $c['centros'] = celCentrosDaCelula($pdo, (int) $c['CEL_CODIGO']);
@@ -275,11 +293,12 @@ $total = count($celulas);
 
       <div class="table-panel" style="margin-bottom:20px;">
         <div class="panel-header">
-          <h2>Meta Diária por Célula</h2>
+          <h2>Meta Diária Padrão</h2>
         </div>
         <div style="padding:16px 18px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
           <p style="font-size:12.5px; color:var(--text-muted); flex:1; min-width:220px;">
-            Meta usada para comparar a produção de cada célula no <strong>BI Células</strong>.
+            Usada no <strong>BI Células</strong> para as células sem meta própria.
+            Para definir a meta de uma célula específica, clique em <strong>Editar</strong> na célula.
           </p>
           <form method="POST" style="display:flex; align-items:center; gap:8px;">
             <input type="hidden" name="acao" value="meta_diaria">
@@ -309,6 +328,7 @@ $total = count($celulas);
                 <th>Código</th>
                 <th>Nome</th>
                 <th>Centros de Trabalho</th>
+                <th>Meta Diária</th>
                 <th>Operações</th>
               </tr>
             </thead>
@@ -328,10 +348,17 @@ $total = count($celulas);
                   </div>
                 <?php endif; ?>
               </td>
+              <td style="white-space:nowrap;">
+                <?php if ($c['CEL_META_DIARIA'] !== null): ?>
+                  <strong><?= number_format((float) $c['CEL_META_DIARIA'], 0, ',', '.') ?></strong>
+                <?php else: ?>
+                  <span class="td-muted"><?= number_format($metaDiaria, 0, ',', '.') ?> (padrão)</span>
+                <?php endif; ?>
+              </td>
               <td>
                 <div class="td-actions">
                   <button class="btn-sm btn-sm-edit"
-                          onclick='abrirModalEditar(<?= (int) $c['CEL_CODIGO'] ?>, <?= json_encode($c['CEL_NOME']) ?>, <?= json_encode($c['centros']) ?>)'>
+                          onclick='abrirModalEditar(<?= (int) $c['CEL_CODIGO'] ?>, <?= json_encode($c['CEL_NOME']) ?>, <?= json_encode($c['centros']) ?>, <?= json_encode($c['CEL_META_DIARIA'] !== null ? (float) $c['CEL_META_DIARIA'] : null) ?>)'>
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     Editar
                   </button>
@@ -367,6 +394,12 @@ $total = count($celulas);
         <input type="text" name="nome" id="frmNome"
                placeholder="Ex: Célula A"
                maxlength="100" required autocomplete="off">
+      </div>
+      <div class="field" style="margin-top:14px;">
+        <label>Meta Diária</label>
+        <input type="number" name="meta_cel" id="frmMeta" min="0" step="1"
+               placeholder="Padrão: <?= number_format($metaDiaria, 0, ',', '.') ?>">
+        <small style="font-size:11px; color:var(--text-muted);">Deixe em branco para usar a meta padrão.</small>
       </div>
       <div class="field" style="margin-top:14px;">
         <label>Centros de Trabalho</label>
@@ -453,6 +486,7 @@ function abrirModalCriar() {
   document.getElementById('frmAcao').value = 'criar';
   document.getElementById('frmCod').value = '';
   document.getElementById('frmNome').value = '';
+  document.getElementById('frmMeta').value = '';
   document.getElementById('funcSearch').value = '';
   limparSelecaoFuncionarios();
   aplicarBloqueioCentros(0);
@@ -461,11 +495,12 @@ function abrirModalCriar() {
   document.getElementById('frmNome').focus();
 }
 
-function abrirModalEditar(cod, nome, funcionarios) {
+function abrirModalEditar(cod, nome, funcionarios, meta) {
   document.getElementById('modalFormTitulo').textContent = 'Editar Célula';
   document.getElementById('frmAcao').value = 'editar';
   document.getElementById('frmCod').value = cod;
   document.getElementById('frmNome').value = nome;
+  document.getElementById('frmMeta').value = meta === null || meta === undefined ? '' : Math.round(meta);
   document.getElementById('funcSearch').value = '';
   limparSelecaoFuncionarios();
   aplicarBloqueioCentros(cod);

@@ -434,10 +434,12 @@ tbody tr:hover td { background:rgba(255,255,255,.025); }
   .sidebar { display:none !important; }
 
   /* ── Topbar desktop ──────────────────────────── */
-  .topbar        { padding:10px 14px; min-height:auto; }
+  .topbar        { padding:10px 14px; min-height:auto; flex-wrap:wrap; row-gap:8px; }
   .page-title h1 { font-size:15px; white-space:normal; }
   .page-title p  { display:none; }
-  .topbar-actions { gap:6px; flex-wrap:wrap; }
+  /* flex-shrink:1 + min-width:0: sem isso o bloco nunca fica mais estreito que
+     a soma dos botões e o wrap não acontece — os últimos saem da tela. */
+  .topbar-actions { gap:6px; flex-wrap:wrap; flex-shrink:1; min-width:0; max-width:100%; }
 
   /* ── Painéis ──────────────────────────────────── */
   .panel        { overflow-x:auto; }
