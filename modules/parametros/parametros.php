@@ -35,11 +35,93 @@ function setParam(PDO $pdo, string $chave, string $valor): void
     ')->execute([':k' => $chave, ':v' => $valor, ':v2' => $valor]);
 }
 
+// ── Assistente IA: só administradores ────────────────────────────────────────
+$st = $pdo->prepare('SELECT USU_ADMIN FROM USUARIOS WHERE USU_CODIGO = ?');
+$st->execute([usuCodigo()]);
+$ehAdmin = !empty($st->fetchColumn());
+if (empty($_SESSION['par_csrf'])) {
+    $_SESSION['par_csrf'] = bin2hex(random_bytes(32));
+}
+$ia_erros = [];
+
+// Teste de conexão com o provedor (AJAX, só admin)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['aba'] ?? '') === 'ia_testar') {
+    header('Content-Type: application/json; charset=utf-8');
+    if (!$ehAdmin || !hash_equals($_SESSION['par_csrf'], (string) ($_POST['csrf'] ?? ''))) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'msg' => 'Sem permissão.']);
+        exit;
+    }
+    echo json_encode(iaTestarConexao(), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// Consulta só os metadados do modelo configurado (não envia dados da empresa).
+function iaTestarConexao(): array
+{
+    $gemini = (dombagConfig('CHAT_PROVEDOR') ?: (dombagConfig('GEMINI_API_KEY') ? 'gemini' : 'anthropic')) === 'gemini';
+    $chave  = dombagConfig($gemini ? 'GEMINI_API_KEY' : 'ANTHROPIC_API_KEY');
+    $modelo = $gemini ? dombagConfig('GEMINI_MODEL', 'gemini-3.5-flash-lite') : dombagConfig('CLAUDE_MODEL', 'claude-sonnet-5-5');
+    if (!$chave) {
+        return ['ok' => false, 'msg' => 'Nenhuma chave configurada para o provedor ' . ($gemini ? 'Gemini' : 'Claude') . '.'];
+    }
+    $ch = curl_init($gemini
+        ? 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode($modelo)
+        : 'https://api.anthropic.com/v1/models/' . rawurlencode($modelo));
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15, CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_HTTPHEADER => $gemini ? ['x-goog-api-key: ' . $chave] : ['x-api-key: ' . $chave, 'anthropic-version: 2023-06-01'],
+    ]);
+    $corpo  = curl_exec($ch);
+    $codigo = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $erro   = curl_error($ch);
+    curl_close($ch);
+    if ($corpo === false) {
+        return ['ok' => false, 'msg' => 'Sem conexão com o provedor: ' . $erro];
+    }
+    return match (true) {
+        $codigo === 200            => ['ok' => true,  'msg' => 'Conectado. Modelo ' . $modelo . ' disponível para esta chave.'],
+        in_array($codigo, [401, 403], true) || ($codigo === 400 && str_contains((string) $corpo, 'API_KEY')) => ['ok' => false, 'msg' => 'Chave recusada pelo provedor (inválida ou sem permissão).'],
+        $codigo === 404            => ['ok' => false, 'msg' => 'A chave funciona, mas o modelo "' . $modelo . '" não existe ou não está liberado.'],
+        $codigo === 429            => ['ok' => false, 'msg' => 'Chave válida, mas a cota está esgotada no momento.'],
+        default                    => ['ok' => false, 'msg' => "O provedor respondeu HTTP {$codigo}."],
+    };
+}
+
 // ── POST ──────────────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $aba = $_POST['aba'] ?? 'integracoes';
 
-    if ($aba === 'integracoes') {
+    if ($aba === 'ia') {
+        if (!$ehAdmin || !hash_equals($_SESSION['par_csrf'], (string) ($_POST['csrf'] ?? ''))) {
+            http_response_code(403);
+            exit('Sem permissão.');
+        }
+        // Valida tudo antes de gravar qualquer coisa.
+        $novos = [];
+        foreach (DOMBAG_CONFIG_IA as $k => $d) {
+            $v = (string) ($_POST['ia'][$k] ?? '');
+            if ($d['tipo'] === 'segredo') {
+                if (!empty($_POST['ia_limpar'][$k])) {
+                    $novos[$k] = '';
+                }
+                if (trim($v) === '') {
+                    continue;                            // em branco = mantém a chave atual
+                }
+            }
+            [$norm, $erro] = dombagConfigValidar($k, $v);
+            if ($erro) {
+                $ia_erros[] = $erro;
+            } else {
+                $novos[$k] = $norm;
+            }
+        }
+        if (!$ia_erros) {
+            foreach ($novos as $k => $v) {
+                dombagConfigSalvar($k, $v);
+            }
+        }
+    } elseif ($aba === 'integracoes') {
         $openai_key          = trim($_POST['openai_key']          ?? '');
         $trello_key          = trim($_POST['trello_key']          ?? '');
         $trello_token        = trim($_POST['trello_token']        ?? '');
@@ -53,8 +135,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setParam($pdo, 'tema_sistema', $tema);
     }
 
-    $msg      = 'Parâmetros salvos com sucesso.';
-    $msg_tipo = 'ok';
+    $msg      = $ia_erros ? 'Nada foi salvo. Corrija: ' . htmlspecialchars(implode(' ', $ia_erros)) : 'Parâmetros salvos com sucesso.';
+    $msg_tipo = $ia_erros ? 'err' : 'ok';
 }
 
 // ── Leitura atual ─────────────────────────────────────────────────────────────
@@ -65,7 +147,7 @@ $trello_default_board = getParam($pdo, 'trello_default_board');
 $tema                 = getParam($pdo, 'tema_sistema', 'claro');
 
 $aba_ativa  = $_POST['aba'] ?? ($_GET['aba'] ?? 'integracoes');
-if (!in_array($aba_ativa, ['integracoes', 'aparencia'])) $aba_ativa = 'integracoes';
+if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['integracoes', 'aparencia'])) $aba_ativa = 'integracoes';
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -184,6 +266,25 @@ if (!in_array($aba_ativa, ['integracoes', 'aparencia'])) $aba_ativa = 'integraco
   .tab-btn { font-size: 11px; padding: 7px 10px; gap: 5px; }
   .tab-btn svg { width: 14px; height: 14px; }
 }
+/* ── Aba Assistente IA ── */
+.ia-intro { font-size: 12.5px; color: var(--text-muted); margin-bottom: 18px; max-width: 820px; line-height: 1.6; }
+.ia-intro a { color: #7db3ff; }
+.ia-grupo { padding: 16px 0; border-top: 1px solid var(--border); }
+.ia-grupo:first-of-type { border-top: 0; padding-top: 0; }
+.ia-grupo-t { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; }
+.ia-campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px 22px; max-width: 1000px; }
+.ia-meta { display: flex; flex-direction: column; gap: 2px; font-size: 11px; color: var(--text-muted); margin-top: 5px; }
+.ia-origem { font-weight: 600; }
+.ia-origem.ok  { color: var(--teal); }
+.ia-origem.arq { color: #7db3ff; }
+.ia-origem.amb { color: var(--amber); }
+.ia-limpar { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-muted); margin-top: 6px; font-weight: 400; }
+.ia-aviso { margin-top: 8px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg);
+            font-size: 12px; color: var(--text-muted); line-height: 1.6; max-width: 1000px; }
+.ia-aviso b { color: var(--text-primary); }
+.ia-teste { font-size: 12px; margin-right: auto; margin-left: 10px; }
+.ia-teste.ok  { color: var(--teal); }
+.ia-teste.err { color: var(--red); }
 </style>
 </head>
 <body>
@@ -240,6 +341,15 @@ if (!in_array($aba_ativa, ['integracoes', 'aparencia'])) $aba_ativa = 'integraco
             </svg>
             Aparência
           </button>
+          <?php if ($ehAdmin): ?>
+          <button class="tab-btn <?= $aba_ativa === 'ia' ? 'active' : '' ?>"
+                  onclick="trocarAba('ia')" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8"/><path d="M8 13h5"/>
+            </svg>
+            Assistente IA
+          </button>
+          <?php endif; ?>
         </div>
 
         <!-- ── Aba: Integrações ──────────────────────────────────────────── -->
@@ -417,12 +527,120 @@ if (!in_array($aba_ativa, ['integracoes', 'aparencia'])) $aba_ativa = 'integraco
           </form>
         </div>
 
+        <?php if ($ehAdmin):
+            $origemTxt = [
+                'tela'     => ['Salvo nesta tela', 'ok'],
+                'arquivo'  => ['Vindo do arquivo dombag.env.php', 'arq'],
+                'ambiente' => ['Variável de ambiente do servidor — tem prioridade, altere no servidor', 'amb'],
+                'padrao'   => ['Padrão do sistema', 'pad'],
+            ];
+            $telaIA = dombagConfigTela();
+        ?>
+        <!-- ── Aba: Assistente IA (só admin) ─────────────────────────────── -->
+        <div class="tab-pane <?= $aba_ativa === 'ia' ? 'active' : '' ?>" id="pane-ia">
+          <form method="POST" autocomplete="off">
+            <input type="hidden" name="aba" value="ia">
+            <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['par_csrf']) ?>">
+            <div class="form-body">
+              <p class="ia-intro">
+                Configurações do <a href="/assistente">Assistente IA</a>. Valem na hora para todos os usuários.
+                Campos em branco usam o valor do arquivo <code>dombag.env.php</code> ou o padrão do sistema.
+                As chaves são guardadas criptografadas e nunca são exibidas inteiras.
+              </p>
+
+              <?php foreach (DOMBAG_CONFIG_IA_GRUPOS as $g => $tituloGrupo): ?>
+              <div class="ia-grupo">
+                <div class="ia-grupo-t"><?= htmlspecialchars($tituloGrupo) ?></div>
+                <div class="ia-campos">
+                <?php foreach (DOMBAG_CONFIG_IA as $k => $d):
+                    if ($d['grupo'] !== $g) continue;
+                    $origem  = dombagConfigOrigem($k);
+                    $efetivo = dombagConfig($k, $d['padrao'] ?? null);
+                    $naTela  = $telaIA[$k] ?? '';
+                    $id      = 'ia_' . strtolower($k);
+                ?>
+                  <div class="field">
+                    <label for="<?= $id ?>"><?= htmlspecialchars($d['rotulo']) ?></label>
+                    <?php if ($d['tipo'] === 'opcao'): ?>
+                      <select name="ia[<?= $k ?>]" id="<?= $id ?>">
+                        <option value=""><?= $k === 'CHAT_PROVEDOR' ? 'Automático (Gemini, se houver chave)' : 'Padrão' ?><?= $origem !== 'tela' && $efetivo ? ' — atual: ' . htmlspecialchars($d['opcoes'][$efetivo] ?? $efetivo) : '' ?></option>
+                        <?php foreach ($d['opcoes'] as $ov => $ol): ?>
+                          <option value="<?= htmlspecialchars($ov) ?>" <?= $naTela === $ov ? 'selected' : '' ?>><?= htmlspecialchars($ol) ?></option>
+                        <?php endforeach; ?>
+                      </select>
+                    <?php elseif ($d['tipo'] === 'segredo'): ?>
+                      <div class="api-key-wrap">
+                        <input type="password" name="ia[<?= $k ?>]" id="<?= $id ?>" value="" maxlength="300" autocomplete="new-password"
+                               placeholder="<?= $efetivo ? 'Atual: ' . htmlspecialchars(dombagMascarar($efetivo)) . ' — em branco mantém' : 'Cole a chave aqui' ?>">
+                      </div>
+                      <?php if ($naTela !== ''): ?>
+                        <label class="ia-limpar"><input type="checkbox" name="ia_limpar[<?= $k ?>]" value="1"> Remover a chave salva nesta tela</label>
+                      <?php endif; ?>
+                    <?php else: ?>
+                      <input type="<?= $d['tipo'] === 'inteiro' ? 'number' : 'text' ?>" name="ia[<?= $k ?>]" id="<?= $id ?>"
+                             value="<?= htmlspecialchars($naTela) ?>"
+                             <?= $d['tipo'] === 'inteiro' ? 'min="' . $d['min'] . '" max="' . $d['max'] . '"' : 'maxlength="200"' ?>
+                             <?= !empty($d['sugestoes']) ? 'list="' . $id . '_lista"' : '' ?>
+                             placeholder="<?= $efetivo !== null && $efetivo !== '' ? 'Atual: ' . htmlspecialchars($efetivo) : '' ?>">
+                      <?php if (!empty($d['sugestoes'])): ?>
+                        <datalist id="<?= $id ?>_lista"><?php foreach ($d['sugestoes'] as $s): ?><option value="<?= htmlspecialchars($s) ?>"><?php endforeach; ?></datalist>
+                      <?php endif; ?>
+                    <?php endif; ?>
+                    <div class="ia-meta">
+                      <span class="ia-origem <?= $origemTxt[$origem][1] ?>"><?= $origemTxt[$origem][0] ?></span>
+                      <?php if (!empty($d['ajuda'])): ?><span><?= htmlspecialchars($d['ajuda']) ?></span><?php endif; ?>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+                </div>
+              </div>
+              <?php endforeach; ?>
+
+              <div class="ia-aviso">
+                <b>Ficam só no arquivo <code>dombag.env.php</code>:</b> as credenciais dos bancos (MySQL e ERP).
+                O sistema precisa delas para se conectar ao banco antes de conseguir ler esta tela.<br>
+                A chave que criptografa os segredos fica no arquivo <code>dombag.chave</code>, ao lado do <code>dombag.env.php</code>.
+                Se ele for apagado, as chaves de API salvas aqui precisam ser digitadas de novo.
+              </div>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn-secondary" id="btnTestarIA" onclick="testarIA()">Testar conexão</button>
+              <span id="testeIA" class="ia-teste"></span>
+              <button type="submit" class="btn-primary">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                  <polyline points="17 21 17 13 7 13 7 21"/>
+                  <polyline points="7 3 7 8 15 8"/>
+                </svg>
+                Salvar
+              </button>
+            </div>
+          </form>
+        </div>
+        <?php endif; ?>
+
       </div><!-- /panel -->
     </div><!-- /content -->
   </div>
 </div>
 
 <script>
+// Testa a configuração SALVA (consulta só os dados do modelo no provedor).
+function testarIA() {
+  const btn = document.getElementById('btnTestarIA'), out = document.getElementById('testeIA');
+  const csrf = document.querySelector('#pane-ia input[name="csrf"]').value;
+  btn.disabled = true; out.className = 'ia-teste'; out.textContent = 'Testando a configuração salva…';
+  fetch(location.pathname, {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ aba: 'ia_testar', csrf })
+  }).then(r => r.json()).then(j => {
+    out.className = 'ia-teste ' + (j.ok ? 'ok' : 'err');
+    out.textContent = (j.ok ? '✓ ' : '✕ ') + j.msg;
+  }).catch(() => { out.className = 'ia-teste err'; out.textContent = '✕ Falha ao testar.'; })
+    .finally(() => { btn.disabled = false; });
+}
+
 function trocarAba(id) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));

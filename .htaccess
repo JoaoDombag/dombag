@@ -18,7 +18,8 @@ RewriteEngine On
 RewriteRule ^(debug_widgets|migrate_iv_status)\.php$ - [F,L]
 
 # Bloqueia acesso direto a diretórios internos
-RewriteRule ^(config|shared|migrations)(/|$) - [F,L]
+RewriteRule ^(config|shared|migrations|tests|docs)(/|$) - [F,L]
+RewriteRule ^modules/chat/(?!(api|relatorio)\.php$) - [F,L]
 
 # Base do projeto (raiz do domínio em produção)
 RewriteBase /
@@ -65,8 +66,7 @@ RewriteRule ^pcp/painel-ops$           modules/pcp/painel_ops.php               
 RewriteRule ^pcp/painel-funcionarios$  modules/pcp/painel_funcionarios.php       [L,QSA]
 RewriteRule ^pcp/painel-funcionarios-pdf$ modules/pcp/painel_funcionarios_pdf.php [L,QSA]
 RewriteRule ^pcp/bi$                   modules/pcp/bi_producao.php              [L,QSA]
-RewriteRule ^pcp/bi-celulas$           modules/pcp/bi_celulas.php                [L,QSA]
-RewriteRule ^pcp/celulas$              modules/pcp/celulas.php                  [L,QSA]
+RewriteRule ^pcp/bi-individual$        modules/pcp/bi_individual.php            [L,QSA]
 
 # Relatórios
 RewriteRule ^relatorios/producao$          modules/relatorios/rel_producao.php         [L,QSA]
@@ -101,6 +101,11 @@ RewriteRule ^admin/atualiza-bd$        modules/admin/atualiza_bd.php           [
 RewriteRule ^admin/menus-ativos$       modules/admin/menus_ativos.php          [L,QSA]
 RewriteRule ^admin/migrations$         modules/admin/migrations.php            [L,QSA]
 
+
+# Chat com IA
+RewriteRule ^assistente$               modules/assistente/assistente.php       [L,QSA]
+RewriteRule ^api/chat$                modules/chat/api.php                    [L,QSA]
+RewriteRule ^api/chat/relatorio/([a-f0-9]{32})$ modules/chat/relatorio.php?t=$1 [L]
 
 # Rota raiz → login
 RewriteRule ^$                         modules/login/login.php                 [L,QSA]

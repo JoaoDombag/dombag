@@ -101,6 +101,14 @@ $DOMBAG_PAGINAS = [
         'icon'    => '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
     ],
     [
+        'href'    => '/assistente',
+        'label'   => 'Assistente IA',
+        'grupo'   => null,
+        'menu'    => true,
+        'publico' => true,   // todos os logados; os DADOS continuam limitados por permissão/representante
+        'icon'    => '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8"/><path d="M8 13h5"/>',
+    ],
+    [
         'href'    => '/produtos',
         'label'   => 'Produtos',
         'grupo'   => null,
@@ -139,8 +147,7 @@ $DOMBAG_PAGINAS = [
     ['href' => '/pcp/painel-funcionarios', 'label' => 'Produção por Funcionário', 'grupo' => 'producao', 'menu' => true, 'publico' => false],
     ['href' => '/pcp/painel-funcionarios-pdf', 'label' => 'Relatório de Funcionários (PDF)', 'grupo' => 'producao', 'menu' => false, 'publico' => false],
     ['href' => '/pcp/bi',                  'label' => 'BI da Produção',           'grupo' => 'producao', 'menu' => true,  'publico' => false],
-    ['href' => '/pcp/bi-celulas',          'label' => 'BI Células',               'grupo' => 'producao', 'menu' => true,  'publico' => false],
-    ['href' => '/pcp/celulas',             'label' => 'Cadastro de Células',      'grupo' => 'producao', 'menu' => true,  'publico' => false],
+    ['href' => '/pcp/bi-individual',       'label' => 'BI Individual',            'grupo' => 'producao', 'menu' => true,  'publico' => false],
 
     // ── Máquinas ──────────────────────────────────────────────────────────────
     ['href' => '/maquinas',           'label' => 'Máquinas',             'grupo' => 'maquinas', 'menu' => true,  'publico' => false],

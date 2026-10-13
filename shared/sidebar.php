@@ -883,3 +883,21 @@ button.mob-item.open { color: var(--text-primary); background: rgba(255,255,255,
 
 })();
 </script>
+
+<?php // ── Chat com IA: só aparece com a chave do provedor (Gemini ou Claude) configurada ──
+// Sem botão flutuante nas telas de BI e de Relatórios (área de leitura cheia);
+// lá o assistente continua acessível pelo menu "Assistente IA".
+$__chat_sem_botao = (bool) preg_match('#^/(pcp/bi(-individual)?|relatorios)(/|$)#', $_uri)
+                 || (bool) preg_match('#/modules/(relatorios/|pcp/bi_)#', $_script);
+if ((dombagConfig('GEMINI_API_KEY') || dombagConfig('ANTHROPIC_API_KEY')) && (!empty($DOMBAG_CHAT_PAGINA) || !$__chat_sem_botao)):
+    if (empty($_SESSION['chat_csrf'])) {
+        $_SESSION['chat_csrf'] = bin2hex(random_bytes(32));
+    } ?>
+<script src="/public/js/chat-widget.js?v=5" defer
+        data-csrf="<?= htmlspecialchars($_SESSION['chat_csrf']) ?>"
+        data-usuario="<?= (int) ($_SESSION['usu_codigo'] ?? 0) ?>"
+        data-max="<?= (int) (dombagConfig('CHAT_MAX_CHARS') ?? 2000) ?>"
+<?php if (!empty($DOMBAG_CHAT_PAGINA)): // página /assistente: chat ocupa a tela, sem botão flutuante ?>
+        data-modo="pagina" data-alvo="#assistente-chat"
+<?php endif; ?>></script>
+<?php endif; ?>

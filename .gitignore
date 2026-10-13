@@ -2,6 +2,9 @@
 .env
 .env.*
 config/db.local.php
+dombag.env.php
+dombag.chave
+_fake_anthropic.php
 
 # Sessões PHP — nunca commitar
 config/sessions/*

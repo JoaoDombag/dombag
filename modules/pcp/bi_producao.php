@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
+require_once __DIR__ . '/bi_individual_dados.php';
 
 // ══════════════════════════════════════════════════════════════
 //  DOMBAG — BI de Produção (painel para TV, leitura em tempo real)
@@ -210,80 +211,6 @@ function biFetchIndicadoresHoje($pg): array
     ];
 }
 
-// ── Células cadastradas e seus centros de trabalho (MySQL local) ─────────────
-function biFetchCelulas(PDO $pdo): array
-{
-    try {
-        $celulas = $pdo->query('SELECT CEL_CODIGO, CEL_NOME FROM CELULA_PRODUCAO ORDER BY CEL_NOME')->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Throwable) {
-        return [];
-    }
-    $st = $pdo->prepare('SELECT CT_CODIGO FROM CELULA_CENTRO_TRABALHO WHERE CEL_CODIGO = :c');
-    foreach ($celulas as &$c) {
-        $st->execute([':c' => (int) $c['CEL_CODIGO']]);
-        $c['centros'] = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
-    }
-    unset($c);
-    return $celulas;
-}
-
-// ── Quantidade produzida hoje, por centro de trabalho ────────────────────────
-function biFetchCentrosHoje($pg): array
-{
-    $sql = "
-        SELECT CT_CODIGO, FU_CODIGO, COALESCE(SUM(OIAP_QTD_PRODUZIDA), 0) AS QTD_PRODUZIDA
-          FROM OP_ITENS_ATIVIDADES_APONTADAS
-         WHERE NOT OIAP_EXCLUIDO
-           AND TRIM(OIAP_STATUS) <> 'C'
-           AND OIAP_DATA_HORA_INICIO::date = CURRENT_DATE
-         GROUP BY CT_CODIGO, FU_CODIGO
-    ";
-    $res = @pg_query($pg, $sql);
-    if (!$res) {
-        return [];
-    }
-    $rows = pg_fetch_all($res) ?: [];
-    pg_free_result($res);
-    return $rows;
-}
-
-// ── Produção de hoje agrupada por célula (soma dos centros de trabalho) ──────
-function biFetchProducaoPorCelula(PDO $pdo, array $centrosHoje): array
-{
-    $celulas = biFetchCelulas($pdo);
-    if (!$celulas) {
-        return [];
-    }
-    $qtdPorCt   = [];
-    $funcsPorCt = [];
-    foreach ($centrosHoje as $f) {
-        $ct = (int) $f['ct_codigo'];
-        $qtdPorCt[$ct] = ($qtdPorCt[$ct] ?? 0.0) + (float) $f['qtd_produzida'];
-        if ($f['fu_codigo'] !== null && $f['fu_codigo'] !== '') {
-            $funcsPorCt[$ct][(int) $f['fu_codigo']] = true;
-        }
-    }
-
-    $resultado = [];
-    foreach ($celulas as $c) {
-        $total = 0.0;
-        $funcs = [];
-        foreach ($c['centros'] as $ct) {
-            $total += $qtdPorCt[$ct] ?? 0.0;
-            $funcs += $funcsPorCt[$ct] ?? [];
-        }
-        $resultado[] = [
-            'cel_codigo' => (int) $c['CEL_CODIGO'],
-            'cel_nome'   => $c['CEL_NOME'],
-            'qtd_produzida' => $total,
-            'qtd_centros' => count($c['centros']),
-            'qtd_funcionarios' => count($funcs),
-        ];
-    }
-    usort($resultado, static fn ($a, $b) => $b['qtd_produzida'] <=> $a['qtd_produzida']);
-    return $resultado;
-}
-
 function biBuildPayload($pg, PDO $pdo): array
 {
     $anoAtual = (int) date('Y');
@@ -291,7 +218,6 @@ function biBuildPayload($pg, PDO $pdo): array
 
     $mesProduzido = biFetchProducaoMes($pg, $anoAtual, $mesAtual);
     $horasProdutivas = biFetchHorasProdutivasMes($pg, $anoAtual, $mesAtual);
-    $centrosHoje = biFetchCentrosHoje($pg);
 
     return [
         'ops_ativas'        => biFetchOpsAtivas($pg),
@@ -299,10 +225,12 @@ function biBuildPayload($pg, PDO $pdo): array
         'meta'              => biFetchMeta($pdo),
         'mes_nome'          => ucfirst(BI_MESES[$mesAtual]),
         'media_bags_hora'   => $horasProdutivas > 0 ? round($mesProduzido / $horasProdutivas, 1) : 0.0,
-        'celulas'           => biFetchProducaoPorCelula($pdo, $centrosHoje),
         'mensal'            => array_values(biFetchMonthly($pg, $anoAtual)),
         'meses'             => array_values(BI_MESES),
         'indicadores'       => biFetchIndicadoresHoje($pg),
+        // Produção individual de hoje (mesmos dados do BI Individual)
+        'individual'        => biiFetchProducaoPorFuncionario($pg, date('Y-m-d')),
+        'meta_individual'   => biiFetchMeta($pdo),
         'atualizado_em'     => date('H:i:s'),
     ];
 }
@@ -344,7 +272,8 @@ if (($_GET['action'] ?? '') === 'refresh') {
 $error = '';
 $payload = [
     'ops_ativas' => [], 'mes_produzido' => 0, 'meta' => 0, 'mes_nome' => ucfirst(BI_MESES[(int) date('n')]),
-    'media_bags_hora' => 0, 'celulas' => [], 'mensal' => array_fill(0, 12, 0), 'meses' => array_values(BI_MESES),
+    'media_bags_hora' => 0, 'mensal' => array_fill(0, 12, 0), 'meses' => array_values(BI_MESES),
+    'individual' => [], 'meta_individual' => 0,
     'indicadores' => ['funcionarios' => 0, 'apontamentos' => 0, 'qtd_produzida' => 0.0, 'seg_produtivo' => 0.0, 'seg_pausado' => 0.0, 'pausas' => 0, 'media_hora' => 0.0],
     'atualizado_em' => date('H:i:s'),
 ];
@@ -405,8 +334,25 @@ if (!$pg) {
   @media (max-width: 768px) {
     .app-wrapper { height: 100vh !important; overflow: hidden !important; flex-direction: row !important; }
     .main { height: 100vh !important; overflow: hidden !important; }
-    .content { padding: 0 !important; overflow: hidden !important; height: 100vh !important; flex: 1 1 auto !important; display: flex !important; }
+    /* altura = o que sobra abaixo das barras (a topbar móvel pode ter 2-3 linhas) */
+    .content { padding: 0 !important; overflow: hidden !important; height: auto !important; min-height: 0; flex: 1 1 auto !important; display: flex !important; }
   }
+
+  /* ── Celular (fora da tela cheia): em vez de encolher o painel de TV inteiro
+     até ficar ilegível, vira uma página rolável — cards empilhados, KPIs em
+     2 colunas e OPs em 1 coluna. JS: biApplyScale liga a classe bi-mobile. ── */
+  body.bi-mobile .content { overflow-y: auto !important; overflow-x: hidden !important; display: block !important; -webkit-overflow-scrolling: touch; }
+  body.bi-mobile #bizDashboard { width: 100% !important; min-width: 0; padding: 12px; gap: 12px; transform: none !important; }
+  body.bi-mobile .biz-card, body.bi-mobile .biz-chart-card { padding: 14px; }
+  body.bi-mobile .biz-toprow { grid-template-columns: 1fr; gap: 12px; }
+  body.bi-mobile .biz-kpi-mini-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  body.bi-mobile .biz-kpi-mini:last-child { grid-column: 1 / -1; }
+  body.bi-mobile .biz-kpi-mini-value { font-size: 20px; }
+  body.bi-mobile .biz-ops-list { grid-template-columns: 1fr !important; overflow: visible; }
+  body.bi-mobile .biz-op-name { font-size: 14px; }
+  body.bi-mobile .biz-gauge-svg-wrap { width: 85%; }
+  body.bi-mobile .biz-meta-body { overflow: visible; }
+  body.bi-mobile .biz-chart-wrap { height: 200px; }
 
   /* Widgets crescem/encolhem para sempre preencher o painel, acompanhando
      o tamanho real da janela (não só a largura). min-height:0 é o que
@@ -424,7 +370,9 @@ if (!$pg) {
   }
   .biz-title { text-align: center; font-size: 21px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; color: var(--biz-orange); margin: 2px 0 20px; }
 
-  .biz-toprow { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: stretch; }
+  /* flex-grow: quando o JS estica o painel pra preencher a altura da tela,
+     é esta linha (OPs ativas + Meta) que ocupa o espaço que sobra */
+  .biz-toprow { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; align-items: stretch; flex: 1 0 auto; }
   .biz-toprow.biz-toprow-single { grid-template-columns: 1fr; }
   .biz-toprow > .biz-card { min-width: 0; display: flex; flex-direction: column; }
 
@@ -510,6 +458,23 @@ if (!$pg) {
   .biz-op-nums strong { color: var(--biz-text); font-weight: 600; }
   .biz-empty-msg { text-align: center; color: var(--biz-muted); font-size: 13px; padding: 40px 0; }
 
+  /* ── Produção individual: um mini-card por funcionário (nome, barra vs meta
+     individual, O.P ativa). Grade de colunas automáticas. ── */
+  .biz-ind-meta { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--biz-muted); margin-left: 6px; }
+  .biz-ind-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+  .biz-ind-item { border: 1px solid var(--biz-border); border-radius: 10px; padding: 12px 14px; background: var(--biz-card2); min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .biz-ind-item.hit { border-color: rgba(45,106,255,.5); background: rgba(45,106,255,.1); }
+  .biz-ind-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .biz-ind-name { font-size: 14px; font-weight: 600; color: var(--biz-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .biz-ind-item.hit .biz-ind-name { color: #7db3ff; }
+  .biz-ind-qtd { font-size: 18px; font-weight: 700; color: var(--biz-teal); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  .biz-ind-qtd small { font-size: 11px; font-weight: 500; color: var(--biz-muted); }
+  .biz-ind-item.hit .biz-op-fill { background: linear-gradient(90deg,#2d6aff,#58d6c9); }
+  .biz-ind-op { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--biz-teal); min-width: 0; }
+  .biz-ind-op span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .biz-ind-op.off { color: var(--biz-muted); font-weight: 500; }
+  .biz-ind-dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--biz-teal); animation: bizPulse 1.8s infinite; }
+
   /* ── Mês x Meta: centraliza o corpo do card (fora do cabeçalho) ── */
   .biz-meta-body { flex: 1 1 auto; min-height: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
   .biz-meta-btn { width: 22px; height: 22px; border-radius: 6px; border: 1px solid var(--biz-border); background: transparent; color: var(--biz-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -525,20 +490,19 @@ if (!$pg) {
   .biz-meta-save { background: var(--biz-teal); color: #04231c; }
   .biz-meta-cancel { background: transparent; color: var(--biz-muted); border: 1px solid var(--biz-border) !important; }
 
-  /* ── Painel de funcionários (visão simples) ── */
-  .biz-func-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); grid-auto-rows: 1fr; gap: 12px; flex: 1 1 auto; }
-  .biz-func-card { border: 1px solid var(--biz-border); border-radius: 10px; padding: 18px; background: var(--biz-card2); display: flex; align-items: center; justify-content: space-between; gap: 8px; transition: border-color .15s; min-width: 0; }
-  .biz-func-card:hover { border-color: rgba(88,214,201,.35); }
-  .biz-func-name { font-size: 13px; font-weight: 600; color: var(--biz-text); overflow-wrap: anywhere; }
-  .biz-func-qtd { font-size: 20px; font-weight: 700; color: var(--biz-teal); font-variant-numeric: tabular-nums; }
-
   /* ── Topbar desta página: badge "Ao vivo" + hora + 2 botões de texto não
      cabem numa única linha em telas de celular; o topbar padrão não quebra
      linha (flex-shrink:0 nos topbar-actions), o que empurrava os botões
      para fora da viewport e espremia o título. ── */
-  @media (max-width: 640px) {
-    .topbar { flex-wrap: wrap; row-gap: 8px; }
+  /* Quebra a topbar em duas linhas assim que título + ações não cabem lado a
+     lado (antes só abaixo de 640px, e entre isso e ~1100px o título ficava
+     por cima do "Ao vivo"). */
+  @media (max-width: 1100px) {
+    .topbar { flex-wrap: wrap; row-gap: 8px; height: auto; }
+    .topbar-left { min-width: 0; }
     .topbar-actions { flex-wrap: wrap; row-gap: 6px; }
+  }
+  @media (max-width: 640px) {
     .last-update { display: none; }
   }
   @media (max-width: 360px) {
@@ -563,6 +527,25 @@ if (!$pg) {
   html:fullscreen .sidebar, body.biz-fs-fallback .sidebar,
   html:fullscreen .topbar,  body.biz-fs-fallback .topbar { display: none !important; }
   html:fullscreen .biz-settings-btn, body.biz-fs-fallback .biz-settings-btn { display: none !important; }
+  html:fullscreen .mobile-topbar, body.biz-fs-fallback .mobile-topbar,
+  html:fullscreen .mob-sub,       body.biz-fs-fallback .mob-sub,
+  html:fullscreen .mob-scroll,    body.biz-fs-fallback .mob-scroll,
+  html:fullscreen .mob-sub-backdrop, body.biz-fs-fallback .mob-sub-backdrop { display: none !important; }
+  html:fullscreen .main, body.biz-fs-fallback .main { padding-top: 0 !important; }
+
+  /* Botão flutuante para sair da tela cheia quando o navegador não tem a API
+     nativa (iPhone/fallback): a topbar some e não há Esc no celular. */
+  .biz-fs-exit {
+    display: none; position: fixed; top: 10px; right: 10px; z-index: 1000;
+    width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255,255,255,.15);
+    background: rgba(15,32,64,.75); color: #e8edf5; cursor: pointer;
+    align-items: center; justify-content: center; opacity: .55;
+  }
+  .biz-fs-exit:hover, .biz-fs-exit:active { opacity: 1; }
+  html:not(:fullscreen) body.biz-fs-fallback .biz-fs-exit { display: flex; }
+  @media (max-width: 768px) {
+    body.biz-fs-fallback .biz-fs-exit { display: flex; }
+  }
 
   html:fullscreen .app-wrapper, body.biz-fs-fallback .app-wrapper { height: 100vh !important; overflow: hidden; }
   html:fullscreen .main,        body.biz-fs-fallback .main        { height: 100vh !important; overflow: hidden; }
@@ -594,6 +577,10 @@ if (!$pg) {
         </button>
       </div>
     </header>
+
+    <button type="button" class="biz-fs-exit" id="biFsExit" title="Sair da tela cheia" aria-label="Sair da tela cheia">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v3a2 2 0 0 1-2 2H3"/><path d="M21 8h-3a2 2 0 0 1-2-2V3"/><path d="M3 16h3a2 2 0 0 1 2 2v3"/><path d="M16 21v-3a2 2 0 0 1 2-2h3"/></svg>
+    </button>
 
     <div class="content">
 
@@ -682,13 +669,13 @@ if (!$pg) {
 
         </div>
 
-        <!-- Produção por Célula — soma dos funcionários de cada célula -->
-        <div class="biz-card" id="biCelulasCard" data-widget="celulas" style="display:none;">
+        <!-- Produção individual de hoje: quem já produziu, vs meta individual (BI Individual) -->
+        <div class="biz-card" data-widget="individual">
           <div class="biz-card-head">
-            <h2>Produção por Célula Hoje</h2>
-            <span class="biz-count-badge" id="biCelulasCount">0</span>
+            <h2>Produção Individual Hoje <span class="biz-ind-meta" id="biIndMetaTxt"></span></h2>
+            <span class="biz-count-badge" id="biIndCount">0</span>
           </div>
-          <div class="biz-func-grid" id="biCelulasGrid"></div>
+          <div class="biz-ind-grid" id="biIndGrid"></div>
         </div>
 
       </div>
@@ -718,6 +705,7 @@ function biEsc(v) {
   return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 let biMetaAtual = <?= (float) $payload['meta'] ?>;
+const biMqMobile = window.matchMedia('(max-width: 768px)');
 
 // ── Gauge em semicírculo (SVG com pathLength normalizado 0-100) ──────────────
 function biRenderGauge(svgId, pct, colorFrom, colorTo) {
@@ -836,24 +824,34 @@ function biRenderOps(ops) {
   }).join('');
 }
 
-// ── Produção por célula — soma dos funcionários de cada célula ───────────────
-function biRenderCelulas(celulas) {
-  const card = document.getElementById('biCelulasCard');
-  if (!celulas.length) {
-    card.style.display = 'none';
+// ── Produção individual de hoje: barra vs meta individual + O.P ativa ───────
+function biRenderIndividual(funcs, meta) {
+  document.getElementById('biIndCount').textContent = funcs.length;
+  document.getElementById('biIndMetaTxt').textContent = meta > 0 ? '· meta ' + biFmt(meta, 0) + ' por pessoa' : '';
+  const el = document.getElementById('biIndGrid');
+  if (!funcs.length) {
+    el.innerHTML = '<div class="biz-empty-msg">Ninguém produziu hoje ainda.</div>';
     return;
   }
-  card.style.display = '';
-  document.getElementById('biCelulasCount').textContent = celulas.length;
-  document.getElementById('biCelulasGrid').innerHTML = celulas.map(c => `
-    <div class="biz-func-card">
-      <div>
-        <div class="biz-func-name">${biEsc(c.cel_nome)}</div>
-        <div class="biz-op-sub">${c.qtd_funcionarios} funcionário(s) hoje</div>
+  el.innerHTML = funcs.map(f => {
+    const qtd = Number(f.qtd_produzida || 0);
+    const pct = meta > 0 ? Math.min(100, (qtd / meta) * 100) : 0;
+    const hit = meta > 0 && qtd >= meta;
+    const ativa = (f.ops_detalhe || []).find(o => o.em_producao);
+    const op = ativa
+      ? `<div class="biz-ind-op"><span class="biz-ind-dot"></span><span>O.P ${ativa.op}${ativa.cliente ? ' - ' + biEsc(ativa.cliente) : ''}</span></div>`
+      : '<div class="biz-ind-op off"><span>Nenhuma O.P ativa</span></div>';
+    return `
+      <div class="biz-ind-item${hit ? ' hit' : ''}">
+        <div class="biz-ind-head">
+          <div class="biz-ind-name">${biEsc(f.nome)}</div>
+          <div class="biz-ind-qtd">${biFmt(qtd, 0)}${meta > 0 ? ` <small>/ ${biFmt(meta, 0)}</small>` : ''}</div>
+        </div>
+        ${meta > 0 ? `<div class="biz-op-bar"><div class="biz-op-fill" style="width:${pct}%"></div></div>` : ''}
+        ${op}
       </div>
-      <div class="biz-func-qtd">${Number(c.qtd_produzida || 0).toLocaleString('pt-BR')}</div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 function biRenderIndicadores(ind) {
@@ -881,6 +879,8 @@ const BI_SCALE_MAX = 1.6;
 const BI_REF_W = 1800;
 const BI_REF_W_MIN = BI_REF_W * 0.8;
 const BI_REF_W_MAX = BI_REF_W * 1.25;
+// Abaixo desta largura de janela (fora da tela cheia) usa o layout em lista
+const BI_LISTA_MAX_W = 900;
 
 function biApplyScale() {
   const stage = document.getElementById('bizDashboard');
@@ -889,8 +889,27 @@ function biApplyScale() {
   const availH = wrap.clientHeight;
   if (!availW || !availH) return;
 
+  // Celular — ou janela estreita no PC — fora da tela cheia: página rolável,
+  // sem escala nem largura fixa (não zera o scroll — a atualização a cada 15s
+  // não pode pular pro topo). Abaixo de ~900px o painel de TV escalado fica
+  // pequeno demais pra ler.
+  const kiosk = document.body.classList.contains('biz-fs-fallback') || !!biFsElement();
+  const mobile = !kiosk && (biMqMobile.matches || window.innerWidth < BI_LISTA_MAX_W);
+  document.body.classList.toggle('bi-mobile', mobile);
+  if (mobile) {
+    stage.style.transform = 'none';
+    stage.style.transformOrigin = '';
+    stage.style.marginBottom = '';
+    stage.style.width = '';
+    stage.style.height = '';
+    wrap.style.alignItems = '';
+    wrap.style.overflowY = '';
+    return;
+  }
+
   // 1) mede a altura natural na largura de referência (sem distorcer nada).
   stage.style.width = '';
+  stage.style.height = '';
   const baseH = stage.offsetHeight;
   if (!baseH) return;
 
@@ -908,8 +927,32 @@ function biApplyScale() {
   const natH = stage.offsetHeight;
   if (!natW || !natH) return;
 
-  let scale = Math.max(availW / natW, availH / natH);
-  scale = Math.max(BI_SCALE_MIN, Math.min(BI_SCALE_MAX, scale));
+  // Tela cheia (TV): escala pra COBRIR todo o espaço, como sempre foi.
+  if (kiosk) {
+    let scale = Math.max(availW / natW, availH / natH);
+    scale = Math.max(BI_SCALE_MIN, Math.min(BI_SCALE_MAX, scale));
+    stage.style.transformOrigin = '';
+    stage.style.marginBottom = '';
+    wrap.style.alignItems = '';
+    wrap.style.overflowY = '';
+    stage.style.transform = `scale(${scale})`;
+    return;
+  }
+
+  // Fora da tela cheia: escala pela LARGURA — nunca corta as laterais (antes,
+  // em janelas mais estreitas/altas, cobrir a altura cortava os indicadores
+  // das pontas). Se ficar mais alto que a área, rola na vertical; a margem
+  // negativa/positiva corrige a altura de layout, que o transform não altera.
+  const scale = Math.max(BI_SCALE_MIN, Math.min(BI_SCALE_MAX, availW / natW));
+  const sobraAltura = natH * scale > availH;
+  wrap.style.alignItems = sobraAltura ? 'flex-start' : '';
+  wrap.style.overflowY = sobraAltura ? 'auto' : '';
+  stage.style.transformOrigin = sobraAltura ? 'top center' : '';
+  stage.style.marginBottom = sobraAltura ? (natH * (scale - 1)) + 'px' : '';
+  // Mais baixo que a área: estica o painel na altura (a linha de OPs/Meta
+  // absorve a sobra, ver .biz-toprow) pra preencher tudo, sem faixas vazias
+  // em cima e embaixo.
+  stage.style.height = sobraAltura ? '' : (availH / scale) + 'px';
   stage.style.transform = `scale(${scale})`;
 }
 window.addEventListener('resize', biApplyScale);
@@ -917,8 +960,8 @@ window.addEventListener('resize', biApplyScale);
 function biRenderAll(data) {
   biRenderChart(data.meses || [], data.mensal || []);
   biRenderOps(data.ops_ativas || []);
-  biRenderCelulas(data.celulas || []);
   biRenderIndicadores(data.indicadores);
+  biRenderIndividual(data.individual || [], Number(data.meta_individual || 0));
 
   document.getElementById('biMesTitulo').textContent = 'Produção de ' + (data.mes_nome || '');
   document.getElementById('biMesProduzidoTxt').textContent = biFmt(data.mes_produzido, 0);
@@ -935,7 +978,7 @@ function biRenderAll(data) {
   const upd = document.getElementById('biUpdatedAt');
   if (upd) upd.textContent = data.atualizado_em || '';
 
-  // A quantidade de OPs/células pode mudar a altura natural do painel a
+  // A quantidade de OPs pode mudar a altura natural do painel a
   // cada atualização — reescalar garante que continue cabendo certinho.
   biApplyScale();
 }
@@ -1022,6 +1065,8 @@ function biReflowChart() {
   requestAnimationFrame(biApplyScale);
 }
 window.addEventListener('resize', biReflowChart);
+// Ao cruzar o breakpoint (girar o celular), troca entre lista rolável e painel de TV
+biMqMobile.addEventListener('change', biReflowChart);
 
 biFsBtn.addEventListener('click', () => {
   const active = document.body.classList.contains('biz-fs-fallback');
@@ -1033,9 +1078,14 @@ biFsBtn.addEventListener('click', () => {
     if (biFsElement()) biExitFs().catch(() => {});
   }
 });
+document.getElementById('biFsExit').addEventListener('click', () => {
+  biSetFsState(false);
+  if (biFsElement()) biExitFs().catch(() => {});
+});
 ['fullscreenchange', 'webkitfullscreenchange', 'MSFullscreenChange'].forEach(ev => {
   document.addEventListener(ev, () => {
     if (!biFsElement()) biSetFsState(false);
+    else biReflowChart();
   });
 });
 
@@ -1044,7 +1094,7 @@ const BI_WIDGET_CATALOG = [
   { id: 'indicadores',    label: 'Indicadores do Dia',             default: true },
   { id: 'ops_ativas',     label: 'OPs Ativas — Bags Lidos',        default: true },
   { id: 'meta_mes',       label: 'Produção do Mês x Meta',         default: true },
-  { id: 'celulas',        label: 'Produção por Célula',            default: true },
+  { id: 'individual',     label: 'Produção Individual Hoje',       default: true },
   { id: 'grafico_mensal', label: 'Gráfico Mensal (linha)',         default: false },
 ];
 const BI_WIDGET_STORAGE_KEY = 'bi_widget_config';
