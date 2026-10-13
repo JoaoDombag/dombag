@@ -53,8 +53,10 @@ $chatConfigurado = (bool) (dombagConfig('GEMINI_API_KEY') || dombagConfig('ANTHR
       <?php else: ?>
         <div class="chat-off">
           <h2>Assistente não configurado</h2>
-          Falta a chave da IA. Um administrador precisa preencher <code>GEMINI_API_KEY</code>
-          (ou <code>ANTHROPIC_API_KEY</code>) no arquivo <code>dombag.env.php</code> do servidor.
+          Falta a chave da IA. Um administrador precisa preencher a chave do Google Gemini
+          ou do Anthropic Claude em
+          <a href="/modules/parametros/parametros.php?aba=ia">Parâmetros do Sistema → Assistente IA</a>
+          (a chave OpenAI da aba Integrações não é usada pelo assistente).
         </div>
       <?php endif; ?>
     </div>

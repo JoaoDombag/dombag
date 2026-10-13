@@ -159,7 +159,8 @@ function dombagChaveApp(): string
     }
     $nova = random_bytes(32);
     if (@file_put_contents($arq, base64_encode($nova), LOCK_EX) === false) {
-        throw new RuntimeException('não foi possível criar a chave de criptografia em ' . $arq);
+        throw new RuntimeException('não foi possível criar o arquivo da chave de criptografia (' . $arq . '). '
+            . 'Dê permissão de escrita nessa pasta ou defina DOMBAG_CHAVE_APP no dombag.env.php.');
     }
     @chmod($arq, 0600);
     return $chave = $nova;
@@ -228,6 +229,27 @@ function dombagConfigValidar(string $chave, string $valor): array
 }
 
 // "••••abcd" — nunca devolve o segredo inteiro para o navegador.
+// Segredos salvos pela tela que ESTE servidor não consegue descriptografar —
+// foram gravados com outra chave de criptografia (ex.: salvos no XAMPP local,
+// que usa o mesmo banco da produção mas outro dombag.chave). dombagConfigTela
+// trata esses valores como vazios; a tela usa esta lista para avisar.
+function dombagConfigIlegiveis(): array
+{
+    $ilegiveis = [];
+    try {
+        $st = dbPDO()->query("SELECT PAR_CHAVE, PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE LIKE 'ia.%'");
+        foreach ($st->fetchAll(PDO::FETCH_KEY_PAIR) as $k => $valor) {
+            $nome = substr($k, 3);
+            if (($valor ?? '') !== '' && (DOMBAG_CONFIG_IA[$nome]['tipo'] ?? '') === 'segredo' && dombagDecifrar($valor) === null) {
+                $ilegiveis[] = $nome;
+            }
+        }
+    } catch (Throwable $e) {
+        error_log('[CONFIG IA] ' . $e->getMessage());
+    }
+    return $ilegiveis;
+}
+
 function dombagMascarar(?string $segredo): string
 {
     if ($segredo === null || $segredo === '') {

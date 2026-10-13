@@ -89,62 +89,90 @@ function iaTestarConexao(): array
 }
 
 // ── POST ──────────────────────────────────────────────────────────────────────
+//  Todas as abas exigem o token CSRF. Sucesso → redireciona (PRG), pra que
+//  atualizar a página (F5) não reenvie o formulário. Erro → mostra na hora.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $aba = $_POST['aba'] ?? 'integracoes';
+    $aba = (string) ($_POST['aba'] ?? 'integracoes');
 
-    if ($aba === 'ia') {
-        if (!$ehAdmin || !hash_equals($_SESSION['par_csrf'], (string) ($_POST['csrf'] ?? ''))) {
-            http_response_code(403);
-            exit('Sem permissão.');
-        }
-        // Valida tudo antes de gravar qualquer coisa.
-        $novos = [];
-        foreach (DOMBAG_CONFIG_IA as $k => $d) {
-            $v = (string) ($_POST['ia'][$k] ?? '');
-            if ($d['tipo'] === 'segredo') {
-                if (!empty($_POST['ia_limpar'][$k])) {
-                    $novos[$k] = '';
+    if (!hash_equals($_SESSION['par_csrf'], (string) ($_POST['csrf'] ?? ''))) {
+        $ia_erros[] = 'Sua sessão expirou. Recarregue a página e tente de novo.';
+    } elseif ($aba === 'ia' && !$ehAdmin) {
+        http_response_code(403);
+        exit('Sem permissão.');
+    } else {
+        try {
+            if ($aba === 'ia') {
+                // Valida tudo antes de gravar qualquer coisa.
+                $novos = [];
+                foreach (DOMBAG_CONFIG_IA as $k => $d) {
+                    $v = (string) ($_POST['ia'][$k] ?? '');
+                    if ($d['tipo'] === 'segredo') {
+                        if (!empty($_POST['ia_limpar'][$k])) {
+                            $novos[$k] = '';
+                        }
+                        if (trim($v) === '') {
+                            continue;                            // em branco = mantém a chave atual
+                        }
+                    }
+                    [$norm, $erro] = dombagConfigValidar($k, $v);
+                    if ($erro) {
+                        $ia_erros[] = $erro;
+                    } else {
+                        $novos[$k] = $norm;
+                    }
                 }
-                if (trim($v) === '') {
-                    continue;                            // em branco = mantém a chave atual
+                if (!$ia_erros) {
+                    foreach ($novos as $k => $v) {
+                        dombagConfigSalvar($k, $v);
+                    }
+                    // Confere se as chaves gravadas voltam legíveis (criptografia ok)
+                    $lidas = dombagConfigTela(true);
+                    foreach ($novos as $k => $v) {
+                        if (DOMBAG_CONFIG_IA[$k]['tipo'] === 'segredo' && $v !== '' && ($lidas[$k] ?? '') !== $v) {
+                            $ia_erros[] = 'A chave "' . DOMBAG_CONFIG_IA[$k]['rotulo'] . '" foi gravada, mas não pôde ser lida de volta.';
+                        }
+                    }
                 }
+            } elseif ($aba === 'integracoes') {
+                // Credenciais: em branco mantém a atual; "remover" apaga.
+                foreach (['trello_key' => 'trello_api_key', 'trello_token' => 'trello_token'] as $campo => $chave) {
+                    $v = trim((string) ($_POST[$campo] ?? ''));
+                    if (!empty($_POST['limpar'][$campo])) {
+                        setParam($pdo, $chave, '');
+                    } elseif ($v !== '') {
+                        setParam($pdo, $chave, $v);
+                    }
+                }
+                setParam($pdo, 'trello_default_board', trim((string) ($_POST['trello_default_board'] ?? '')));
+            } elseif ($aba === 'aparencia') {
+                $tema = in_array($_POST['tema'] ?? '', ['claro', 'escuro'], true) ? $_POST['tema'] : 'escuro';
+                setParam($pdo, 'tema_sistema', $tema);
             }
-            [$norm, $erro] = dombagConfigValidar($k, $v);
-            if ($erro) {
-                $ia_erros[] = $erro;
-            } else {
-                $novos[$k] = $norm;
-            }
+        } catch (Throwable $e) {
+            error_log('[PARAMETROS] ' . $e->getMessage());
+            $ia_erros[] = 'Erro ao salvar: ' . $e->getMessage();
         }
-        if (!$ia_erros) {
-            foreach ($novos as $k => $v) {
-                dombagConfigSalvar($k, $v);
-            }
-        }
-    } elseif ($aba === 'integracoes') {
-        $openai_key          = trim($_POST['openai_key']          ?? '');
-        $trello_key          = trim($_POST['trello_key']          ?? '');
-        $trello_token        = trim($_POST['trello_token']        ?? '');
-        $trello_default_board = trim($_POST['trello_default_board'] ?? '');
-        setParam($pdo, 'openai_api_key',      $openai_key);
-        setParam($pdo, 'trello_api_key',      $trello_key);
-        setParam($pdo, 'trello_token',        $trello_token);
-        setParam($pdo, 'trello_default_board', $trello_default_board);
-    } elseif ($aba === 'aparencia') {
-        $tema = in_array($_POST['tema'] ?? '', ['claro', 'escuro']) ? $_POST['tema'] : 'claro';
-        setParam($pdo, 'tema_sistema', $tema);
     }
 
-    $msg      = $ia_erros ? 'Nada foi salvo. Corrija: ' . htmlspecialchars(implode(' ', $ia_erros)) : 'Parâmetros salvos com sucesso.';
-    $msg_tipo = $ia_erros ? 'err' : 'ok';
+    if (!$ia_erros) {
+        $_SESSION['par_flash'] = 'Parâmetros salvos com sucesso.';
+        header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?') . '?aba=' . rawurlencode($aba));
+        exit;
+    }
+    $msg      = 'Nada foi salvo. ' . htmlspecialchars(implode(' ', $ia_erros));
+    $msg_tipo = 'err';
+} elseif (!empty($_SESSION['par_flash'])) {
+    $msg      = htmlspecialchars($_SESSION['par_flash']);
+    $msg_tipo = 'ok';
+    unset($_SESSION['par_flash']);
 }
 
 // ── Leitura atual ─────────────────────────────────────────────────────────────
-$openai_key           = getParam($pdo, 'openai_api_key');
 $trello_key           = getParam($pdo, 'trello_api_key');
 $trello_token         = getParam($pdo, 'trello_token');
 $trello_default_board = getParam($pdo, 'trello_default_board');
-$tema                 = getParam($pdo, 'tema_sistema', 'claro');
+// Mesmo padrão do resto do sistema (dombagTema): sem parâmetro salvo = escuro
+$tema                 = getParam($pdo, 'tema_sistema', dombagTema());
 
 $aba_ativa  = $_POST['aba'] ?? ($_GET['aba'] ?? 'integracoes');
 if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['integracoes', 'aparencia'])) $aba_ativa = 'integracoes';
@@ -282,7 +310,11 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
 .ia-aviso { margin-top: 8px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg);
             font-size: 12px; color: var(--text-muted); line-height: 1.6; max-width: 1000px; }
 .ia-aviso b { color: var(--text-primary); }
+.ia-ilegivel { margin-top: 6px; padding: 7px 10px; border-radius: 6px; font-size: 11.5px; line-height: 1.5;
+               color: var(--amber); background: rgba(245,158,11,.08); border: 1px solid rgba(245,158,11,.3); }
 .ia-teste { font-size: 12px; margin-right: auto; margin-left: 10px; }
+.trello-status { font-size: 11px; margin-top: 6px; }
+.trello-status.err { color: var(--red); }
 .ia-teste.ok  { color: var(--teal); }
 .ia-teste.err { color: var(--red); }
 </style>
@@ -298,6 +330,17 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
           <h1>Parâmetros do Sistema</h1>
           <p>Configure integrações e preferências globais do sistema</p>
         </div>
+      </div>
+      <div class="topbar-actions">
+        <!-- Salva a aba aberta (cada aba é um formulário próprio) -->
+        <button type="button" class="btn-primary" id="btnSalvar" onclick="salvarAbaAtiva()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+          </svg>
+          Salvar
+        </button>
       </div>
     </header>
 
@@ -319,7 +362,7 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
         <!-- ── Abas ─────────────────────────────────────────────────────── -->
         <div class="tabs-bar">
           <button class="tab-btn <?= $aba_ativa === 'integracoes' ? 'active' : '' ?>"
-                  onclick="trocarAba('integracoes')" type="button">
+                  data-aba="integracoes" onclick="trocarAba('integracoes')" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
@@ -327,7 +370,7 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
             Integrações
           </button>
           <button class="tab-btn <?= $aba_ativa === 'aparencia' ? 'active' : '' ?>"
-                  onclick="trocarAba('aparencia')" type="button">
+                  data-aba="aparencia" onclick="trocarAba('aparencia')" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
               <circle cx="12" cy="12" r="5"/>
               <line x1="12" y1="1"  x2="12" y2="3"/>
@@ -343,7 +386,7 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
           </button>
           <?php if ($ehAdmin): ?>
           <button class="tab-btn <?= $aba_ativa === 'ia' ? 'active' : '' ?>"
-                  onclick="trocarAba('ia')" type="button">
+                  data-aba="ia" onclick="trocarAba('ia')" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8"/><path d="M8 13h5"/>
             </svg>
@@ -354,36 +397,12 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
 
         <!-- ── Aba: Integrações ──────────────────────────────────────────── -->
         <div class="tab-pane <?= $aba_ativa === 'integracoes' ? 'active' : '' ?>" id="pane-integracoes">
-          <form method="POST">
+          <form method="POST" class="par-form">
             <input type="hidden" name="aba" value="integracoes">
+            <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['par_csrf']) ?>">
             <div class="form-body">
-              <!-- OpenAI -->
-              <div class="field" style="max-width:480px;">
-                <label>Chave de API OpenAI</label>
-                <div class="api-key-wrap">
-                  <input type="password"
-                         name="openai_key"
-                         id="openai_key"
-                         value="<?= htmlspecialchars($openai_key) ?>"
-                         placeholder="sk-..."
-                         autocomplete="off"
-                         maxlength="200">
-                  <button type="button" class="btn-toggle-vis" onclick="toggleVis('openai_key','iconEye','iconEyeOff')" title="Mostrar/ocultar chave">
-                    <svg id="iconEye" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                      <circle cx="12" cy="12" r="3"/>
-                    </svg>
-                    <svg id="iconEyeOff" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="display:none;">
-                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                      <line x1="1" y1="1" x2="23" y2="23"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Trello -->
-              <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);">
+              <!-- Trello (usado pelo Dashboard e pela tela Pedidos/Trello) -->
+              <div>
                 <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:#7db3ff;">
                     <rect x="3" y="3" width="7" height="18" rx="2"/>
@@ -398,9 +417,9 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
                     <input type="password"
                            name="trello_key"
                            id="trello_key"
-                           value="<?= htmlspecialchars($trello_key) ?>"
-                           placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                           autocomplete="off"
+                           value=""
+                           placeholder="<?= $trello_key !== '' ? 'Atual: ' . htmlspecialchars(dombagMascarar($trello_key)) . ' — em branco mantém' : 'Cole a API Key aqui' ?>"
+                           autocomplete="new-password"
                            maxlength="200">
                     <button type="button" class="btn-toggle-vis" onclick="toggleVis('trello_key','iconTrelloEye','iconTrelloEyeOff')" title="Mostrar/ocultar">
                       <svg id="iconTrelloEye" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -413,6 +432,9 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
                       </svg>
                     </button>
                   </div>
+                  <?php if ($trello_key !== ''): ?>
+                    <label class="ia-limpar"><input type="checkbox" name="limpar[trello_key]" value="1"> Remover a API Key salva</label>
+                  <?php endif; ?>
                 </div>
                 <div class="field" style="max-width:480px;">
                   <label>Token</label>
@@ -420,9 +442,9 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
                     <input type="password"
                            name="trello_token"
                            id="trello_token"
-                           value="<?= htmlspecialchars($trello_token) ?>"
-                           placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                           autocomplete="off"
+                           value=""
+                           placeholder="<?= $trello_token !== '' ? 'Atual: ' . htmlspecialchars(dombagMascarar($trello_token)) . ' — em branco mantém' : 'Cole o Token aqui' ?>"
+                           autocomplete="new-password"
                            maxlength="200">
                     <button type="button" class="btn-toggle-vis" onclick="toggleVis('trello_token','iconTrelloTokenEye','iconTrelloTokenEyeOff')" title="Mostrar/ocultar">
                       <svg id="iconTrelloTokenEye" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -435,6 +457,9 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
                       </svg>
                     </button>
                   </div>
+                  <?php if ($trello_token !== ''): ?>
+                    <label class="ia-limpar"><input type="checkbox" name="limpar[trello_token]" value="1"> Remover o Token salvo</label>
+                  <?php endif; ?>
                 </div>
 
                 <!-- Board do Dashboard -->
@@ -454,27 +479,19 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
                       Carregar boards
                     </button>
                   </div>
-                  <p style="font-size:11px;color:var(--text-muted);margin-top:6px;">Board cujos dados aparecem no Dashboard. Guarde as credenciais antes de carregar.</p>
+                  <p style="font-size:11px;color:var(--text-muted);margin-top:6px;">Board cujos dados aparecem no Dashboard. Usa as credenciais já salvas — se alterou a API Key ou o Token, salve antes de carregar.</p>
+                  <div class="trello-status" id="trelloStatus"></div>
                 </div>
               </div>
-            </div>
-            <div class="form-actions">
-              <button type="submit" class="btn-primary">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                  <polyline points="17 21 17 13 7 13 7 21"/>
-                  <polyline points="7 3 7 8 15 8"/>
-                </svg>
-                Salvar
-              </button>
             </div>
           </form>
         </div>
 
         <!-- ── Aba: Aparência ────────────────────────────────────────────── -->
         <div class="tab-pane <?= $aba_ativa === 'aparencia' ? 'active' : '' ?>" id="pane-aparencia">
-          <form method="POST">
+          <form method="POST" class="par-form">
             <input type="hidden" name="aba" value="aparencia">
+            <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['par_csrf']) ?>">
             <div class="form-body">
               <div class="field">
                 <label>Tema do Sistema</label>
@@ -514,16 +531,6 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
                 </div>
               </div>
             </div>
-            <div class="form-actions">
-              <button type="submit" class="btn-primary">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                  <polyline points="17 21 17 13 7 13 7 21"/>
-                  <polyline points="7 3 7 8 15 8"/>
-                </svg>
-                Salvar
-              </button>
-            </div>
           </form>
         </div>
 
@@ -535,10 +542,11 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
                 'padrao'   => ['Padrão do sistema', 'pad'],
             ];
             $telaIA = dombagConfigTela();
+            $iaIlegiveis = dombagConfigIlegiveis();
         ?>
         <!-- ── Aba: Assistente IA (só admin) ─────────────────────────────── -->
         <div class="tab-pane <?= $aba_ativa === 'ia' ? 'active' : '' ?>" id="pane-ia">
-          <form method="POST" autocomplete="off">
+          <form method="POST" class="par-form" autocomplete="off">
             <input type="hidden" name="aba" value="ia">
             <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['par_csrf']) ?>">
             <div class="form-body">
@@ -573,7 +581,10 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
                         <input type="password" name="ia[<?= $k ?>]" id="<?= $id ?>" value="" maxlength="300" autocomplete="new-password"
                                placeholder="<?= $efetivo ? 'Atual: ' . htmlspecialchars(dombagMascarar($efetivo)) . ' — em branco mantém' : 'Cole a chave aqui' ?>">
                       </div>
-                      <?php if ($naTela !== ''): ?>
+                      <?php if (in_array($k, $iaIlegiveis, true)): ?>
+                        <div class="ia-ilegivel">Há uma chave salva, mas este servidor não consegue lê-la (foi salva com outra chave de criptografia, ex.: em outro computador). Cole a chave de novo e salve.</div>
+                      <?php endif; ?>
+                      <?php if ($naTela !== '' || in_array($k, $iaIlegiveis, true)): ?>
                         <label class="ia-limpar"><input type="checkbox" name="ia_limpar[<?= $k ?>]" value="1"> Remover a chave salva nesta tela</label>
                       <?php endif; ?>
                     <?php else: ?>
@@ -600,20 +611,15 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
                 <b>Ficam só no arquivo <code>dombag.env.php</code>:</b> as credenciais dos bancos (MySQL e ERP).
                 O sistema precisa delas para se conectar ao banco antes de conseguir ler esta tela.<br>
                 A chave que criptografa os segredos fica no arquivo <code>dombag.chave</code>, ao lado do <code>dombag.env.php</code>.
-                Se ele for apagado, as chaves de API salvas aqui precisam ser digitadas de novo.
+                Se ele for apagado, as chaves de API salvas aqui precisam ser digitadas de novo.<br>
+                <b>Mais de um servidor no mesmo banco</b> (ex.: XAMPP local e produção): a chave salva num deles só é
+                lida pelo outro se os dois usarem o mesmo <code>DOMBAG_CHAVE_APP</code> no <code>dombag.env.php</code>.
+                Na dúvida, salve as chaves pela tela do servidor de produção.
               </div>
             </div>
             <div class="form-actions">
               <button type="button" class="btn-secondary" id="btnTestarIA" onclick="testarIA()">Testar conexão</button>
               <span id="testeIA" class="ia-teste"></span>
-              <button type="submit" class="btn-primary">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                  <polyline points="17 21 17 13 7 13 7 21"/>
-                  <polyline points="7 3 7 8 15 8"/>
-                </svg>
-                Salvar
-              </button>
             </div>
           </form>
         </div>
@@ -641,12 +647,33 @@ function testarIA() {
     .finally(() => { btn.disabled = false; });
 }
 
+// Pelo data-aba (antes procurava 'ia' dentro do onclick e acendia a aba
+// "Aparência", que também contém "ia"). Guarda a aba na URL pra um F5 voltar nela.
 function trocarAba(id) {
-  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-  document.querySelector('.tab-btn[onclick*="' + id + '"]').classList.add('active');
-  document.getElementById('pane-' + id).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.aba === id));
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.toggle('active', p.id === 'pane-' + id));
+  try { history.replaceState(null, '', location.pathname + '?aba=' + encodeURIComponent(id)); } catch (e) {}
 }
+
+// Botão Salvar da topbar: envia o formulário da aba aberta. requestSubmit
+// (e não submit) pra respeitar a validação dos campos (min/max etc.).
+function salvarAbaAtiva() {
+  const form = document.querySelector('.tab-pane.active form.par-form');
+  if (!form) return;
+  if (form.requestSubmit) form.requestSubmit(); else form.submit();
+}
+// Sem botão submit dentro dos formulários, o Enter num campo deixaria de salvar
+document.querySelectorAll('form.par-form').forEach(f => f.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'checkbox' && e.target.type !== 'radio') {
+    e.preventDefault();
+    salvarAbaAtiva();
+  }
+}));
+document.querySelectorAll('form.par-form').forEach(f => f.addEventListener('submit', () => {
+  const b = document.getElementById('btnSalvar');
+  b.disabled = true;
+  b.lastChild.textContent = ' Salvando…';
+}));
 
 function toggleVis(inputId, eyeId, eyeOffId) {
   const inp    = document.getElementById(inputId);
@@ -663,19 +690,32 @@ function toggleVis(inputId, eyeId, eyeOffId) {
   }
 }
 
-function carregarBoards() {
+// Usa as credenciais SALVAS (o proxy lê do banco). silencioso = carga
+// automática ao abrir a página: erro vira texto discreto, sem alert().
+function carregarBoards(silencioso) {
   const btn = document.getElementById('btnCarregarBoards');
   const sel = document.getElementById('trello_default_board');
+  const status = document.getElementById('trelloStatus');
   const currentVal = sel.value;
 
   btn.disabled = true;
   btn.textContent = 'Carregando…';
+  status.textContent = '';
+  status.className = 'trello-status';
 
-  fetch('/modules/trello/api.php?action=my_boards')
+  const falhou = (txt) => {
+    status.textContent = txt;
+    status.className = 'trello-status err';
+    if (silencioso !== true) alert(txt);
+  };
+
+  fetch('/modules/trello/api.php?action=my_boards', { credentials: 'same-origin' })
     .then(r => r.json())
     .then(boards => {
-      if (!Array.isArray(boards) || boards.error) {
-        alert('Não foi possível carregar os boards. Verifique a API Key e o Token.');
+      if (!Array.isArray(boards)) {
+        falhou(boards && boards.error === 'not_configured'
+          ? 'Salve a API Key e o Token antes de carregar os boards.'
+          : 'Não foi possível carregar os boards. Verifique a API Key e o Token salvos.');
         return;
       }
       sel.innerHTML = '<option value="">— Nenhum —</option>';
@@ -686,9 +726,18 @@ function carregarBoards() {
         if (b.id === currentVal) opt.selected = true;
         sel.appendChild(opt);
       });
-      if (!currentVal && boards.length) sel.value = boards[0].id;
+      // Board salvo que não existe mais (arquivado/sem acesso): mantém visível e avisa
+      if (currentVal && !boards.some(b => b.id === currentVal)) {
+        const opt = document.createElement('option');
+        opt.value = currentVal;
+        opt.textContent = 'Board salvo (não encontrado no Trello)';
+        opt.selected = true;
+        sel.appendChild(opt);
+        status.textContent = 'O board salvo não está mais acessível com estas credenciais.';
+        status.className = 'trello-status err';
+      }
     })
-    .catch(() => alert('Erro ao comunicar com a API do Trello.'))
+    .catch(() => falhou('Erro ao comunicar com a API do Trello.'))
     .finally(() => {
       btn.disabled = false;
       btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg> Carregar boards';
@@ -697,7 +746,7 @@ function carregarBoards() {
 
 // Carrega boards automaticamente se já houver credenciais salvas
 <?php if ($trello_key && $trello_token): ?>
-document.addEventListener('DOMContentLoaded', carregarBoards);
+document.addEventListener('DOMContentLoaded', () => carregarBoards(true));
 <?php endif; ?>
 
 const alertEl = document.getElementById('alertMsg');

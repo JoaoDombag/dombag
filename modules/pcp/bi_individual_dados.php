@@ -7,9 +7,10 @@ declare(strict_types=1);
 //  Produção. Fonte: PostgreSQL ERP Yzidro (somente leitura) + meta local.
 // ══════════════════════════════════════════════════════════════
 
-const BII_META_CHAVE = 'meta_diaria_funcionario';
+// Meta diária TOTAL da equipe (soma de todos os bags produzidos no dia)
+const BII_META_CHAVE = 'meta_diaria_total';
 
-// ── Meta diária por funcionário (a mesma para todos) ─────────────────────────
+// ── Meta diária total (equipe inteira) ─────────────────────────────────────
 function biiFetchMeta(PDO $pdo): float
 {
     try {

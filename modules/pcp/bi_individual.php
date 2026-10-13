@@ -5,8 +5,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
 require_once __DIR__ . '/bi_individual_dados.php';
 
 // ══════════════════════════════════════════════════════════════
-//  DOMBAG — BI Individual (produção de cada funcionário no dia x meta
-//  diária individual, painel para TV)
+//  DOMBAG — BI Individual: total de bags produzidos no dia x meta TOTAL
+//  da equipe, e ao lado a produção de cada funcionário (painel para TV)
 //  Fonte: PostgreSQL ERP Yzidro (somente leitura) + meta local (MySQL)
 // ══════════════════════════════════════════════════════════════
 
@@ -48,7 +48,7 @@ $pdo = dbPDO();
 $pg  = dbPG();
 $dia = biiDia();
 
-// ── AJAX: salvar meta individual ──────────────────────────────────────────────
+// ── AJAX: salvar meta total do dia ─────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_meta') {
     header('Content-Type: application/json; charset=utf-8');
     $valor = max(0.0, (float) str_replace(',', '.', (string) ($_POST['meta'] ?? '0')));
@@ -105,189 +105,142 @@ if (!$pg) {
     --biz-orange: #f0a638;
     --biz-teal: #58d6c9;
     --biz-teal-2: #34b6a8;
+    --biz-blue: #3aa7ff;
     --biz-text: #eef2f7;
     --biz-muted: #8fa0b3;
-    /* Largura de referência do painel: o #bizDashboard é sempre desenhado
-       nessa largura fixa e depois escalado (JS: biApplyScale) pra cobrir o
-       espaço real disponível — mesma técnica do BI da Produção. */
-    --bi-ref-w: 1800px;
   }
 
-  /* Painel de TV/kiosk: em vez de reorganizar colunas por breakpoint, o
-     #bizDashboard é desenhado num tamanho fixo de referência (ver mais
-     abaixo) e o JS (biApplyScale) calcula um único fator de escala pra
-     cobrir o espaço disponível, aplicado via transform:scale() — a
-     aparência fica idêntica em qualquer tamanho de tela, só menor/maior. */
+  /* Painel de TV: #bizDashboard ocupa exatamente a área visível (JS:
+     biApplyScale fixa largura/altura em px) e tudo dentro encolhe/cresce
+     pra caber, sem rolagem nem corte. No celular vira página rolável. */
   .content { display: flex; align-items: flex-start; justify-content: center; overflow: hidden; min-width: 0; padding: 0; }
-
-  /* ── Fora da tela cheia: o painel preenche a largura E cabe na altura
-     visível (JS fixa a altura em px). min-height some pra que a grade e os
-     anéis encolham em vez de empurrar o conteúdo pra fora do painel. ── */
-  body.bi-fit .content { overflow: hidden; }
-  body.bi-fit #bizDashboard { min-height: 0; }
-  body.bi-fit .biz-func-grid { min-height: 0; }
-  body.bi-fit .biz-fu-card { overflow: hidden; }
   @media (max-width: 768px) {
     .app-wrapper { height: 100vh !important; overflow: hidden !important; flex-direction: row !important; }
     .main { height: 100vh !important; overflow: hidden !important; }
-    /* altura = o que sobra abaixo das barras (que agora podem ter 2-3 linhas) */
+    /* altura = o que sobra abaixo das barras (que podem ter 2-3 linhas) */
     .content { padding: 0 !important; overflow: hidden !important; height: auto !important; min-height: 0; flex: 1 1 auto !important; display: flex !important; }
   }
 
   #bizDashboard {
-    width: var(--bi-ref-w);
-    min-height: 1000px;
-    display: flex; flex-direction: column; gap: 16px;
-    background: var(--biz-bg); border-width: 0; border-radius: 0;
-    padding: 26px 28px; color: var(--biz-text); font-family: 'Segoe UI', sans-serif;
-    box-shadow: none; box-sizing: border-box;
-    flex-shrink: 0; transform-origin: center center;
-    /* center (não "top"): fora da tela cheia não há transform (JS usa
-       width/height fixos), então isso só importa pra tela cheia, onde o
-       painel é centralizado por flex ANTES da escala — com origem no topo,
-       o excesso de altura "crescia" sempre pra cima e ficava fora da tela. */
-    /* As fontes dos cards usam cqw (abaixo) em vez de vw: precisam ser
-       relativas à LARGURA DESENHADA do próprio painel, não à janela real —
-       na tela cheia o painel é desenhado numa largura de referência quase
-       fixa e depois escalado por transform, então vw ficaria errado
-       (baseado na janela real) e quebraria o tamanho consistente da TV. */
+    display: flex; gap: 20px;
+    background: var(--biz-bg);
+    padding: 22px 24px; color: var(--biz-text); font-family: 'Segoe UI', sans-serif;
+    box-sizing: border-box; flex-shrink: 0; min-height: 0;
+    /* fontes em cqw: relativas à largura do próprio painel (TV ou monitor) */
     container-type: inline-size;
   }
 
-  .biz-card { background: var(--biz-card); border: 1px solid var(--biz-border); border-radius: 14px; padding: 16px 20px 18px; box-shadow: 0 10px 24px -16px rgba(0,0,0,.5); min-width: 0; }
-  .biz-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--biz-border); }
-  .biz-card-head h2 { font-size: clamp(12px, .9cqw, 16px); font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--biz-text); }
-  .biz-count-badge { font-size: clamp(11px, .8cqw, 13px); font-weight: 800; padding: 3px 11px; border-radius: 20px; background: rgba(88,214,201,.18); color: var(--biz-teal); }
+  .biz-card { background: var(--biz-card); border: 1px solid var(--biz-border); border-radius: 16px; padding: 18px 22px; box-shadow: 0 10px 24px -16px rgba(0,0,0,.5); min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .biz-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--biz-border); flex: 0 0 auto; }
+  .biz-card-head h2 { font-size: clamp(13px, 1cqw, 20px); font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--biz-text); }
+  .biz-count-badge { font-size: clamp(11px, .85cqw, 15px); font-weight: 800; padding: 3px 12px; border-radius: 20px; background: rgba(88,214,201,.18); color: var(--biz-teal); white-space: nowrap; }
+  .biz-empty-msg { margin: auto; text-align: center; color: var(--biz-muted); font-size: clamp(13px, 1.2cqw, 20px); font-weight: 700; padding: 30px 0; }
 
-  .biz-empty-msg { text-align: center; color: var(--biz-text); font-size: clamp(12px, 1cqw, 16px); font-weight: 700; padding: 40px 0; }
+  /* ══ Esquerda: TOTAL produzido x meta total ══════════════════════════════ */
+  .biz-total { flex: 0 0 36%; }
+  .biz-total.hit { border-color: rgba(45,106,255,.55); background: rgba(45,106,255,.09); box-shadow: 0 0 0 1px rgba(45,106,255,.3), 0 0 40px -10px rgba(45,106,255,.4); }
+  .biz-ring-wrap { flex: 1 1 auto; min-height: 0; display: flex; padding: 4px 0; }
+  .biz-ring-shape { margin: auto; aspect-ratio: 1 / 1; height: 100%; max-width: 100%; }
+  .biz-ring-shape svg { width: 100%; height: 100%; display: block; overflow: visible; }
+  .biz-total-foot { flex: 0 0 auto; text-align: center; }
+  .biz-total-nums { font-size: clamp(14px, 1.3cqw, 24px); font-weight: 700; color: var(--biz-muted); }
+  .biz-total-nums strong { font-size: clamp(34px, 4cqw, 76px); color: #fff; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
+  .biz-total-nums .meta { font-size: clamp(20px, 2cqw, 38px); color: var(--biz-text); font-weight: 800; }
+  .biz-total-msg { margin-top: 6px; font-size: clamp(15px, 1.5cqw, 28px); font-weight: 800; color: var(--biz-text); }
+  .biz-total.hit .biz-total-msg { color: #7db3ff; }
+  /* 3 indicadores sempre na mesma linha (grade de 3 colunas iguais) */
+  .biz-total-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+  .biz-stat { background: var(--biz-card2); border: 1px solid var(--biz-border); border-radius: 10px; padding: 8px 6px; min-width: 0; text-align: center; }
+  .biz-stat b { display: block; font-size: clamp(18px, 1.7cqw, 32px); font-weight: 900; color: var(--biz-teal); font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .biz-stat span { display: block; font-size: clamp(9px, .75cqw, 14px); font-weight: 700; color: var(--biz-muted); text-transform: uppercase; letter-spacing: .03em; line-height: 1.2; }
 
-  /* ── Meta individual editável no cabeçalho do card (mesmo padrão do BI da Produção) ── */
-  .biz-head-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-  .biz-meta-label { font-size: clamp(11px, .85cqw, 14px); font-weight: 700; color: var(--biz-muted); }
-  .biz-meta-label strong { color: var(--biz-text); font-variant-numeric: tabular-nums; }
-  .biz-meta-btn { width: 24px; height: 24px; border-radius: 6px; border: 1px solid var(--biz-border); background: transparent; color: var(--biz-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  /* Meta total editável (lápis no cabeçalho do card) */
+  .biz-head-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .biz-meta-btn { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--biz-border); background: transparent; color: var(--biz-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .biz-meta-btn:hover { background: rgba(255,255,255,.06); color: var(--biz-text); }
   .biz-meta-form { display: none; align-items: center; gap: 6px; }
   .biz-meta-form.open { display: flex; }
-  .biz-meta-form input { width: 90px; background: var(--biz-card2); border: 1px solid var(--biz-border); border-radius: 6px; color: var(--biz-text); font: inherit; font-size: 12px; padding: 4px 8px; }
+  .biz-meta-form input { width: 100px; background: var(--biz-card2); border: 1px solid var(--biz-border); border-radius: 6px; color: var(--biz-text); font: inherit; font-size: 13px; padding: 4px 8px; }
   .biz-meta-save, .biz-meta-cancel { font: inherit; font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 6px; cursor: pointer; }
   .biz-meta-save { background: var(--biz-teal-2); color: #05070a; border: 0; }
   .biz-meta-cancel { background: transparent; color: var(--biz-muted); border: 1px solid var(--biz-border); }
   body.biz-fs-fallback .biz-meta-btn, body.biz-fs-fallback .biz-meta-form { display: none !important; }
 
-  /* ── Posição no ranking do dia e indicador "produzindo agora" ── */
-  /* OP ativa no card: uma linha, com reticências se a descrição for longa */
-  .biz-fu-op { display: flex; align-items: center; justify-content: center; gap: 7px; min-width: 0; color: var(--biz-teal); }
-  .biz-fu-op .biz-op-live-dot { flex: 0 0 auto; }
-  .biz-fu-op-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .biz-fu-op-txt strong { font-weight: 900; }
-  .biz-fu-op-mais { flex: 0 0 auto; font-size: .8em; font-weight: 800; padding: 1px 7px; border-radius: 20px; background: rgba(88,214,201,.15); }
-  .biz-fu-op-off { color: var(--biz-muted); }
+  /* ══ Direita: produção individual (uma linha por pessoa) ═════════════════ */
+  .biz-ind { flex: 1 1 0; }
+  /* As linhas dividem a altura do card igualmente (1fr); com muita gente
+     a lista vira 2 colunas (JS define grid-template-columns). */
+  .biz-ind-list { flex: 1 1 auto; min-height: 0; display: grid; grid-auto-rows: minmax(0, 1fr); gap: 8px 18px; }
+  .biz-ind-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; align-content: center; gap: 4px 16px;
+                 background: var(--biz-card2); border: 1px solid var(--biz-border); border-radius: 10px; padding: 6px 16px; min-height: 0; overflow: hidden; }
+  .biz-ind-name { font-size: clamp(14px, 1.35cqw, 26px); font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .biz-ind-qtd { grid-row: span 3; text-align: right; font-variant-numeric: tabular-nums; }
+  .biz-ind-qtd b { display: block; font-size: clamp(20px, 2.1cqw, 40px); font-weight: 900; color: #fff; line-height: 1.05; }
+  .biz-ind-qtd span { font-size: clamp(10px, .85cqw, 15px); font-weight: 700; color: var(--biz-muted); }
+  .biz-ind-bar { height: clamp(6px, .55cqw, 11px); background: rgba(255,255,255,.07); border-radius: 6px; overflow: hidden; }
+  .biz-ind-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--biz-blue), var(--biz-teal)); transition: width .5s ease; }
+  .biz-ind-op { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: clamp(11px, .95cqw, 17px); font-weight: 700; color: var(--biz-teal); }
+  .biz-ind-op > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .biz-ind-op.off { color: var(--biz-muted); font-weight: 600; }
+  .biz-live-dot-sm { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--biz-teal); animation: bizPulse 1.8s infinite; }
 
-  /* ── Grade de funcionários: um card por funcionário, ocupando 100% da
-     célula da grade (largura e altura) — o anel de progresso cresce pra
-     preencher todo o espaço vertical sobrando, em vez de ficar pequeno e
-     centralizado numa área grande vazia. ── */
-  .biz-func-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); grid-auto-rows: 1fr; gap: 20px; flex: 1 1 auto; min-height: 760px; }
+  /* ── Tela em pé ou estreita (retrato, tablet): o total vira uma faixa no
+     topo — anel à esquerda, números à direita — e a lista ocupa o resto da
+     altura. JS (biApplyScale) liga a classe bi-vertical pela proporção. ── */
+  body.bi-vertical #bizDashboard { flex-direction: column; gap: 14px; }
+  body.bi-vertical .biz-total { flex: 0 0 auto; display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 24px; align-items: center; }
+  body.bi-vertical .biz-total .biz-card-head { grid-column: 1 / -1; }
+  body.bi-vertical .biz-ring-wrap { flex: none; width: clamp(130px, 24cqw, 300px); height: clamp(130px, 24cqw, 300px); padding: 0; }
+  body.bi-vertical .biz-total-foot { text-align: left; }
+  body.bi-vertical .biz-total-nums strong { font-size: clamp(32px, 6cqw, 70px); }
+  body.bi-vertical .biz-total-msg { font-size: clamp(14px, 2.4cqw, 26px); }
+  body.bi-vertical .biz-total-stats { max-width: 520px; }
+  body.bi-vertical .biz-stat span { font-size: clamp(9px, 1.5cqw, 13px); }
+  body.bi-vertical .biz-ind-name { font-size: clamp(14px, 2.2cqw, 24px); }
+  body.bi-vertical .biz-ind-qtd b { font-size: clamp(20px, 3.4cqw, 38px); }
+  body.bi-vertical .biz-ind-qtd span, body.bi-vertical .biz-ind-op { font-size: clamp(11px, 1.6cqw, 16px); }
 
-  .biz-fu-card { border: 1px solid var(--biz-border); border-radius: 14px; padding: 20px 22px; background: var(--biz-card2); display: flex; flex-direction: column; height: 100%; min-width: 0; min-height: 0; transition: border-color .15s, background .2s, box-shadow .2s; }
-  .biz-fu-card:hover { border-color: rgba(88,214,201,.35); }
-
-  /* ── Poucos funcionários: o card vira duas colunas — anel à esquerda e um
-     painel de detalhamento à direita (OPs e centros de trabalho do dia),
-     aproveitando o espaço que antes ficava vazio. ── */
-  .biz-fu-card.has-detail { flex-direction: row; align-items: stretch; gap: 26px; padding: 22px 26px; }
-  .biz-fu-card.has-detail .biz-fu-left { flex: 0 0 44%; min-width: 0; display: flex; flex-direction: column; }
-  .biz-fu-left { display: contents; }
-
-  .biz-fu-detail { display: none; }
-  .biz-fu-card.has-detail .biz-fu-detail {
-    display: flex; flex-direction: column; gap: 18px; flex: 1 1 0; min-width: 0;
-    border-left: 1px solid var(--biz-border); padding-left: 26px; overflow: hidden;
+  /* ── Topbar: quebra em 2 linhas assim que título + ações não cabem lado a
+     lado (antes só no celular, e em tablet o título ficava sobre o "Ao vivo") ── */
+  @media (max-width: 1200px) {
+    .topbar { flex-wrap: wrap; row-gap: 8px; height: auto; }
+    .topbar-left { min-width: 0; }
+    .topbar-actions { flex-wrap: wrap; row-gap: 8px; }
   }
-  .biz-fu-detail-sec { display: flex; flex-direction: column; min-height: 0; }
-  .biz-fu-detail-sec h4 { font-size: clamp(10px, .8cqw, 14px); font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--biz-teal); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--biz-border); }
-  .biz-detail-list { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
-  .biz-detail-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 2px; font-size: clamp(12px, 1.1cqw, 18px); font-weight: 700; border-bottom: 1px solid rgba(255,255,255,.07); }
-  .biz-detail-row:last-child { border-bottom: 0; }
-  .biz-detail-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--biz-text); }
-  .biz-detail-row strong { flex: 0 0 auto; color: var(--biz-teal); font-weight: 800; font-variant-numeric: tabular-nums; }
-  .biz-detail-empty { font-size: clamp(12px, 1cqw, 16px); font-weight: 700; color: var(--biz-muted); padding: 6px 2px; }
-
-  .biz-op-row span { flex: 1 1 auto; }
-  .biz-op-live { flex: 0 0 auto; font-style: normal; font-size: clamp(10px, .8cqw, 13px); font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--biz-teal); display: inline-flex; align-items: center; gap: 5px; }
-  .biz-op-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--biz-teal); box-shadow: 0 0 0 0 rgba(88,214,201,.6); animation: bizPulse 1.8s infinite; }
-
-  .biz-fu-head { text-align: center; flex: 0 0 auto; }
-  /* nome sempre em uma linha: cards com nomes longos não podem ter anel menor */
-  .biz-fu-name { font-size: clamp(18px, 1.7cqw, 32px); font-weight: 800; color: var(--biz-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .biz-fu-sub { font-size: clamp(12px, 1cqw, 17px); font-weight: 700; color: var(--biz-text); margin-top: 8px; }
-
-  /* O SVG do anel é sempre quadrado (aspect-ratio) e cresce até o limite do
-     espaço disponível (altura OU largura, o que for menor) — assim ele
-     realmente ocupa a área que sobra, em vez de um tamanho fixo em px. */
-  .biz-fu-ring-wrap { flex: 1 1 auto; min-height: 0; display: flex; padding: 6px 0; }
-  .biz-fu-ring-shape { margin: auto; aspect-ratio: 1 / 1; height: 100%; max-width: 100%; }
-  .biz-fu-ring-shape svg { width: 100%; height: 100%; display: block; overflow: visible; }
-
-  .biz-fu-foot { flex: 0 0 auto; text-align: center; }
-  .biz-fu-nums { font-size: clamp(13px, 1.1cqw, 20px); font-weight: 700; color: var(--biz-muted); }
-  .biz-fu-nums strong { font-size: clamp(26px, 2.8cqw, 50px); color: white; font-weight: 900; font-variant-numeric: tabular-nums; }
-  .biz-fu-msg { margin-top: 8px; font-size: clamp(15px, 1.4cqw, 24px); font-weight: 800; }
-  .biz-fu-msg.msg-hit    { color: #7db3ff; }
-  .biz-fu-msg.msg-behind { color: var(--biz-text); font-weight: 700; }
-
-  /* ── Funcionário que bateu a meta diária: destaque azul no card inteiro ── */
-  .biz-fu-card.biz-fu-hit { border-color: rgba(45,106,255,.5); background: rgba(45,106,255,.1); box-shadow: 0 0 0 1px rgba(45,106,255,.3), 0 0 32px -8px rgba(45,106,255,.35); }
-  .biz-fu-card.biz-fu-hit .biz-fu-name { color: #7db3ff; }
-
-  /* ── Topbar desta página: badge "Ao vivo" + hora + botões de texto não
-     cabem numa única linha em telas de celular — mesma regra do BI da
-     Produção. ── */
   .biz-btn-short { display: none; }
   @media (max-width: 768px) {
     .topbar { flex-wrap: wrap; row-gap: 8px; }
     .topbar-left { width: 100%; }
     .topbar-actions { width: 100%; flex-wrap: wrap; row-gap: 8px; column-gap: 8px; }
     .last-update { display: none; }
-    /* Linha 1: ao vivo + data. Linha 2: os três botões dividindo a largura */
     .biz-date-filter { margin-left: auto; }
-    .topbar-actions .btn-secondary {
-      flex: 1 1 0; min-width: 0; justify-content: center;
-      padding: 8px 10px; font-size: 12px; white-space: nowrap; overflow: hidden;
-    }
+    .topbar-actions .btn-secondary { flex: 1 1 0; min-width: 0; justify-content: center; padding: 8px 10px; font-size: 12px; white-space: nowrap; overflow: hidden; }
     .biz-btn-long { display: none; }
     .biz-btn-short { display: inline; }
   }
 
-  /* ── Celular (fora da tela cheia): em vez de espremer tudo na altura da
-     tela, vira uma lista rolável — um funcionário por linha, com anel de tamanho
-     fixo e o detalhamento (OPs/centros de trabalho) abaixo dele. JS: biApplyScale. ── */
+  /* ── Celular (fora da tela cheia): página rolável, total em cima e a
+     lista de pessoas embaixo. JS: biApplyScale liga a classe bi-mobile. ── */
   body.bi-mobile .content { overflow-y: auto !important; overflow-x: hidden !important; display: block !important; -webkit-overflow-scrolling: touch; }
-  body.bi-mobile #bizDashboard { width: 100% !important; min-width: 0; min-height: 0; padding: 12px; transform: none !important; }
+  body.bi-mobile #bizDashboard { width: 100% !important; height: auto !important; flex-direction: column; padding: 12px; gap: 12px; }
   body.bi-mobile .biz-card { padding: 14px; }
-  body.bi-mobile .biz-func-grid { grid-template-columns: 1fr !important; grid-auto-rows: auto; min-height: 0; gap: 14px; }
-  body.bi-mobile .biz-fu-card,
-  body.bi-mobile .biz-fu-card.has-detail { flex-direction: column; height: auto; padding: 16px; gap: 14px; }
-  body.bi-mobile .biz-fu-card .biz-fu-left { display: flex; flex-direction: column; flex: none; }
-  body.bi-mobile .biz-fu-ring-wrap { flex: none; }
-  body.bi-mobile .biz-fu-ring-shape { width: 150px; height: 150px; }
-  body.bi-mobile .biz-fu-name { font-size: 20px; }
-  body.bi-mobile .biz-fu-sub { font-size: 13px; }
-  body.bi-mobile .biz-fu-nums strong { font-size: 28px; }
-  body.bi-mobile .biz-fu-msg { font-size: 15px; }
-  body.bi-mobile .biz-fu-card .biz-fu-detail {
-    display: flex; flex-direction: column; gap: 14px;
-    border-left: 0; padding-left: 0; border-top: 1px solid var(--biz-border); padding-top: 12px; overflow: visible;
-  }
-  body.bi-mobile .biz-detail-list { overflow: visible; }
-  body.bi-mobile .biz-fu-detail-sec h4 { font-size: 11px; }
-  body.bi-mobile .biz-detail-row { font-size: 13px; }
-  body.bi-mobile .biz-detail-empty { font-size: 13px; }
-  body.bi-mobile .biz-op-live { font-size: 10px; }
+  body.bi-mobile .biz-total, body.bi-mobile .biz-ind { flex: none; }
+  body.bi-mobile .biz-ring-wrap { flex: none; }
+  body.bi-mobile .biz-ring-shape { width: 190px; height: 190px; }
+  body.bi-mobile .biz-total-nums strong { font-size: 36px; }
+  /* Lista no celular: 1 coluna, linhas com altura do conteúdo. Os !important
+     anulam o que o JS define pro painel de TV (linhas de altura fixa e fluxo
+     por coluna) — sem isso as linhas ficavam com altura zero, empilhadas. */
+  body.bi-mobile .biz-ind-list { grid-template-columns: 1fr !important; grid-template-rows: none !important; grid-auto-flow: row !important; grid-auto-rows: auto !important; flex: none; }
+  body.bi-mobile .biz-ind-row { padding: 10px 12px; overflow: visible; }
+  body.bi-mobile .biz-ind-name { font-size: 15px; }
+  body.bi-mobile .biz-ind-qtd b { font-size: 24px; }
+  body.bi-mobile .biz-ind-qtd span, body.bi-mobile .biz-ind-op { font-size: 12px; }
+  body.bi-mobile .biz-total-msg { font-size: 15px; }
+  body.bi-mobile .biz-stat b { font-size: 20px; }
+  body.bi-mobile .biz-stat span { font-size: 9.5px; }
 
   .biz-fullscreen-btn { display: flex; align-items: center; gap: 7px; }
-
   /* Botão flutuante para sair da tela cheia quando o navegador não tem a API
      nativa (iPhone/fallback): a topbar some e não há Esc no celular. */
   .biz-fs-exit {
@@ -298,44 +251,33 @@ if (!$pg) {
   }
   .biz-fs-exit:hover, .biz-fs-exit:active { opacity: 1; }
   html:not(:fullscreen) body.biz-fs-fallback .biz-fs-exit { display: flex; }
-  @media (max-width: 768px) {
-    body.biz-fs-fallback .biz-fs-exit { display: flex; }
-  }
+  @media (max-width: 768px) { body.biz-fs-fallback .biz-fs-exit { display: flex; } }
 
   /* ── Topbar mais legível de longe (o painel fica numa TV) ── */
   .page-title h1 { font-size: 22px; font-weight: 800; }
   .page-title p { font-size: 14px; font-weight: 600; color: var(--biz-text); }
-  .biz-live { font-size: 13px !important; font-weight: 800 !important; }
   .last-update { font-size: 14px; font-weight: 700; }
 
-  /* ── Filtro de data discreto: parece parte da topbar, some quando é hoje ── */
+  /* ── Filtro de data discreto ── */
   .biz-date-filter { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--biz-muted); }
-  .biz-date-filter input[type="date"] {
-    background: var(--biz-card2); border: 1px solid var(--biz-border); border-radius: 8px;
-    color: var(--biz-text); font: inherit; font-size: 12px; padding: 4px 8px; color-scheme: dark;
-  }
+  .biz-date-filter input[type="date"] { background: var(--biz-card2); border: 1px solid var(--biz-border); border-radius: 8px; color: var(--biz-text); font: inherit; font-size: 12px; padding: 4px 8px; color-scheme: dark; }
   .biz-date-filter input[type="date"]:hover { border-color: rgba(88,214,201,.35); }
-  .biz-date-nav {
-    display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px;
-    background: var(--biz-card2); border: 1px solid var(--biz-border); border-radius: 8px;
-    color: var(--biz-text); cursor: pointer; padding: 0;
-  }
+  .biz-date-nav { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; background: var(--biz-card2); border: 1px solid var(--biz-border); border-radius: 8px; color: var(--biz-text); cursor: pointer; padding: 0; }
   .biz-date-nav:hover:not(:disabled) { border-color: rgba(88,214,201,.35); color: var(--biz-teal); }
   .biz-date-nav:disabled { opacity: .35; cursor: default; }
   .biz-date-reset { color: var(--biz-teal); text-decoration: none; font-weight: 600; }
   .biz-date-reset[hidden] { display: none; }
 
   /* ── Indicador "ao vivo" ── */
-  .biz-live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--biz-teal); }
-  .biz-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--biz-teal); box-shadow: 0 0 0 0 rgba(88,214,201,.6); animation: bizPulse 1.8s infinite; }
+  .biz-live { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--biz-teal); }
+  .biz-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--biz-teal); animation: bizPulse 1.8s infinite; }
   @keyframes bizPulse {
     0%   { box-shadow: 0 0 0 0 rgba(88,214,201,.55); }
     70%  { box-shadow: 0 0 0 7px rgba(88,214,201,0); }
     100% { box-shadow: 0 0 0 0 rgba(88,214,201,0); }
   }
 
-  /* ── Modo tela cheia: esconde sidebar/topbar, dando mais espaço real pro
-     JS (biApplyScale) escalar o painel — mesma técnica do BI da Produção. ── */
+  /* ── Tela cheia: esconde menus e barras, o painel ocupa a tela toda ── */
   html:fullscreen .sidebar, body.biz-fs-fallback .sidebar,
   html:fullscreen .topbar,  body.biz-fs-fallback .topbar { display: none !important; }
   html:fullscreen .mobile-topbar, body.biz-fs-fallback .mobile-topbar,
@@ -343,7 +285,6 @@ if (!$pg) {
   html:fullscreen .mob-scroll,    body.biz-fs-fallback .mob-scroll,
   html:fullscreen .mob-sub-backdrop, body.biz-fs-fallback .mob-sub-backdrop { display: none !important; }
   html:fullscreen .main, body.biz-fs-fallback .main { padding-top: 0 !important; }
-
   html:fullscreen .app-wrapper, body.biz-fs-fallback .app-wrapper { height: 100vh !important; overflow: hidden; }
   html:fullscreen .main,        body.biz-fs-fallback .main        { height: 100vh !important; overflow: hidden; }
   html:fullscreen .content,     body.biz-fs-fallback .content     { height: 100vh; padding: 0; align-items: center; overflow: hidden; }
@@ -358,7 +299,7 @@ if (!$pg) {
       <div class="topbar-left">
         <div class="page-title">
           <h1>BI Individual</h1>
-          <p>Produção de cada funcionário no dia, comparada com a meta diária individual — atualização automática</p>
+          <p>Total de bags produzidos x meta do dia, e a produção de cada pessoa — atualização automática</p>
         </div>
       </div>
       <div class="topbar-actions">
@@ -400,25 +341,40 @@ if (!$pg) {
 
       <div id="bizDashboard">
 
-        <!-- Produção individual — um card por funcionário que apontou no dia, vs meta diária
-             individual (a mesma para todos, editável aqui no lápis) -->
-        <div class="biz-card" style="flex:1 1 auto; display:flex; flex-direction:column; min-height:0;">
+        <!-- Esquerda: total de bags produzidos no dia x meta total da equipe -->
+        <div class="biz-card biz-total" id="biTotalCard">
           <div class="biz-card-head">
-            <h2>Produção Individual <span id="biDiaTitulo"><?= biiEscape($payload['dia_label']) ?></span></h2>
+            <h2>Total Produzido <span id="biDiaTitulo"><?= biiEscape($payload['dia_label']) ?></span></h2>
             <div class="biz-head-right">
-              <span class="biz-meta-label">Meta individual: <strong id="biMetaTxt"><?= number_format((float) $payload['meta'], 0, ',', '.') ?></strong></span>
-              <button type="button" class="biz-meta-btn" id="biMetaEditBtn" title="Editar meta individual" aria-label="Editar meta individual">
+              <button type="button" class="biz-meta-btn" id="biMetaEditBtn" title="Editar meta total do dia" aria-label="Editar meta total do dia">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
               </button>
               <form class="biz-meta-form" id="biMetaForm">
-                <input type="number" min="0" step="1" id="biMetaInput" value="<?= (int) $payload['meta'] ?>">
+                <input type="number" min="0" step="1" id="biMetaInput" value="<?= (int) $payload['meta'] ?>" title="Meta total de bags do dia">
                 <button type="submit" class="biz-meta-save">Salvar</button>
                 <button type="button" class="biz-meta-cancel" id="biMetaCancel">Cancelar</button>
               </form>
-              <span class="biz-count-badge" id="biFuncsCount">0</span>
             </div>
           </div>
-          <div class="biz-func-grid" id="biFuncsGrid"></div>
+          <div class="biz-ring-wrap"><div class="biz-ring-shape"><svg id="biGaugeTotal"></svg></div></div>
+          <div class="biz-total-foot">
+            <div class="biz-total-nums"><strong id="biTotalQtd">0</strong> / <span class="meta" id="biMetaTxt">0</span> bags</div>
+            <div class="biz-total-msg" id="biTotalMsg"></div>
+            <div class="biz-total-stats">
+              <div class="biz-stat"><b id="biStatPessoas">0</b><span>pessoas</span></div>
+              <div class="biz-stat"><b id="biStatAgora">0</b><span>produzindo agora</span></div>
+              <div class="biz-stat"><b id="biStatOps">0</b><span>O.Ps no dia</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Direita: produção de cada pessoa (ranking), com a O.P ativa -->
+        <div class="biz-card biz-ind">
+          <div class="biz-card-head">
+            <h2>Produção Individual</h2>
+            <span class="biz-count-badge" id="biFuncsCount">0</span>
+          </div>
+          <div class="biz-ind-list" id="biIndList"></div>
         </div>
 
       </div>
@@ -463,204 +419,129 @@ if (biDataInput) {
 document.getElementById('biDataPrev')?.addEventListener('click', () => biDeslocaDia(-1));
 document.getElementById('biDataNext')?.addEventListener('click', () => biDeslocaDia(1));
 
-// ── Anel de progresso em círculo cheio (em vez do semicírculo do BI da
-// Produção): ocupa toda a área quadrada disponível no card e fica mais fácil
-// de ler à distância. Vira azul e ganha um brilho quando bate a meta — um
-// retorno visual imediato que funciona como incentivo à produção. ──────────
-function biRenderGauge(svg, pct, hit) {
+// ── Anel de progresso do total: azul com brilho quando a equipe bate a meta ──
+function biRenderGauge(svg, pct, hit, semMeta) {
   const clamped = Math.max(0, Math.min(100, pct));
-  const gradId = 'biGrad' + Math.random().toString(36).slice(2);
-  const r = 82, cx = 100, cy = 100, sw = 26;
+  const r = 82, cx = 100, cy = 100, sw = 24;
   const circ = 2 * Math.PI * r;
   const dash = circ * (clamped / 100);
-  const colorFrom = hit ? '#2d6aff' : '#3aa7ff';
-  const colorTo   = hit ? '#58d6c9' : '#58d6c9';
-
-  const fgCircle = clamped > 0
-    ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="url(#${gradId})" stroke-width="${sw}"
+  const fg = clamped > 0
+    ? `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="url(#biGradTotal)" stroke-width="${sw}"
          stroke-linecap="round" stroke-dasharray="${dash.toFixed(1)} ${(circ - dash).toFixed(1)}"
-         transform="rotate(-90 ${cx} ${cy})" ${hit ? 'filter="url(#' + gradId + 'Glow)"' : ''}/>`
+         transform="rotate(-90 ${cx} ${cy})" ${hit ? 'filter="url(#biGlowTotal)"' : ''}/>`
     : '';
-
   svg.setAttribute('viewBox', '0 0 200 200');
   svg.innerHTML = `
     <defs>
-      <linearGradient id="${gradId}" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="${colorFrom}"/>
-        <stop offset="100%" stop-color="${colorTo}"/>
+      <linearGradient id="biGradTotal" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="${hit ? '#2d6aff' : '#3aa7ff'}"/>
+        <stop offset="100%" stop-color="#58d6c9"/>
       </linearGradient>
-      <filter id="${gradId}Glow" x="-60%" y="-60%" width="220%" height="220%">
+      <filter id="biGlowTotal" x="-60%" y="-60%" width="220%" height="220%">
         <feGaussianBlur stdDeviation="5" result="blur"/>
         <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
     </defs>
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="${sw}"/>
-    ${fgCircle}
-    <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" fill="#eef2f7" font-size="48" font-weight="900">${biFmt(pct, 0)}%</text>
+    ${fg}
+    <text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" fill="#eef2f7" font-size="${semMeta ? 22 : 46}" font-weight="900">${semMeta ? 'Defina a meta' : biFmt(pct, 0) + '%'}</text>
   `;
 }
 
-// ── Nº de colunas da grade: testa cada combinação colunas x linhas e fica com
-// a que deixa o anel de progresso maior no espaço real disponível — numa TV
-// 16:9 com 8 funcionários vira 4x2, num monitor mais quadrado 3x3, etc. ─────
-let biColsAtual = 0;
-function biFuncsCols(n) {
-  if (n <= 1) return 1;
-  const wrap = document.querySelector('.content');
-  const W = (wrap ? wrap.clientWidth : 0) - 60;    // padding do painel e do card
-  const H = (wrap ? wrap.clientHeight : 0) - 110;  // padding + cabeçalho do card
-  if (W <= 0 || H <= 0) return Math.ceil(Math.sqrt(n));
-  const TEXTO_H = 150;  // nome + subtítulo + "Produzido x Meta" de cada card
-  let melhor = 1, melhorAnel = -Infinity;
-  for (let c = 1; c <= n; c++) {
-    const r = Math.ceil(n / c);
-    const cw = (W - (c - 1) * 20) / c;
-    const ch = (H - (r - 1) * 20) / r;
-    // Com até 2 colunas o anel divide a largura com o detalhamento (44%)
-    const anel = Math.min(c <= 2 ? cw * 0.44 : cw - 44, ch - TEXTO_H);
-    if (anel > melhorAnel + 1) { melhorAnel = anel; melhor = c; }
-  }
-  return melhor;
-}
-
-// ── Produção individual — um card por funcionário (ranking), vs meta ────────
-function biRenderFuncs(funcs) {
-  document.getElementById('biFuncsCount').textContent = funcs.length;
-  const grid = document.getElementById('biFuncsGrid');
-  if (!funcs.length) {
-    grid.style.gridTemplateColumns = '1fr';
-    grid.innerHTML = '<div class="biz-empty-msg">Ninguém produziu ' + (biDiaLabel === 'HOJE' ? 'hoje' : 'em ' + biEsc(biDiaLabel)) + '.</div>';
-    return;
-  }
-  const cols = biFuncsCols(funcs.length);
-  biColsAtual = cols;
-  const mobileLista = biMqMobile.matches && !biIsKiosk();
-
-  // Última linha incompleta (ex.: 7 funcionários em 4 colunas = 4 + 3): os
-  // cards dela se esticam pra preencher a largura toda. A grade passa a ter
-  // MMC(colunas, sobra) trilhas — cada card normal ocupa total/colunas
-  // trilhas e cada card da última linha total/sobra. No celular (lista de
-  // uma coluna) não se aplica: span criaria colunas implícitas.
-  const sobra = mobileLista ? 0 : funcs.length % cols;
-  const mdc = (a, b) => (b ? mdc(b, a % b) : a);
-  const trilhas = sobra ? (cols * sobra) / mdc(cols, sobra) : cols;
-  const spanNormal = trilhas / cols;
-  const spanUltima = sobra ? trilhas / sobra : spanNormal;
-  const inicioUltima = funcs.length - sobra;
-  grid.style.gridTemplateColumns = `repeat(${trilhas}, 1fr)`;
-
-  // Até 2 colunas de cards (ou seja, até 4 funcionários) os cards são largos
-  // o bastante pra mostrar o painel de detalhamento ao lado do anel; com mais
-  // colunas ficaria apertado demais.
-  // No celular (lista de uma coluna) o detalhamento vai abaixo do anel, então
-  // cabe sempre, qualquer que seja a quantidade de funcionários.
-  const comDetalhe = cols <= 2 || mobileLista;
+// ── Total do dia x meta total ────────────────────────────────────────────────
+function biRenderTotal(funcs) {
+  const total = funcs.reduce((s, f) => s + Number(f.qtd_produzida || 0), 0);
   const meta = biMetaAtual;
-  grid.innerHTML = funcs.map((f, i) => {
-    const hit = meta > 0 && f.qtd_produzida >= meta;
-    const msg = biFuncMensagem(f.qtd_produzida, hit, meta) || 'Produzido x Meta';
-    const span = mobileLista ? '' : ` style="grid-column: span ${i >= inicioUltima ? spanUltima : spanNormal}"`;
-    return `
-    <div class="biz-fu-card${hit ? ' biz-fu-hit' : ''}${comDetalhe ? ' has-detail' : ''}"${span}>
-      <div class="biz-fu-left">
-        <div class="biz-fu-head">
-          <div class="biz-fu-name">${biEsc(f.nome)}</div>
-        </div>
-        <div class="biz-fu-ring-wrap"><div class="biz-fu-ring-shape"><svg class="biz-gauge"></svg></div></div>
-        <div class="biz-fu-foot">
-          <div class="biz-fu-msg${hit ? ' msg-hit' : ' msg-behind'}">${msg}</div>
-          <div class="biz-fu-nums"> <strong>${biFmt(f.qtd_produzida, 0)}</strong> / <strong>${biFmt(meta, 0)}</strong></div>
-          <div class="biz-fu-sub">${biFuncOpAtiva(f)}</div>
-        </div>
-      </div>
-      ${comDetalhe ? biFuncDetalhe(f) : ''}
-    </div>
-  `;
-  }).join('');
+  const hit = meta > 0 && total >= meta;
+  const pct = meta > 0 ? (total / meta) * 100 : 0;
 
-  const svgs = grid.querySelectorAll('.biz-gauge');
-  funcs.forEach((f, i) => {
-    const pct = meta > 0 ? (f.qtd_produzida / meta) * 100 : 0;
-    const hit = meta > 0 && f.qtd_produzida >= meta;
-    biRenderGauge(svgs[i], pct, hit);
-  });
+  document.getElementById('biTotalCard').classList.toggle('hit', hit);
+  biRenderGauge(document.getElementById('biGaugeTotal'), pct, hit, meta <= 0);
+  document.getElementById('biTotalQtd').textContent = biFmt(total, 0);
+  if (!biMetaForm.classList.contains('open')) {
+    document.getElementById('biMetaTxt').textContent = meta > 0 ? biFmt(meta, 0) : '—';
+  }
+  document.getElementById('biTotalMsg').textContent = meta <= 0
+    ? 'Clique no lápis para definir a meta do dia'
+    : hit
+      ? (total > meta ? `Meta batida — ${biFmt(total - meta, 0)} acima!` : 'Meta batida!')
+      : `Faltam ${biFmt(meta - total, 0)} para a meta`;
+
+  const ops = new Set();
+  funcs.forEach(f => (f.ops_detalhe || []).forEach(o => ops.add(o.op)));
+  document.getElementById('biStatPessoas').textContent = funcs.length;
+  document.getElementById('biStatAgora').textContent = funcs.filter(f => f.em_producao).length;
+  document.getElementById('biStatOps').textContent = ops.size;
+  return total;
 }
 
-// ── OP ativa do funcionário (apontamento em aberto), sempre visível no card.
-// ops_detalhe já vem com as OPs em produção primeiro. ──────────────────────
+// ── O.P ativa da pessoa (apontamento em aberto) — "O.P xxxx - cliente" ──────
 function biFuncOpAtiva(f) {
   const ativas = (f.ops_detalhe || []).filter(o => o.em_producao);
   if (!ativas.length) {
-    return '<div class="biz-fu-op biz-fu-op-off">Nenhuma O.P ativa</div>';
+    return '<div class="biz-ind-op off"><span>Nenhuma O.P ativa</span></div>';
   }
   const o = ativas[0];
-  const mais = ativas.length > 1 ? ` <span class="biz-fu-op-mais">+${ativas.length - 1}</span>` : '';
-  return `<div class="biz-fu-op">
-    <span class="biz-op-live-dot"></span>
-    <span class="biz-fu-op-txt"><strong>O.P ${o.op}</strong>${o.cliente ? ' - ' + biEsc(o.cliente) : ''}</span>${mais}
-  </div>`;
+  const mais = ativas.length > 1 ? ` (+${ativas.length - 1})` : '';
+  return `<div class="biz-ind-op"><span class="biz-live-dot-sm"></span><span><strong>O.P ${o.op}</strong>${o.cliente ? ' - ' + biEsc(o.cliente) : ''}${mais}</span></div>`;
 }
 
-// ── Painel de detalhamento do card (só quando há espaço): OPs e centros de
-// trabalho em que o funcionário apontou no dia. ────────────────────────────
-function biFuncLista(itens) {
-  if (!itens || !itens.length) {
-    return '<div class="biz-detail-empty">Sem apontamentos.</div>';
+// ── Lista individual: barra proporcional a quem mais produziu, quantidade e
+// participação no total. Com muita gente, 2 colunas pra caber na TV. ────────
+function biRenderFuncs(funcs) {
+  const total = biRenderTotal(funcs);
+  document.getElementById('biFuncsCount').textContent = funcs.length + (funcs.length === 1 ? ' pessoa' : ' pessoas');
+  const list = document.getElementById('biIndList');
+  if (!funcs.length) {
+    list.style.gridTemplateColumns = '1fr';
+    list.style.gridTemplateRows = '';
+    list.innerHTML = '<div class="biz-empty-msg">Ninguém produziu ' + (biDiaLabel === 'HOJE' ? 'hoje' : 'em ' + biEsc(biDiaLabel)) + '.</div>';
+    return;
   }
-  return '<div class="biz-detail-list">' + itens.map(it => `
-    <div class="biz-detail-row"><span>${biEsc(it.nome)}</span><strong>${biFmt(it.qtd, 0)}</strong></div>
-  `).join('') + '</div>';
+  biAjustaLinhas(funcs.length);
+  const maior = Math.max(...funcs.map(f => Number(f.qtd_produzida || 0)), 1);
+  list.innerHTML = funcs.map(f => {
+    const qtd = Number(f.qtd_produzida || 0);
+    const part = total > 0 ? (qtd / total) * 100 : 0;
+    return `
+      <div class="biz-ind-row">
+        <div class="biz-ind-name">${biEsc(f.nome)}</div>
+        <div class="biz-ind-qtd"><b>${biFmt(qtd, 0)}</b><span>${biFmt(part, 0)}% do total</span></div>
+        <div class="biz-ind-bar"><div class="biz-ind-fill" style="width:${(qtd / maior) * 100}%"></div></div>
+        ${biFuncOpAtiva(f)}
+      </div>`;
+  }).join('');
 }
 
-function biFuncOps(ops) {
-  if (!ops || !ops.length) {
-    return '<div class="biz-detail-empty">Nenhuma OP apontada.</div>';
-  }
-  return '<div class="biz-detail-list">' + ops.map(o => {
-    const nome = 'O.P ' + o.op + (o.cliente ? ' - ' + o.cliente : (o.descricao ? ' - ' + o.descricao : ''));
-    const tag = o.em_producao
-      ? '<em class="biz-op-live"><span class="biz-op-live-dot"></span>em produção</em>'
-      : '';
-    return `<div class="biz-detail-row biz-op-row">
-      <span>${biEsc(nome)}</span>${tag}<strong>${biFmt(o.qtd, 0)}</strong>
-    </div>`;
-  }).join('') + '</div>';
+// ── Grade da lista: colunas e altura das linhas conforme o espaço real ──────
+// Mais de 10 pessoas → 2 colunas (preenchidas coluna por coluna, pra ler o
+// ranking de cima pra baixo). As linhas dividem a altura do card, mas nunca
+// passam de ~110px: em tela alta (retrato) ou com pouca gente, sobra espaço
+// embaixo em vez de linhas enormes e vazias. No celular o CSS ignora isto.
+const BI_LINHA_MAX_H = 110;
+function biAjustaLinhas(n) {
+  const list = document.getElementById('biIndList');
+  if (!n) return;
+  const cols = n > 10 ? 2 : 1;
+  const linhas = Math.ceil(n / cols);
+  const cabem = Math.floor((list.clientHeight || 0) / BI_LINHA_MAX_H);
+  list.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+  // Sobra altura: linhas de altura fixa (colunas equilibradas, espaço livre
+  // embaixo). Senão: dividem a altura igualmente.
+  list.style.gridTemplateRows = cabem > linhas
+    ? `repeat(${linhas}, ${BI_LINHA_MAX_H}px)`
+    : `repeat(${linhas}, minmax(0, 1fr))`;
+  list.style.gridAutoFlow = cols > 1 ? 'column' : 'row';
 }
 
-function biFuncDetalhe(f) {
-  return `
-    <div class="biz-fu-detail">
-      <div class="biz-fu-detail-sec">
-        <h4>OPs apontadas</h4>
-        ${biFuncOps(f.ops_detalhe)}
-      </div>
-      <div class="biz-fu-detail-sec">
-        <h4>Centros de trabalho</h4>
-        ${biFuncLista(f.centros_detalhe)}
-      </div>
-    </div>
-  `;
-}
-
-// ── Mensagem de incentivo: quanto falta pra bater a meta, ou o quanto passou
-// dela — dá um retorno mais direto do que só o número da meta. ──────────────
-function biFuncMensagem(qtdProduzida, hit, meta) {
-  if (meta <= 0) return '';
-  if (hit) {
-    const acima = qtdProduzida - meta;
-    return acima > 0 ? `Meta batida — ${biFmt(acima, 0)} acima!` : 'Meta batida!';
-  }
-  const falta = meta - qtdProduzida;
-  return `Faltam ${biFmt(falta, 0)} para a meta`;
-}
-
-// ── Editar meta individual (lápis no cabeçalho) ──────────────────────────────
+// ── Editar meta total (lápis no card do total) ───────────────────────────────
 const biMetaForm = document.getElementById('biMetaForm');
 const biMetaInput = document.getElementById('biMetaInput');
 document.getElementById('biMetaEditBtn').addEventListener('click', () => {
   biMetaInput.value = Math.round(biMetaAtual);
   biMetaForm.classList.add('open');
   biMetaInput.focus();
+  biMetaInput.select();
 });
 document.getElementById('biMetaCancel').addEventListener('click', () => {
   biMetaForm.classList.remove('open');
@@ -675,18 +556,16 @@ biMetaForm.addEventListener('submit', (e) => {
   })
     .then(r => r.json())
     .then(data => {
+      biMetaForm.classList.remove('open');
       if (data.ok) {
         biMetaAtual = Number(data.meta);
-        document.getElementById('biMetaTxt').textContent = biFmt(biMetaAtual, 0);
         biRenderFuncs(biUltimosFuncs);
-        biApplyScale();
       }
-      biMetaForm.classList.remove('open');
     })
     .catch(() => { biMetaForm.classList.remove('open'); });
 });
 
-// ── Ajusta #bizDashboard ao espaço real de .content: no celular vira lista
+// ── Ajusta #bizDashboard ao espaço real de .content: no celular vira página
 // rolável; no resto (inclusive tela cheia/TV) ocupa exatamente a área visível.
 function biApplyScale() {
   const stage = document.getElementById('bizDashboard');
@@ -695,61 +574,34 @@ function biApplyScale() {
   const availH = wrap.clientHeight;
   if (!availW || !availH) return;
 
-  const kiosk = biIsKiosk();
-
-  // Celular fora da tela cheia: lista rolável, sem escala nem altura fixa
-  // (não zera o scroll — a atualização a cada 15s não pode pular pro topo).
-  const mobile = !kiosk && biMqMobile.matches;
+  // Celular fora da tela cheia (não zera o scroll — a atualização a cada 15s
+  // não pode pular pro topo).
+  const mobile = !biIsKiosk() && biMqMobile.matches;
   document.body.classList.toggle('bi-mobile', mobile);
   if (mobile) {
-    document.body.classList.remove('bi-fit');
-    stage.style.transform = 'none';
+    document.body.classList.remove('bi-vertical');
     stage.style.width = '';
     stage.style.height = '';
     return;
   }
-
-  // Com tela cheia ou sem: sem transform. O painel ocupa exatamente o espaço
-  // visível (abaixo da topbar, ou a tela inteira na tela cheia) e a
-  // grade/anéis encolhem pra todos os funcionários caberem sem rolagem nem
-  // corte — com muitos funcionários, escalar pra "cobrir" cortava as linhas
-  // de baixo.
-  document.body.classList.add('bi-fit');
-  stage.style.transform = 'none';
-  stage.style.marginBottom = '';
+  // Tela em pé (retrato) ou estreita: total numa faixa no topo, lista embaixo
+  document.body.classList.toggle('bi-vertical', availH > availW * 0.85 || availW < 900);
   stage.style.width = availW + 'px';
   stage.style.height = availH + 'px';
   wrap.scrollTop = 0;
-
-  // O formato da área mudou (entrou/saiu da tela cheia, redimensionou):
-  // recalcula o nº de colunas que deixa os anéis maiores.
-  if (biUltimosFuncs.length && biFuncsCols(biUltimosFuncs.length) !== biColsAtual) {
-    biRenderFuncs(biUltimosFuncs);
-  }
+  // A altura da lista mudou junto com o painel: recalcula as linhas
+  biAjustaLinhas(biUltimosFuncs.length);
 }
 window.addEventListener('resize', biApplyScale);
-// Ao cruzar o breakpoint (girar o celular, redimensionar), o card muda de
-// formato (detalhamento sempre visível no celular) — redesenha.
-biMqMobile.addEventListener('change', () => {
-  biRenderFuncs(biUltimosFuncs);
-  biApplyScale();
-});
+biMqMobile.addEventListener('change', biApplyScale);
 
 function biRenderAll(data) {
   biMetaAtual = Number(data.meta || 0);
   if (data.dia_label) biDiaLabel = data.dia_label;
   biUltimosFuncs = data.funcionarios || [];
   biRenderFuncs(biUltimosFuncs);
-
   const upd = document.getElementById('biUpdatedAt');
   if (upd) upd.textContent = data.atualizado_em || '';
-  // Não sobrescreve a meta enquanto o usuário está editando
-  if (!biMetaForm.classList.contains('open')) {
-    document.getElementById('biMetaTxt').textContent = biFmt(biMetaAtual, 0);
-  }
-
-  // A quantidade de funcionários pode mudar a altura natural do painel a cada
-  // atualização — reescalar garante que continue cobrindo certinho.
   biApplyScale();
 }
 
@@ -768,8 +620,8 @@ function biRefresh() {
 }
 setInterval(biRefresh, 15000);
 
-// ── Tela cheia (mesma técnica do BI da Produção: Fullscreen API + fallback
-// via classe CSS, pra funcionar mesmo se o navegador bloquear a API nativa) ──
+// ── Tela cheia (Fullscreen API + fallback via classe CSS, pra funcionar
+// mesmo se o navegador bloquear a API nativa) ───────────────────────────────
 const biFsBtn = document.getElementById('biFullscreenBtn');
 const biFsLabel = document.getElementById('biFullscreenLabel');
 
@@ -787,12 +639,8 @@ function biExitFs() {
 function biSetFsState(active) {
   document.body.classList.toggle('biz-fs-fallback', active);
   biFsLabel.textContent = active ? 'Sair da tela cheia' : 'Tela cheia';
-  // No celular o card muda de formato entre lista e painel de TV
-  if (biMqMobile.matches) biRenderFuncs(biUltimosFuncs);
   requestAnimationFrame(biApplyScale);
-  // A transição da API nativa de tela cheia (animação do SO) pode demorar
-  // mais que um frame — reaplica de novo um pouco depois pra pegar o
-  // tamanho final da janela.
+  // A animação da tela cheia do sistema pode demorar mais que um frame
   setTimeout(biApplyScale, 300);
 }
 
@@ -812,10 +660,6 @@ document.getElementById('biFsExit').addEventListener('click', () => {
 });
 ['fullscreenchange', 'webkitfullscreenchange', 'MSFullscreenChange'].forEach(ev => {
   document.addEventListener(ev, () => {
-    // Dispara nas duas pontas: ao SAIR (inclusive via Esc, sem passar pelo
-    // botão) e ao ENTRAR — a troca de dimensões da API nativa só termina
-    // depois do clique, então precisa recalcular a escala aqui também, e não
-    // só uma vez (via requestAnimationFrame) logo no clique.
     if (!biFsElement()) {
       biSetFsState(false);
     } else {

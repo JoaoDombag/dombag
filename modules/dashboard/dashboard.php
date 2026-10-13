@@ -1,363 +1,163 @@
 <?php
 // ══════════════════════════════════════════════════════════════════════
 //  DOMBAG — Dashboard
-//  ERP:   PostgreSQL Yzidro  (vendas, pedidos)
-//  Local: MySQL dombag       (produção, máquinas)
+//  KPIs de produção (apontamentos) e de saída (pedidos finalizados), tudo
+//  direto do ERP Yzidro (PostgreSQL, somente leitura) — ver dashboard_dados.php.
+//  As antigas tabelas locais (PRODUCAO_DIARIA, ITENS_VENDAS, PCP_PROGRAMACAO)
+//  pararam de ser alimentadas e deixaram de ser usadas aqui.
 // ══════════════════════════════════════════════════════════════════════
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
+require_once __DIR__ . '/dashboard_dados.php';
 
-// ── Variáveis iniciais ────────────────────────────────────────────────
-$erp_ok               = false;
-$kpi_pedidos_mes      = 0;
-$kpi_pedidos_hoje     = 0;
-$kpi_mes_ant          = 0;
-$kpi_pendentes_importar = 0;
-$kpi_finalizados      = 0;
-$kpi_a_produzir       = 0;
-$ultimas_vendas       = [];
-$prod_7dias           = [];
-$top_maquinas         = [];
-$vendas_grupo         = [];
-$etapas_producao      = [];
+// ── Catálogo de widgets (a tela /dashboard/widgets usa o mesmo) ───────
+require_once __DIR__ . '/dashboard_widgets.php';
 
-// ── Preferências de widgets do utilizador ─────────────────────────────
-$_dash_uid = (int)($_SESSION['usu_codigo'] ?? 0);
-try {
-    $_dash_pdo_w = dbPDO();
-    $_dash_val   = $_dash_pdo_w->prepare("SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = :k");
-    $_dash_val->execute([':k' => 'dashboard_widgets_' . $_dash_uid]);
-    $_dash_raw   = $_dash_val->fetchColumn();
-    $dashWidgets = $_dash_raw !== false ? (json_decode($_dash_raw, true) ?? []) : null;
-} catch (Throwable) {
-    $dashWidgets = null;
-}
-// null = sem preferência salva; será preenchido com padrão após carregar permissões
-$_dash_widgets_default = [
-    'kpi_erp','kpi_local',
-    'ultimas_vendas','maquinas_hoje',
-    'vendas_grupo','prod_7dias',
-    'etapas_producao',
-    'trello_geral','trello_atividade',
-];
+// ── Preferências de widgets do usuário ────────────────────────────────
+$_dash_uid = (int) ($_SESSION['usu_codigo'] ?? 0);
+$dashWidgets = dashWidgetsDoUsuario($_dash_uid);
 
-// ── Permissões e menus activos (para filtrar widgets) ─────────────────
-$_dash_admin       = false;
-$_dash_perms       = [];
-$_dash_desativados = [];
-try {
-    $_pdo_p = dbPDO();
-    $_st_u  = $_pdo_p->prepare('SELECT USU_ADMIN, GRU_CODIGO FROM USUARIOS WHERE USU_CODIGO = :c');
-    $_st_u->execute([':c' => $_dash_uid]);
-    $_row_u = $_st_u->fetch(PDO::FETCH_ASSOC);
-    if ($_row_u) {
-        $_dash_admin = !empty($_row_u['USU_ADMIN']);
-        if (!$_dash_admin && !empty($_row_u['GRU_CODIGO'])) {
-            $_st_p = $_pdo_p->prepare('SELECT PAC_PAGINA FROM PERMISSAO_ACESSO WHERE PAC_GRU_CODIGO = :g');
-            $_st_p->execute([':g' => (int)$_row_u['GRU_CODIGO']]);
-            $_dash_perms = array_column($_st_p->fetchAll(PDO::FETCH_ASSOC), 'PAC_PAGINA');
-        }
-    }
-    if ($v = $_pdo_p->query("SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = 'sidebar_menus_desativados'")->fetchColumn()) {
-        $_dash_desativados = json_decode($v, true) ?? [];
-    }
-} catch (Throwable) {}
-
-// Se o usuário nunca personalizou, exibe todos os widgets que ele tem permissão
-if ($dashWidgets === null) {
-    $dashWidgets = $_dash_widgets_default;
-}
-
-// Mapa: widget → [página_requerida, grupo_de_menu]
-$_widget_perm_map = [
-    'kpi_erp'          => ['/vendas',      'vendas'],
-    'kpi_local'        => ['/pcp/planejamento',  'producao'],
-    'ultimas_vendas'   => ['/vendas',      'vendas'],
-    'maquinas_hoje'    => ['/pcp/planejamento',  'producao'],
-    'vendas_grupo'     => ['/vendas',      'vendas'],
-    'prod_7dias'       => ['/pcp/planejamento',  'producao'],
-    'etapas_producao'  => ['/pcp/reuniao', 'producao'],
-    'trello_geral'     => ['/trello',      'trello'],
-    'trello_atividade' => ['/trello',      'trello'],
-];
-
-function dashW(string $key): bool {
-    global $dashWidgets, $_dash_admin, $_dash_perms, $_dash_desativados, $_widget_perm_map;
-    if (!in_array($key, $dashWidgets, true)) return false;
-    if (isset($_widget_perm_map[$key])) {
-        [$page, $menu] = $_widget_perm_map[$key];
-        // Menu desativado aplica-se a todos, incluindo admins
-        if (in_array($menu, $_dash_desativados, true)) return false;
-        // Permissão de página: só verifica para não-admins
-        if (!$_dash_admin && !in_array($page, $_dash_perms, true)) return false;
-    }
-    return true;
+function dashW(string $key): bool
+{
+    global $dashWidgets, $_dash_uid;
+    return in_array($key, $dashWidgets, true) && dashWidgetPermitido($key, $_dash_uid);
 }
 
 // ── Board Trello padrão ───────────────────────────────────────────────
 $trello_default_board = '';
-try {
-    $pdo_tmp = dbPDO();
-    $st_tk   = $pdo_tmp->prepare(
-        "SELECT PAR_CHAVE, PAR_VALOR FROM PARAMETROS
-         WHERE PAR_CHAVE IN ('trello_api_key','trello_token','trello_default_board')"
-    );
-    $st_tk->execute();
-    $trello_params = [];
-    foreach ($st_tk->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $trello_params[$r['PAR_CHAVE']] = trim($r['PAR_VALOR']);
-    }
-    $tk = $trello_params['trello_api_key'] ?? '';
-    $tt = $trello_params['trello_token']   ?? '';
-    if (!empty($trello_params['trello_default_board'])) {
-        $trello_default_board = $trello_params['trello_default_board'];
-    } elseif ($tk && $tt) {
-        $ch_tmp = curl_init(
-            'https://api.trello.com/1/members/me/boards?fields=id,name&filter=open'
-            . '&key=' . urlencode($tk) . '&token=' . urlencode($tt)
-        );
-        curl_setopt_array($ch_tmp, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 5, CURLOPT_SSL_VERIFYPEER => true]);
-        $res_tmp  = curl_exec($ch_tmp);
-        $code_tmp = curl_getinfo($ch_tmp, CURLINFO_HTTP_CODE);
-        if ($code_tmp === 200 && $boards_tmp = json_decode($res_tmp, true)) {
-            $trello_default_board = $boards_tmp[0]['id'] ?? '';
-        }
-    }
-} catch (Throwable) {}
+if (dashW('trello_geral') || dashW('trello_atividade')) {
+    try {
+        $v = dbPDO()->query("SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = 'trello_default_board'")->fetchColumn();
+        $trello_default_board = $v !== false ? trim((string) $v) : '';
+    } catch (Throwable) {}
+}
 
-// ── Dados MySQL ───────────────────────────────────────────────────────
-try {
-    $pdo = dbPDO();
+// ── Dados do ERP (só o que os widgets ativos usam) ────────────────────
+$erp_ok   = false;
+$hoje     = date('Y-m-d');
+$prodDias = [];      // 'Y-m-d' => qtd
+$prodMes  = 0.0;
+$metaMes  = 0.0;
+$agora    = ['funcionarios' => 0, 'ops' => 0];
+$opsAtivas = [];
+$saidasMes = [];     // pedidos finalizados desde o 1º dia do mês (ou de 14 dias atrás)
+$ultimaSaida = null;
 
-    // Garante colunas adicionadas às MAQUINAS após a criação inicial da tabela
-    foreach ([
-        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_QTDE NUMERIC(6,2) NOT NULL DEFAULT 1",
-        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_PRODUCAO_MIN NUMERIC(10,4) NOT NULL DEFAULT 0",
-        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_HORAS_DIA NUMERIC(5,2) NOT NULL DEFAULT 8",
-        "ALTER TABLE MAQUINAS ADD COLUMN MAQ_CONTA_PRODUCAO TINYINT(1) NOT NULL DEFAULT 1",
-    ] as $ddl) {
-        try { $pdo->exec($ddl); } catch (Throwable) {}
-    }
-
-    $kpi_finalizados = (int)$pdo->query(
-        "SELECT COALESCE(SUM(IV_QTDE),0) FROM ITENS_VENDAS WHERE IV_STATUS='Finalizado'"
-    )->fetchColumn();
-
-    $kpi_a_produzir = (int)$pdo->query(
-        "SELECT COALESCE(SUM(IV_QTDE),0) FROM ITENS_VENDAS WHERE IV_STATUS='Pendente de produção'"
-    )->fetchColumn();
-
-    $rows = $pdo->query('
-        SELECT pd.PD_DATA AS pd_data,
-               SUM(CASE WHEN COALESCE(m.MAQ_CONTA_PRODUCAO,1)=1 THEN pd.PD_QUANTIDADE ELSE 0 END) AS qtd
-        FROM PRODUCAO_DIARIA pd
-        LEFT JOIN MAQUINAS m ON m.MAQ_CODIGO = pd.MAQ_CODIGO
-        WHERE pd.PD_DATA >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-        GROUP BY pd.PD_DATA
-        ORDER BY pd.PD_DATA ASC
-    ')->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($rows as $r) {
-        $prod_7dias[$r['pd_data']] = (int)$r['qtd'];
-    }
-
-    $top_maquinas = $pdo->query('
-        SELECT m.MAQ_DESCRICAO AS maq_descricao, SUM(pd.PD_QUANTIDADE) AS total
-        FROM PRODUCAO_DIARIA pd
-        INNER JOIN MAQUINAS m ON m.MAQ_CODIGO = pd.MAQ_CODIGO
-        WHERE pd.PD_DATA = CURDATE()
-        GROUP BY pd.MAQ_CODIGO, m.MAQ_DESCRICAO
-        ORDER BY total DESC
-        LIMIT 5
-    ')->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException) {}
-
-// Pedidos programados por etapa de produção (tabelas criadas sob demanda em /pcp/reuniao)
-try {
-    $etapas_producao = $pdo->query('
-        SELECT e.ETP_CODIGO, e.ETP_DESCRICAO,
-               COUNT(p.PRG_CODIGO) AS qtd
-        FROM ETAPA_PRODUCAO e
-        LEFT JOIN PCP_PROGRAMACAO p ON p.ETP_CODIGO = e.ETP_CODIGO AND p.PRG_FINALIZADO = 0
-        GROUP BY e.ETP_CODIGO, e.ETP_DESCRICAO
-        ORDER BY e.ETP_CODIGO
-    ')->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException) {}
-
-// ── Dados ERP (PostgreSQL) ────────────────────────────────────────────
-$pg = dbPG();
+$precisaProducao = dashW('kpi_producao') || dashW('grafico_14dias');
+$precisaSaida    = dashW('kpi_saida') || dashW('saidas_hoje') || dashW('grafico_14dias');
+$pg = ($precisaProducao || $precisaSaida || dashW('ops_produzindo')) ? dbPG() : null;
 if ($pg) {
-    $erp_ok      = true;
-    $mes_ini     = date('Y-m-01');
-    $mes_fim     = date('Y-m-t');
-    $mes_ant_ini = date('Y-m-01', strtotime('-1 month'));
-    $mes_ant_fim = date('Y-m-t',  strtotime('-1 month'));
-    $hoje        = date('Y-m-d');
-
-    $res = pg_query($pg, "
-        SELECT COUNT(DISTINCT PEDIDO) AS qtd_ped
-        FROM VW_VENDAS
-        WHERE COD_GRUPO IN (6,24,5) AND OPERACAO_PEDIDO='V'
-          AND COD_ESTADO IN ('9') AND EMP_CODIGO=1
-          AND DATAFATURA BETWEEN '$mes_ini' AND '$mes_fim'
-    ");
-    if ($res && $row = pg_fetch_assoc($res)) {
-        $kpi_pedidos_mes  = (int)$row['qtd_ped'];
+    $erp_ok = true;
+    if ($precisaProducao) {
+        $prodDias = dashProducaoPorDia($pg, 14);
+        $prodMes  = dashProducaoMes($pg);
+        $agora    = dashProduzindoAgora($pg);
+        try {
+            $v = dbPDO()->query("SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = 'meta_producao'")->fetchColumn();
+            $metaMes = $v !== false ? (float) $v : 0.0;
+        } catch (Throwable) {}
     }
-
-    $res = pg_query($pg, "
-        SELECT COUNT(DISTINCT PEDIDO) AS qtd
-        FROM VW_VENDAS
-        WHERE COD_GRUPO IN (6,24,5) AND OPERACAO_PEDIDO='V'
-          AND COD_ESTADO IN ('9') AND EMP_CODIGO=1
-          AND DATAFATURA = '$hoje'
-    ");
-    if ($res && $row = pg_fetch_assoc($res)) {
-        $kpi_pedidos_hoje = (int)$row['qtd'];
+    if (dashW('ops_produzindo')) {
+        $opsAtivas = dashOpsAtivas($pg);
     }
-
-    $res = pg_query($pg, "
-        SELECT COUNT(DISTINCT PEDIDO) AS qtd
-        FROM VW_VENDAS
-        WHERE COD_GRUPO IN (6,24,5) AND OPERACAO_PEDIDO='V'
-          AND COD_ESTADO IN ('9') AND EMP_CODIGO=1
-          AND DATAFATURA BETWEEN '$mes_ant_ini' AND '$mes_ant_fim'
-    ");
-    if ($res && $row = pg_fetch_assoc($res)) {
-        $kpi_mes_ant = (int)$row['qtd'];
-    }
-
-    $res = pg_query($pg, "
-        SELECT VV.PEDIDO::TEXT AS pedido,
-               CAST(IIF(COALESCE(MIN(VV.NOME_FANTASIA),'') = '', MIN(VV.CLIENTE), MIN(VV.NOME_FANTASIA)) AS VARCHAR(80)) AS cliente,
-               TO_CHAR(MAX(VV.DATAFATURA), 'DD/MM/YYYY') AS data,
-               COUNT(*) AS qtd_itens,
-               COALESCE(SUM(VV.TOTAL_PRODUTO), 0) AS total,
-               COALESCE(MIN(VV.GRUPO_CLIENTES)::VARCHAR, '') AS grupo
-        FROM VW_VENDAS VV
-        WHERE VV.COD_GRUPO IN (6,24,5) AND VV.OPERACAO_PEDIDO='V'
-          AND VV.COD_ESTADO IN ('9') AND VV.EMP_CODIGO=1
-        GROUP BY VV.PEDIDO
-        ORDER BY MIN(VV.DATAEMISSAO) DESC, VV.PEDIDO DESC
-        LIMIT 5
-    ");
-    if ($res) {
-        while ($row = pg_fetch_assoc($res)) $ultimas_vendas[] = $row;
-    }
-
-    $res = pg_query($pg, "
-        SELECT COALESCE(GRUPO_CLIENTES::VARCHAR,'Outros') AS grupo,
-               COUNT(DISTINCT PEDIDO) AS qtd,
-               SUM(TOTAL_PRODUTO)     AS total
-        FROM VW_VENDAS
-        WHERE COD_GRUPO IN (6,24,5) AND OPERACAO_PEDIDO='V'
-          AND COD_ESTADO IN ('9') AND EMP_CODIGO=1
-          AND DATAFATURA BETWEEN '$mes_ini' AND '$mes_fim'
-        GROUP BY GRUPO_CLIENTES
-        ORDER BY total DESC
-        LIMIT 5
-    ");
-    if ($res) {
-        while ($row = pg_fetch_assoc($res)) $vendas_grupo[] = $row;
-    }
-
-    $janela_import = date('Y-m-d', strtotime('-90 days'));
-    $res = pg_query($pg, "
-        SELECT DISTINCT PEDIDO::TEXT AS pedido
-        FROM VW_VENDAS
-        WHERE COD_GRUPO IN (6,24,5) AND OPERACAO_PEDIDO='V'
-          AND COD_ESTADO IN ('9') AND EMP_CODIGO=1
-          AND DATAFATURA >= '$janela_import'
-    ");
-    if ($res) {
-        $pedidos_erp_lista = pg_fetch_all_columns($res, 0) ?: [];
-        if (!empty($pedidos_erp_lista) && isset($pdo)) {
-            $ph  = implode(',', array_fill(0, count($pedidos_erp_lista), '?'));
-            $st  = $pdo->prepare("SELECT COUNT(DISTINCT VEN_CODIGO_YZIDRO) FROM VENDAS WHERE VEN_CODIGO_YZIDRO IN ($ph)");
-            $st->execute($pedidos_erp_lista);
-            $kpi_pendentes_importar = max(0, count($pedidos_erp_lista) - (int)$st->fetchColumn());
+    if ($precisaSaida) {
+        $desde = min(date('Y-m-01'), date('Y-m-d', strtotime('-13 days')));
+        $saidasMes = dashSaidasDesde($pg, $desde);
+        if (dashW('saidas_hoje')) {
+            $ultimaSaida = dashUltimaSaida($pg);
         }
     }
-
-    pg_close($pg);
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────
-function fmtNum(int $v): string     { return number_format($v, 0, ',', '.'); }
-function variacao(int $atual, int $ant): string {
-    if ($ant <= 0) return '';
-    $pct = round(($atual - $ant) / $ant * 100, 1);
-    $cor  = $pct >= 0 ? 'up' : 'down';
-    $seta = $pct >= 0 ? '↑' : '↓';
-    return "<span class=\"$cor\">$seta " . abs($pct) . '%</span>';
+// ── Agregados ─────────────────────────────────────────────────────────
+$prodHoje = $prodDias[$hoje] ?? 0.0;
+// Último dia útil anterior com produção (pra comparar com hoje)
+$prodAnterior = 0.0;
+$diaAnterior  = null;
+foreach ($prodDias as $d => $q) {
+    if ($d < $hoje && $q > 0 && ($diaAnterior === null || $d > $diaAnterior)) {
+        $diaAnterior  = $d;
+        $prodAnterior = $q;
+    }
+}
+$saidasHoje = array_values(array_filter($saidasMes, fn ($s) => $s['dia'] === $hoje));
+$saidasDoMes = array_values(array_filter($saidasMes, fn ($s) => $s['dia'] >= date('Y-m-01')));
+$totHoje = dashSomaSaidas($saidasHoje);
+$totMes  = dashSomaSaidas($saidasDoMes);
+
+// Série de 14 dias: produção (bags apontados) x saída de bags
+$serie = ['labels' => [], 'producao' => [], 'saida' => []];
+$bagsPorDia = [];
+foreach ($saidasMes as $s) {
+    $bagsPorDia[$s['dia']] = ($bagsPorDia[$s['dia']] ?? 0) + $s['bag'];
+}
+for ($i = 13; $i >= 0; $i--) {
+    $d = date('Y-m-d', strtotime("-$i days"));
+    $serie['labels'][]   = date('d/m', strtotime($d));
+    $serie['producao'][] = round($prodDias[$d] ?? 0);
+    $serie['saida'][]    = round($bagsPorDia[$d] ?? 0);
 }
 
-// ── Dados JS para gráficos ────────────────────────────────────────────
-$dias_labels = [];
-$dias_values = [];
-for ($i = 6; $i >= 0; $i--) {
-    $dt           = date('Y-m-d', strtotime("-$i days"));
-    $dias_labels[] = date('d/m', strtotime("-$i days"));
-    $dias_values[] = $prod_7dias[$dt] ?? 0;
+// ── Helpers de formato ────────────────────────────────────────────────
+function fmtNum(float $v): string   { return number_format($v, 0, ',', '.'); }
+function fmtMoeda(float $v): string { return 'R$ ' . number_format($v, 2, ',', '.'); }
+function fmtMoedaCurta(float $v): string
+{
+    $a = abs($v);
+    return match (true) {
+        $a >= 1e6 => 'R$ ' . number_format($v / 1e6, 1, ',', '.') . ' mi',
+        $a >= 1e3 => 'R$ ' . number_format($v / 1e3, 0, ',', '.') . ' mil',
+        default   => fmtMoeda($v),
+    };
 }
-$js_dias_lbl     = json_encode($dias_labels);
-$js_dias_val     = json_encode($dias_values);
-$js_grupo        = json_encode($vendas_grupo);
-$max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'total')) : 1;
+function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); }
 ?>
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-br" data-theme="<?= e(dombagTema()) ?>">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard | DOMBAG</title>
   <link rel="stylesheet" href="/public/css/unified_admin.css">
-<link rel="icon" href="/public/css/icone.ico" type="image/png">
+  <link rel="icon" href="/public/css/icone.ico" type="image/png">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
     /* ── Layout do dashboard ───────────────────────── */
     .content           { display:flex; flex-direction:column; gap:16px; overflow-y:auto; overflow-x:hidden; }
     .dash-grid         { display:grid; gap:16px; align-items:stretch; }
     .dash-grid > div   { display:flex; flex-direction:column; }
-    .dash-grid > div > .panel { flex:1; }
+    .dash-grid > div > .panel, .dash-grid > .panel { flex:1; }
     @media(max-width:1100px) { .dash-grid { grid-template-columns:1fr !important; } }
 
-    /* ── KPI grid ──────────────────────────────────── */
-    .kpi-grid{
-        display:grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    }
-    @media(max-width:1400px) { .kpi-grid { grid-template-columns:repeat(3,1fr); } }
-    @media(max-width:1100px) { .kpi-grid { grid-template-columns:repeat(2,1fr); } }
-    @media(max-width:768px)  { .kpi-grid { grid-template-columns:repeat(2,1fr); } }
-    @media(max-width:480px)  { .kpi-grid { grid-template-columns:1fr; } }
+    /* ── Linhas de KPI ─────────────────────────────── */
+    .dash-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:14px; }
+    .dash-kpis .kpi-card { margin:0; }
+    .kpi-sub   { font-size:11.5px; color:var(--text-muted); margin-top:2px; }
+    .kpi-sub b { color:var(--text-primary); font-weight:600; }
+    .kpi-meta-bar { height:5px; background:rgba(255,255,255,.07); border-radius:3px; overflow:hidden; margin:8px 0 6px; }
+    .kpi-meta-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,#2d6aff,#00c9a7); }
+    .kpi-footer a { font-weight:600; text-decoration:none; }
+    .dash-sec { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin:4px 2px -6px; }
+    @media(max-width:480px) { .dash-kpis { grid-template-columns:1fr 1fr; } .kpi-value { font-size:22px; } }
 
     /* ── Gráfico ───────────────────────────────────── */
-    .chart-wrap { position:relative; height:180px; padding:0 16px 12px; }
-    @media(max-width:768px) { .chart-wrap { height:140px; } }
+    .chart-wrap { position:relative; height:220px; padding:0 16px 12px; }
+    @media(max-width:768px) { .chart-wrap { height:170px; } }
 
-    /* ── Barras horizontais (máquinas / grupos) ────── */
-    .maq-bar-row   { display:flex; flex-direction:column; gap:10px; padding:16px 20px; }
-    .maq-bar-item  { display:flex; flex-direction:column; gap:4px; }
-    .maq-bar-label { display:flex; justify-content:space-between; align-items:center; }
-    .maq-bar-name  { font-size:12.5px; font-weight:500; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px; }
-    .maq-bar-val   { font-size:12px; font-weight:700; color:#7db3ff; white-space:nowrap; }
-    .maq-bar-bg    { height:6px; background:rgba(255,255,255,.06); border-radius:3px; overflow:hidden; }
-    .maq-bar-fill  { height:100%; background:linear-gradient(90deg,#1e4fc9,#2d6aff); border-radius:3px; transition:width .6s ease; }
-    @media(max-width:768px) { .maq-bar-name { max-width:none; } }
-
-    /* ── Últimas vendas ────────────────────────────── */
-    .venda-row   { display:flex; align-items:center; gap:12px; padding:10px 20px; border-bottom:1px solid var(--border); }
-    .venda-row:last-child { border-bottom:none; }
-    .venda-left  { display:flex; align-items:center; gap:7px; flex-shrink:0; }
-    .venda-num   { font-weight:700; color:#7db3ff; font-size:12.5px; white-space:nowrap; }
-    .venda-mid      { flex:1; min-width:0; }
-    .venda-cliente  { font-size:12.5px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .venda-right { display:flex; flex-direction:column; align-items:flex-end; gap:2px; flex-shrink:0; }
-    .venda-qty   { font-size:12px; font-weight:600; color:var(--teal); white-space:nowrap; }
-    .venda-data  { font-size:11px; color:var(--text-muted); white-space:nowrap; }
-    .grupo-pill  { font-size:10px; font-weight:700; padding:2px 7px; border-radius:10px; background:rgba(45,106,255,.1); color:#7db3ff; white-space:nowrap; }
-
-    /* ── Atalhos Rápidos ───────────────────────────── */
+    /* ── Listas (OPs, saídas) ──────────────────────── */
+    .dash-row   { display:flex; align-items:center; gap:12px; padding:10px 20px; border-bottom:1px solid var(--border); }
+    .dash-row:last-child { border-bottom:none; }
+    .dash-row-main { flex:1; min-width:0; }
+    .dash-row-t { font-size:12.5px; font-weight:600; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .dash-row-s { font-size:11px; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; }
+    .dash-row-r { display:flex; flex-direction:column; align-items:flex-end; gap:2px; flex-shrink:0; }
+    .dash-row-v { font-size:12.5px; font-weight:700; color:#7db3ff; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .dash-num   { font-weight:700; color:#7db3ff; font-size:12.5px; white-space:nowrap; flex-shrink:0; }
+    .dash-bar   { height:5px; background:rgba(255,255,255,.06); border-radius:3px; overflow:hidden; margin-top:6px; }
+    .dash-bar-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,#3aa7ff,#00c9a7); }
+    .dash-bar-fill.over { background:linear-gradient(90deg,#f0a638,#fbbf24); }
+    .dash-live  { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--teal); box-shadow:0 0 6px var(--teal); margin-right:6px; vertical-align:middle; }
+    .dash-dev   { font-size:10px; font-weight:700; padding:1px 6px; border-radius:8px; background:rgba(239,68,68,.12); color:var(--red); margin-left:6px; }
 
     /* ── Misc ──────────────────────────────────────── */
     .erp-status    { display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-muted); }
@@ -368,9 +168,16 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
     .greeting      { font-size:11.5px; color:var(--text-muted); }
     .greeting strong { color:var(--text-primary); }
 
-    /* ── Trello widget inner grid ──────────────────── */
+    /* ── Barras do Trello ──────────────────────────── */
+    .maq-bar-row   { display:flex; flex-direction:column; gap:10px; padding:16px 20px; }
+    .maq-bar-item  { display:flex; flex-direction:column; gap:4px; }
+    .maq-bar-label { display:flex; justify-content:space-between; align-items:center; }
+    .maq-bar-name  { font-size:12.5px; font-weight:500; color:var(--text-primary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px; }
+    .maq-bar-val   { font-size:12px; font-weight:700; color:#7db3ff; white-space:nowrap; }
+    .maq-bar-bg    { height:6px; background:rgba(255,255,255,.06); border-radius:3px; overflow:hidden; }
+    .maq-bar-fill  { height:100%; border-radius:3px; transition:width .6s ease; }
     .trello-inner-grid { display:grid; grid-template-columns:1fr 180px; gap:0; align-items:start; }
-    @media(max-width:768px) { .trello-inner-grid { grid-template-columns:1fr; } .trello-inner-grid > div:last-child { border-left:none !important; border-top:1px solid var(--border); } }
+    @media(max-width:768px) { .trello-inner-grid { grid-template-columns:1fr; } .trello-inner-grid > div:last-child { border-left:none !important; border-top:1px solid var(--border); } .maq-bar-name { max-width:none; } }
   </style>
 </head>
 <body>
@@ -395,22 +202,16 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
         </div>
         <a href="/dashboard/widgets" class="btn-secondary" title="Personalizar dashboard"
            style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-size:12px;">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round">
-            <rect x="3"  y="3"  width="7" height="7" rx="1"/>
-            <rect x="14" y="3"  width="7" height="7" rx="1"/>
-            <rect x="3"  y="14" width="7" height="7" rx="1"/>
-            <rect x="14" y="14" width="7" height="7" rx="1"/>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+            <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
           </svg>
           Widgets
         </a>
-        <span class="greeting">Olá, <strong><?= htmlspecialchars(usuNome()) ?></strong></span>
+        <span class="greeting">Olá, <strong><?= e(usuNome()) ?></strong></span>
         <a href="/logout" class="icon-btn" title="Sair" style="text-decoration:none;">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
           </svg>
         </a>
       </div>
@@ -421,263 +222,176 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
     // Pré-renderiza cada widget em buffer para respeitar a ordem salva
     // ════════════════════════════════════════════════════════════════════
     $_w = [];
+    $semErp = '<div class="empty-row">⚠ ERP offline — sem dados.</div>';
 
-    // ── KPIs (grupo único renderizado uma vez) ────────────────────────
-    if (dashW('kpi_erp') || dashW('kpi_local')) {
+    // ── KPIs de Produção ──────────────────────────────────────────────
+    if (dashW('kpi_producao')) {
+        $pctMeta = $metaMes > 0 ? $prodMes / $metaMes * 100 : 0;
         ob_start(); ?>
-        <div class="kpi-grid">
+        <div class="dash-sec">Produção</div>
+        <div class="dash-kpis">
+          <div class="kpi-card teal">
+            <div class="kpi-header">
+              <span class="kpi-label">Produzido Hoje</span>
+              <div class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+            </div>
+            <div class="kpi-value"><?= fmtNum($prodHoje) ?></div>
+            <div class="kpi-footer">
+              peças apontadas
+              <?php if ($diaAnterior): ?>&nbsp;· <?= date('d/m', strtotime($diaAnterior)) ?>: <b><?= fmtNum($prodAnterior) ?></b><?php endif; ?>
+            </div>
+          </div>
 
-          <?php if (dashW('kpi_erp')): ?>
           <div class="kpi-card blue">
             <div class="kpi-header">
-              <span class="kpi-label">Pedidos do Mês</span>
-              <div class="kpi-icon">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                  <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-                </svg>
-              </div>
+              <span class="kpi-label">Produção do Mês</span>
+              <div class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
             </div>
-            <div class="kpi-value"><?= fmtNum($kpi_pedidos_mes) ?></div>
-            <div class="kpi-footer">
-              <?= variacao($kpi_pedidos_mes, $kpi_mes_ant) ?> vs. mês anterior
-              &nbsp;<span class="source-badge src-erp">ERP</span>
-            </div>
+            <div class="kpi-value"><?= fmtNum($prodMes) ?></div>
+            <?php if ($metaMes > 0): ?>
+              <div class="kpi-meta-bar"><div class="kpi-meta-fill" style="width:<?= min(100, round($pctMeta)) ?>%"></div></div>
+              <div class="kpi-footer"><b><?= number_format($pctMeta, 0, ',', '.') ?>%</b>&nbsp;da meta de <?= fmtNum($metaMes) ?></div>
+            <?php else: ?>
+              <div class="kpi-footer">sem meta definida &nbsp;<a href="/pcp/bi" style="color:#7db3ff;">Definir no BI →</a></div>
+            <?php endif; ?>
           </div>
 
-          <div class="kpi-card teal">
+          <div class="kpi-card <?= $agora['funcionarios'] > 0 ? 'teal' : 'amber' ?>">
             <div class="kpi-header">
-              <span class="kpi-label">Pedidos Hoje</span>
-              <div class="kpi-icon">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                  <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
-                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-                </svg>
-              </div>
+              <span class="kpi-label">Produzindo Agora</span>
+              <div class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
             </div>
-            <div class="kpi-value"><?= fmtNum($kpi_pedidos_hoje) ?></div>
-            <div class="kpi-footer">faturados hoje &nbsp;<span class="source-badge src-erp">ERP</span></div>
-          </div>
-
-          <div class="kpi-card <?= $kpi_pendentes_importar > 0 ? 'amber' : 'teal' ?>">
-            <div class="kpi-header">
-              <span class="kpi-label">A Importar do ERP</span>
-              <div class="kpi-icon">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                  <polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/>
-                  <path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"/>
-                </svg>
-              </div>
-            </div>
-            <div class="kpi-value"><?= fmtNum($kpi_pendentes_importar) ?></div>
+            <div class="kpi-value"><?= fmtNum($agora['funcionarios']) ?></div>
             <div class="kpi-footer">
-              <?php if ($kpi_pendentes_importar > 0): ?>
-                pedido<?= $kpi_pendentes_importar !== 1 ? 's' : '' ?>
-                &nbsp;<a href="/yzidro/pedidos" style="color:var(--amber);font-weight:700;text-decoration:none;">Importar →</a>
-              <?php elseif ($erp_ok): ?>
-                <span class="up">✓ Tudo importado</span>
-              <?php else: ?>
-                <span class="source-badge src-off">ERP offline</span>
-              <?php endif; ?>
-              &nbsp;<span class="source-badge src-erp">ERP</span>
+              funcionário<?= $agora['funcionarios'] !== 1 ? 's' : '' ?> em <?= fmtNum($agora['ops']) ?> O.P<?= $agora['ops'] !== 1 ? 's' : '' ?>
+              &nbsp;<a href="/pcp/bi-individual" style="color:var(--teal);">Ver →</a>
             </div>
           </div>
-          <?php endif; ?>
-
-          <?php if (dashW('kpi_local')): ?>
-          <div class="kpi-card teal">
-            <div class="kpi-header">
-              <span class="kpi-label">Itens Finalizados</span>
-              <div class="kpi-icon">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                  <polyline points="22 4 12 14.01 9 11.01"/>
-                </svg>
-              </div>
-            </div>
-            <div class="kpi-value"><?= fmtNum($kpi_finalizados) ?></div>
-            <div class="kpi-footer">
-              unidades finalizadas
-              &nbsp;<a href="/pcp/planejamento" style="color:var(--teal);font-weight:600;text-decoration:none;">Ver →</a>
-              &nbsp;<span class="source-badge src-local">Local</span>
-            </div>
-          </div>
-
-          <div class="kpi-card amber">
-            <div class="kpi-header">
-              <span class="kpi-label">Pendente de Produção</span>
-              <div class="kpi-icon">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                  <circle cx="12" cy="12" r="10"/>
-                  <polyline points="12 6 12 12 16 14"/>
-                </svg>
-              </div>
-            </div>
-            <div class="kpi-value"><?= fmtNum($kpi_a_produzir) ?></div>
-            <div class="kpi-footer">
-              unidades a produzir
-              &nbsp;<a href="/pcp/planejamento" style="color:var(--amber);font-weight:600;text-decoration:none;">Ver →</a>
-              &nbsp;<span class="source-badge src-local">Local</span>
-            </div>
-          </div>
-          <?php endif; ?>
-
         </div>
-        <?php
-        $_kpi = ob_get_clean();
-        foreach (['kpi_erp', 'kpi_local'] as $_k) {
-            if (dashW($_k)) { $_w[$_k] = $_kpi; break; }
-        }
+        <?php $_html = ob_get_clean();
+        $_w['kpi_producao'] = $erp_ok ? $_html : '<div class="panel">' . $semErp . '</div>';
     }
 
-    // ── Últimas Vendas ────────────────────────────────────────────────
-    if (dashW('ultimas_vendas')) {
+    // ── KPIs de Saída ─────────────────────────────────────────────────
+    if (dashW('kpi_saida')) {
+        ob_start(); ?>
+        <div class="dash-sec">Saída</div>
+        <div class="dash-kpis">
+          <div class="kpi-card <?= $totHoje['pedidos'] > 0 ? 'teal' : 'amber' ?>">
+            <div class="kpi-header">
+              <span class="kpi-label">Saída Hoje</span>
+              <div class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
+            </div>
+            <div class="kpi-value"><?= fmtNum($totHoje['pedidos']) ?></div>
+            <div class="kpi-footer">pedido<?= $totHoje['pedidos'] !== 1 ? 's' : '' ?> · <?= fmtNum($totHoje['bag']) ?> bags · <?= fmtNum($totHoje['sac']) ?> sacaria</div>
+          </div>
+
+          <div class="kpi-card blue">
+            <div class="kpi-header">
+              <span class="kpi-label">Saída do Mês</span>
+              <div class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+            </div>
+            <div class="kpi-value"><?= fmtNum($totMes['pedidos']) ?></div>
+            <div class="kpi-footer">pedidos · <?= fmtNum($totMes['bag']) ?> bags · <?= fmtNum($totMes['sac']) ?> sacaria</div>
+          </div>
+
+          <div class="kpi-card teal">
+            <div class="kpi-header">
+              <span class="kpi-label">Faturado no Mês</span>
+              <div class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+            </div>
+            <div class="kpi-value" title="<?= e(fmtMoeda($totMes['valor'])) ?>"><?= e(fmtMoedaCurta($totMes['valor'])) ?></div>
+            <div class="kpi-footer">
+              <?= $totHoje['valor'] != 0 ? e(fmtMoedaCurta($totHoje['valor'])) . ' hoje' : 'nada faturado hoje' ?>
+              &nbsp;<a href="/relatorios/historico-faturamento" style="color:var(--teal);">Histórico →</a>
+            </div>
+          </div>
+        </div>
+        <?php $_html = ob_get_clean();
+        $_w['kpi_saida'] = $erp_ok ? $_html : '<div class="panel">' . $semErp . '</div>';
+    }
+
+    // ── Gráfico: Produção x Saída de Bags — 14 dias ──────────────────
+    if (dashW('grafico_14dias')) {
         ob_start(); ?>
         <div class="panel">
           <div class="panel-header">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="panel-title">Últimas Vendas</span>
-              <span class="source-badge src-erp">ERP</span>
-            </div>
-            <a class="panel-action" href="/vendas">Ver todas →</a>
+            <span class="panel-title">Produção x Saída de Bags — Últimos 14 Dias</span>
+            <a class="panel-action" href="/pcp/bi">BI da Produção →</a>
           </div>
-          <?php if (empty($ultimas_vendas)): ?>
-          <div class="empty-row"><?= $erp_ok ? 'Nenhuma venda encontrada.' : '⚠ ERP offline — sem dados de vendas.' ?></div>
-          <?php else: ?>
-          <?php foreach ($ultimas_vendas as $v): ?>
-          <div class="venda-row">
-            <div class="venda-left">
-              <span class="venda-num"><?= htmlspecialchars($v['pedido']) ?></span>
-            </div>
-            <div class="venda-mid">
-              <div class="venda-cliente" title="<?= htmlspecialchars($v['cliente']) ?>"><?= htmlspecialchars(mb_substr($v['cliente'], 0, 35)) ?><?= mb_strlen($v['cliente']) > 35 ? '…' : '' ?></div>
-            </div>
-            <div class="venda-right">
-              <span class="venda-qty"><?= number_format((int)$v['qtd_itens'], 0, ',', '.') ?> it.</span>
-              <span class="venda-data"><?= htmlspecialchars($v['data']) ?></span>
-            </div>
+          <?= $erp_ok ? '<div class="chart-wrap"><canvas id="chartProdSaida"></canvas></div>' : $semErp ?>
+        </div>
+        <?php $_w['grafico_14dias'] = ob_get_clean();
+    }
+
+    // ── OPs em produção agora ─────────────────────────────────────────
+    if (dashW('ops_produzindo')) {
+        ob_start(); ?>
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">O.Ps em Produção Agora</span>
+            <a class="panel-action" href="/pcp/bi">Ver no BI →</a>
           </div>
+          <?php if (!$erp_ok): ?>
+            <?= $semErp ?>
+          <?php elseif (!$opsAtivas): ?>
+            <div class="empty-row">Nenhuma O.P com apontamento em aberto.</div>
+          <?php else: foreach ($opsAtivas as $o):
+              $pct = $o['pedido'] > 0 ? round($o['lido'] / $o['pedido'] * 100) : 0; ?>
+            <div class="dash-row">
+              <span class="dash-num"><span class="dash-live"></span>O.P <?= e($o['op']) ?></span>
+              <div class="dash-row-main">
+                <div class="dash-row-t" title="<?= e($o['cliente']) ?>"><?= e($o['cliente'] ?: '—') ?></div>
+                <div class="dash-row-s" title="<?= e($o['produto']) ?>"><?= e($o['produto']) ?> · <?= $o['funcs'] ?> pessoa<?= $o['funcs'] !== 1 ? 's' : '' ?></div>
+                <?php if ($o['pedido'] > 0): ?><div class="dash-bar"><div class="dash-bar-fill<?= $pct > 100 ? ' over' : '' ?>" style="width:<?= min(100, $pct) ?>%"></div></div><?php endif; ?>
+              </div>
+              <div class="dash-row-r">
+                <span class="dash-row-v"><?= $o['pedido'] > 0 ? $pct . '%' : '—' ?></span>
+                <span class="dash-row-s"><?= fmtNum($o['lido']) ?> / <?= $o['pedido'] > 0 ? fmtNum($o['pedido']) : '—' ?></span>
+              </div>
+            </div>
+          <?php endforeach; endif; ?>
+        </div>
+        <?php $_w['ops_produzindo'] = ob_get_clean();
+    }
+
+    // ── Pedidos que saíram hoje ───────────────────────────────────────
+    if (dashW('saidas_hoje')) {
+        ob_start(); ?>
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Saídas de Hoje</span>
+            <a class="panel-action" href="/relatorios/historico-faturamento">Histórico →</a>
+          </div>
+          <?php if (!$erp_ok): ?>
+            <?= $semErp ?>
+          <?php elseif (!$saidasHoje): ?>
+            <div class="empty-row">
+              Nenhum pedido saiu hoje ainda.
+              <?php if ($ultimaSaida): ?><br><span style="font-size:11.5px;">Última saída em <?= date('d/m/Y', strtotime($ultimaSaida)) ?>.</span><?php endif; ?>
+            </div>
+          <?php else: foreach (array_slice($saidasHoje, 0, 8) as $s): ?>
+            <div class="dash-row">
+              <span class="dash-num"><?= e($s['pedido']) ?></span>
+              <div class="dash-row-main">
+                <div class="dash-row-t" title="<?= e($s['cliente']) ?>"><?= e($s['cliente'] ?: '—') ?><?= $s['devolucao'] ? '<span class="dash-dev">DEV</span>' : '' ?></div>
+                <div class="dash-row-s">
+                  <?= implode(' · ', array_filter([
+                      $s['bag'] != 0 ? fmtNum($s['bag']) . ' bags' : '',
+                      $s['sac'] != 0 ? fmtNum($s['sac']) . ' sacaria' : '',
+                      $s['bag'] == 0 && $s['sac'] == 0 ? fmtNum($s['pecas']) . ' peças' : '',
+                  ])) ?>
+                </div>
+              </div>
+              <div class="dash-row-r"><span class="dash-row-v"><?= e(fmtMoeda($s['valor'])) ?></span></div>
+            </div>
           <?php endforeach; ?>
+            <?php if (count($saidasHoje) > 8): ?>
+              <div class="dash-row" style="justify-content:center;"><a class="panel-action" href="/relatorios/historico-faturamento?data_ini=<?= $hoje ?>&data_fim=<?= $hoje ?>">+ <?= count($saidasHoje) - 8 ?> pedido(s) →</a></div>
+            <?php endif; ?>
           <?php endif; ?>
         </div>
-        <?php $_w['ultimas_vendas'] = ob_get_clean();
-    }
-
-    // ── Produção por Máquina — Hoje ───────────────────────────────────
-    if (dashW('maquinas_hoje')) {
-        ob_start(); ?>
-        <div class="panel">
-          <div class="panel-header">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="panel-title">Produção por Máquina — Hoje</span>
-              <span class="source-badge src-local">Local</span>
-            </div>
-            <a class="panel-action" href="/pcp/planejamento">Planejamento →</a>
-          </div>
-          <?php if (empty($top_maquinas)): ?>
-          <div class="empty-row">Nenhum apontamento hoje.</div>
-          <?php else: ?>
-          <div class="maq-bar-row">
-            <?php foreach ($top_maquinas as $mq):
-                $pct = $max_prod_maq > 0 ? round($mq['total'] / $max_prod_maq * 100) : 0; ?>
-            <div class="maq-bar-item">
-              <div class="maq-bar-label">
-                <span class="maq-bar-name" title="<?= htmlspecialchars($mq['maq_descricao']) ?>"><?= htmlspecialchars($mq['maq_descricao']) ?></span>
-                <span class="maq-bar-val"><?= number_format((int)$mq['total'],0,',','.') ?> un</span>
-              </div>
-              <div class="maq-bar-bg"><div class="maq-bar-fill" style="width:<?= $pct ?>%;"></div></div>
-            </div>
-            <?php endforeach; ?>
-          </div>
-          <?php endif; ?>
-        </div>
-        <?php $_w['maquinas_hoje'] = ob_get_clean();
-    }
-
-    // ── Etapas de Produção ─────────────────────────────────────────────
-    if (dashW('etapas_producao')) {
-        ob_start();
-        $etp_total = array_sum(array_column($etapas_producao, 'qtd'));
-        $etp_cores = [
-            'Pendente de produção' => '#f59e0b,#fbbf24',
-            'Em produção'          => '#1e4fc9,#2d6aff',
-            'Produção finalizada'  => '#1a6945,#00c9a7',
-        ];
-        ?>
-        <div class="panel">
-          <div class="panel-header">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="panel-title">Etapas de Produção</span>
-              <span class="source-badge src-local">Local</span>
-            </div>
-            <a class="panel-action" href="/pcp/reuniao">Reunião de Planejamento →</a>
-          </div>
-          <?php if (empty($etapas_producao) || $etp_total === 0): ?>
-          <div class="empty-row">Nenhum pedido programado no momento.</div>
-          <?php else: ?>
-          <div class="maq-bar-row">
-            <?php foreach ($etapas_producao as $etp):
-                $pct = $etp_total > 0 ? round((int)$etp['qtd'] / $etp_total * 100) : 0;
-                $cor = $etp_cores[$etp['ETP_DESCRICAO']] ?? '#5a3fc0,#9b6dff'; ?>
-            <div class="maq-bar-item">
-              <div class="maq-bar-label">
-                <span class="maq-bar-name" title="<?= htmlspecialchars($etp['ETP_DESCRICAO']) ?>"><?= htmlspecialchars($etp['ETP_DESCRICAO']) ?></span>
-                <span class="maq-bar-val"><?= (int)$etp['qtd'] ?> ped.</span>
-              </div>
-              <div class="maq-bar-bg"><div class="maq-bar-fill" style="width:<?= $pct ?>%;background:linear-gradient(90deg,<?= $cor ?>);"></div></div>
-            </div>
-            <?php endforeach; ?>
-          </div>
-          <?php endif; ?>
-        </div>
-        <?php $_w['etapas_producao'] = ob_get_clean();
-    }
-
-    // ── Vendas por Grupo — Mês ────────────────────────────────────────
-    if (dashW('vendas_grupo')) {
-        ob_start(); ?>
-        <div class="panel">
-          <div class="panel-header">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="panel-title">Vendas por Grupo — Mês</span>
-              <span class="source-badge src-erp">ERP</span>
-            </div>
-            <a class="panel-action" href="/vendas">Ver →</a>
-          </div>
-          <?php if (empty($vendas_grupo)): ?>
-          <div class="empty-row"><?= $erp_ok ? 'Nenhum dado disponível.' : '⚠ ERP offline.' ?></div>
-          <?php else: $max_grupo_qtd = max(array_column($vendas_grupo,'qtd')); ?>
-          <div class="maq-bar-row">
-            <?php foreach ($vendas_grupo as $g):
-                $pct = $max_grupo_qtd > 0 ? round($g['qtd'] / $max_grupo_qtd * 100) : 0; ?>
-            <div class="maq-bar-item">
-              <div class="maq-bar-label">
-                <span class="maq-bar-name" title="<?= htmlspecialchars($g['grupo']) ?>"><?= htmlspecialchars($g['grupo']) ?></span>
-                <span class="maq-bar-val"><?= (int)$g['qtd'] ?> ped.</span>
-              </div>
-              <div class="maq-bar-bg"><div class="maq-bar-fill" style="width:<?= $pct ?>%;background:linear-gradient(90deg,#1a6945,#00c9a7);"></div></div>
-            </div>
-            <?php endforeach; ?>
-          </div>
-          <?php endif; ?>
-        </div>
-        <?php $_w['vendas_grupo'] = ob_get_clean();
-    }
-
-    // ── Produção — Últimos 7 Dias ─────────────────────────────────────
-    if (dashW('prod_7dias')) {
-        ob_start(); ?>
-        <div class="panel">
-          <div class="panel-header">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span class="panel-title">Produção — Últimos 7 Dias</span>
-              <span class="source-badge src-local">Local</span>
-            </div>
-            <a class="panel-action" href="/relatorios/producao">Apontamentos →</a>
-          </div>
-          <div class="chart-wrap"><canvas id="chartProd"></canvas></div>
-        </div>
-        <?php $_w['prod_7dias'] = ob_get_clean();
+        <?php $_w['saidas_hoje'] = ob_get_clean();
     }
 
     // ── Trello — Visão Geral ──────────────────────────────────────────
@@ -698,31 +412,29 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
         <?php $_w['trello_atividade'] = ob_get_clean();
     }
 
-    // ── Renderiza em ordem com pareamento automático ──────────────────
+    // ── Renderiza em ordem, juntando pares lado a lado ────────────────
     $_pairs = [
-        'ultimas_vendas'   => ['maquinas_hoje',    '1fr 340px'],
-        'maquinas_hoje'    => ['ultimas_vendas',   '340px 1fr'],
-        'vendas_grupo'     => ['prod_7dias',       '320px 1fr'],
-        'prod_7dias'       => ['vendas_grupo',     '1fr 320px'],
+        'ops_produzindo'   => ['saidas_hoje',      '1fr 1fr'],
+        'saidas_hoje'      => ['ops_produzindo',   '1fr 1fr'],
         'trello_geral'     => ['trello_atividade', '7fr 3fr'],
         'trello_atividade' => ['trello_geral',     '3fr 7fr'],
     ];
-    $_active = array_values(array_filter($dashWidgets, fn($k) => isset($_w[$k])));
+    $_active = array_values(array_filter($dashWidgets, fn ($k) => isset($_w[$k])));
     $_skip   = [];
     ?>
 
     <div class="content">
+    <?php if (!$_active): ?>
+      <div class="panel"><div class="empty-row">Nenhum widget ativo. <a href="/dashboard/widgets" style="color:#7db3ff;">Escolher widgets →</a></div></div>
+    <?php endif; ?>
     <?php
     for ($_i = 0; $_i < count($_active); $_i++) {
-        $_key  = $_active[$_i];
+        $_key = $_active[$_i];
         if (in_array($_key, $_skip, true)) continue;
         $_next = $_active[$_i + 1] ?? null;
         $_pair = $_pairs[$_key] ?? null;
         if ($_pair && $_next === $_pair[0]) {
-            echo '<div class="dash-grid" style="grid-template-columns:' . $_pair[1] . ';">';
-            echo $_w[$_key];
-            echo $_w[$_next];
-            echo '</div>';
+            echo '<div class="dash-grid" style="grid-template-columns:' . $_pair[1] . ';">' . $_w[$_key] . $_w[$_next] . '</div>';
             $_skip[] = $_next;
         } else {
             echo $_w[$_key];
@@ -905,46 +617,31 @@ $max_prod_maq    = !empty($top_maquinas) ? max(array_column($top_maquinas, 'tota
   }
 })();
 
-// ── Gráfico produção 7 dias ────────────────────────────────────────────
+// ── Gráfico: produção (bags apontados) x saída de bags, 14 dias ───────
 (function () {
-  const ctx = document.getElementById('chartProd');
-  if (!ctx) return;
-
-  const labels = <?= $js_dias_lbl ?>;
-  const values = <?= $js_dias_val ?>;
-
+  const ctx = document.getElementById('chartProdSaida');
+  if (!ctx || typeof Chart === 'undefined') return;
+  const serie = <?= json_encode($serie) ?>;
+  const fmt = v => Number(v).toLocaleString('pt-BR');
   new Chart(ctx, {
     type: 'bar',
     data: {
-      labels,
-      datasets: [{
-        label: 'Unidades produzidas',
-        data: values,
-        backgroundColor: labels.map((_l, i) => i === labels.length - 1 ? 'rgba(0,201,167,.85)' : 'rgba(45,106,255,.45)'),
-        borderColor:     labels.map((_l, i) => i === labels.length - 1 ? '#00c9a7' : '#2d6aff'),
-        borderWidth: 1,
-        borderRadius: 5,
-        borderSkipped: false,
-      }]
+      labels: serie.labels,
+      datasets: [
+        { label: 'Produzido', data: serie.producao, backgroundColor: 'rgba(45,106,255,.55)', borderColor: '#2d6aff', borderWidth: 1, borderRadius: 4 },
+        { label: 'Saída (bags)', data: serie.saida, backgroundColor: 'rgba(0,201,167,.6)', borderColor: '#00c9a7', borderWidth: 1, borderRadius: 4 },
+      ]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: '#152845',
-          titleColor: '#e8edf5',
-          bodyColor: '#7a90b0',
-          callbacks: { label: ctx => ' ' + Number(ctx.raw).toLocaleString('pt-BR') + ' unidades' }
-        }
+        legend: { labels: { color: '#7a90b0', boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: c => ' ' + c.dataset.label + ': ' + fmt(c.raw) } }
       },
       scales: {
         x: { grid: { color: 'rgba(255,255,255,.04)' }, ticks: { color: '#7a90b0', font: { size: 11 } } },
-        y: {
-          grid: { color: 'rgba(255,255,255,.05)' },
-          ticks: { color: '#7a90b0', font: { size: 11 }, callback: v => v >= 1000 ? (v/1000).toFixed(0)+'k' : v }
-        }
+        y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#7a90b0', font: { size: 11 }, callback: v => v >= 1000 ? (v / 1000).toLocaleString('pt-BR') + 'k' : v } }
       }
     }
   });

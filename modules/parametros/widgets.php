@@ -2,160 +2,66 @@
 declare(strict_types=1);
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/dashboard/dashboard_widgets.php';
 
-$pdo = dbPDO();
+// ══════════════════════════════════════════════════════════════════════════════
+//  DOMBAG — Widgets do Dashboard (preferências pessoais de cada usuário)
+//  O catálogo, as permissões e o armazenamento ficam em dashboard_widgets.php.
+// ══════════════════════════════════════════════════════════════════════════════
+
 $uid = (int)($_SESSION['usu_codigo'] ?? 0);
 
-// ── Permissões e menus activos ────────────────────────────────────────────────
-$_w_admin       = false;
-$_w_perms       = [];
-$_w_desativados = [];
-try {
-    $_st_wu = $pdo->prepare('SELECT USU_ADMIN, GRU_CODIGO FROM USUARIOS WHERE USU_CODIGO = :c');
-    $_st_wu->execute([':c' => $uid]);
-    $_row_wu = $_st_wu->fetch(PDO::FETCH_ASSOC);
-    if ($_row_wu) {
-        $_w_admin = !empty($_row_wu['USU_ADMIN']);
-        if (!$_w_admin && !empty($_row_wu['GRU_CODIGO'])) {
-            $_st_wp = $pdo->prepare('SELECT PAC_PAGINA FROM PERMISSAO_ACESSO WHERE PAC_GRU_CODIGO = :g');
-            $_st_wp->execute([':g' => (int)$_row_wu['GRU_CODIGO']]);
-            $_w_perms = array_column($_st_wp->fetchAll(PDO::FETCH_ASSOC), 'PAC_PAGINA');
-        }
-    }
-    if ($v = $pdo->query("SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = 'sidebar_menus_desativados'")->fetchColumn()) {
-        $_w_desativados = json_decode($v, true) ?? [];
-    }
-} catch (Throwable) {}
-
-$_widget_perm_map = [
-    'kpi_erp'          => ['/vendas',      'vendas'],
-    'kpi_local'        => ['/pcp/planejamento',  'producao'],
-    'ultimas_vendas'   => ['/vendas',      'vendas'],
-    'maquinas_hoje'    => ['/pcp/planejamento',  'producao'],
-    'vendas_grupo'     => ['/vendas',      'vendas'],
-    'prod_7dias'       => ['/pcp/planejamento',  'producao'],
-    'etapas_producao'  => ['/pcp/reuniao', 'producao'],
-    'trello_geral'     => ['/trello',      'trello'],
-    'trello_atividade' => ['/trello',      'trello'],
-];
-
 function widgetPermitido(string $key): bool {
-    global $_w_admin, $_w_perms, $_w_desativados, $_widget_perm_map;
-    if (!isset($_widget_perm_map[$key])) return true;
-    [$page, $menu] = $_widget_perm_map[$key];
-    // Menu desativado aplica-se a todos, incluindo admins
-    if (in_array($menu, $_w_desativados, true)) return false;
-    // Permissão de página: só verifica para não-admins
-    if (!$_w_admin && !in_array($page, $_w_perms, true)) return false;
-    return true;
+    global $uid;
+    return dashWidgetPermitido($key, $uid);
 }
 
 // ── Definição de todos os widgets disponíveis ─────────────────────────────────
-$todosWidgets = [
-    [
-        'key'   => 'kpi_erp',
-        'label' => 'KPIs — ERP',
-        'desc'  => 'Pedidos do mês, pedidos hoje e pedidos a importar do ERP',
-        'icon'  => '<path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1.5 7h13M10 21a1 1 0 1 0 0-2 1 1 0 0 0 0 2zm7 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/>',
-    ],
-    [
-        'key'   => 'kpi_local',
-        'label' => 'KPIs — Produção',
-        'desc'  => 'Itens finalizados e unidades pendentes de produção',
-        'icon'  => '<path d="M2 20h.01M7 20v-4"/><path d="M12 20V10"/><path d="M17 20V4"/>',
-    ],
-    [
-        'key'   => 'ultimas_vendas',
-        'label' => 'Últimas Vendas',
-        'desc'  => 'Tabela com as 5 últimas vendas do ERP',
-        'icon'  => '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>',
-    ],
-    [
-        'key'   => 'maquinas_hoje',
-        'label' => 'Produção por Máquina',
-        'desc'  => 'Top máquinas com maior produção no dia de hoje',
-        'icon'  => '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
-    ],
-    [
-        'key'   => 'vendas_grupo',
-        'label' => 'Vendas por Grupo',
-        'desc'  => 'Pedidos do mês agrupados por tipo de cliente',
-        'icon'  => '<circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/>',
-    ],
-    [
-        'key'   => 'prod_7dias',
-        'label' => 'Produção — 7 Dias',
-        'desc'  => 'Gráfico de barras da produção nos últimos 7 dias',
-        'icon'  => '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>',
-    ],
-    [
-        'key'   => 'etapas_producao',
-        'label' => 'Etapas de Produção',
-        'desc'  => 'Pedidos programados agrupados por etapa de produção',
-        'icon'  => '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
-    ],
-    [
-        'key'   => 'trello_geral',
-        'label' => 'Trello — Visão Geral',
-        'desc'  => 'Cards por lista com indicadores de vencidos e prazos de hoje',
-        'icon'  => '<rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="3" width="7" height="11" rx="2"/>',
-    ],
-    [
-        'key'   => 'trello_atividade',
-        'label' => 'Trello — Atividade',
-        'desc'  => 'Movimentos recentes de cards entre listas do board',
-        'icon'  => '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
-    ],
-];
-
-$paramKey = 'dashboard_widgets_' . $uid;
-
-// ── Carrega preferências atuais do usuário ───────────────────────────────────
-function loadWidgets(PDO $pdo, string $key): array
-{
-    $st = $pdo->prepare('SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = :k');
-    $st->execute([':k' => $key]);
-    $val = $st->fetchColumn();
-    if ($val !== false) return json_decode($val, true) ?? [];
-    // Sem preferência salva → dashboard vazio por padrão
-    return [];
+$todosWidgets = [];
+foreach (DASH_WIDGETS as $k => $d) {
+    $todosWidgets[] = ['key' => $k, 'label' => $d['label'], 'desc' => $d['desc'], 'icon' => $d['icon']];
 }
 
-$activos = loadWidgets($pdo, $paramKey);
+$activos = dashWidgetsDoUsuario($uid);
 $msg     = '';
 $msgType = '';
 
-// ── POST: salvar ──────────────────────────────────────────────────────────────
+// ── POST: salvar (PRG — F5 não reenvia) ───────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $allKeys  = array_column($todosWidgets, 'key');
     $checked  = array_keys(array_filter($_POST['widget'] ?? [], fn($v) => $v === '1'));
     // Respeita a ordem do drag-and-drop se enviada
     $orderRaw = json_decode($_POST['order'] ?? '[]', true);
     $order    = (is_array($orderRaw) && count($orderRaw)) ? $orderRaw : $allKeys;
-    // Filtra: só keys válidas, na ordem do drag, apenas as marcadas
-    $novosActivos = array_values(array_filter(
-        $order,
-        fn($k) => in_array($k, $checked, true) && in_array($k, $allKeys, true)
-    ));
+    if (isset($_POST['restaurar'])) {
+        $novosActivos = DASH_WIDGETS_PADRAO;
+    } else {
+        // Só keys válidas, na ordem do drag, apenas as marcadas
+        $novosActivos = array_values(array_filter(
+            $order,
+            fn($k) => in_array($k, $checked, true) && in_array($k, $allKeys, true)
+        ));
+    }
 
     try {
-        $pdo->prepare("
-            INSERT INTO PARAMETROS (PAR_CHAVE, PAR_VALOR) VALUES (:k, :v)
-            ON DUPLICATE KEY UPDATE PAR_VALOR = VALUES(PAR_VALOR)
-        ")->execute([':k' => $paramKey, ':v' => json_encode($novosActivos, JSON_UNESCAPED_UNICODE)]);
-        $activos = $novosActivos;
-        $msg     = 'Preferências guardadas com sucesso.';
-        $msgType = 'ok';
+        dashSalvarWidgets($uid, $novosActivos);
+        $_SESSION['widgets_flash'] = 'Preferências salvas com sucesso.';
+        header('Location: /dashboard/widgets');
+        exit;
     } catch (Throwable $e) {
         $msg     = 'Erro ao salvar: ' . $e->getMessage();
         $msgType = 'err';
     }
+} elseif (!empty($_SESSION['widgets_flash'])) {
+    $msg     = $_SESSION['widgets_flash'];
+    $msgType = 'ok';
+    unset($_SESSION['widgets_flash']);
 }
 
 function esc($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 ?>
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-br" data-theme="<?= htmlspecialchars(dombagTema()) ?>">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -245,6 +151,7 @@ function esc($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-
       <div class="topbar-actions">
         <button type="button" class="btn-secondary" onclick="toggleTodos(true)">Ativar todos</button>
         <button type="button" class="btn-secondary" onclick="toggleTodos(false)">Desativar todos</button>
+        <button type="submit" form="formWidgets" name="restaurar" value="1" class="btn-secondary" title="Volta para os widgets de produção e saída">Restaurar padrão</button>
         <button type="submit" form="formWidgets" class="btn-primary">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
             <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>

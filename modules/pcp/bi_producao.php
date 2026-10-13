@@ -230,7 +230,7 @@ function biBuildPayload($pg, PDO $pdo): array
         'indicadores'       => biFetchIndicadoresHoje($pg),
         // Produção individual de hoje (mesmos dados do BI Individual)
         'individual'        => biiFetchProducaoPorFuncionario($pg, date('Y-m-d')),
-        'meta_individual'   => biiFetchMeta($pdo),
+        'meta_total_dia'    => biiFetchMeta($pdo),   // meta total da equipe (BI Individual)
         'atualizado_em'     => date('H:i:s'),
     ];
 }
@@ -273,7 +273,7 @@ $error = '';
 $payload = [
     'ops_ativas' => [], 'mes_produzido' => 0, 'meta' => 0, 'mes_nome' => ucfirst(BI_MESES[(int) date('n')]),
     'media_bags_hora' => 0, 'mensal' => array_fill(0, 12, 0), 'meses' => array_values(BI_MESES),
-    'individual' => [], 'meta_individual' => 0,
+    'individual' => [], 'meta_total_dia' => 0,
     'indicadores' => ['funcionarios' => 0, 'apontamentos' => 0, 'qtd_produzida' => 0.0, 'seg_produtivo' => 0.0, 'seg_pausado' => 0.0, 'pausas' => 0, 'media_hora' => 0.0],
     'atualizado_em' => date('H:i:s'),
 ];
@@ -669,7 +669,7 @@ if (!$pg) {
 
         </div>
 
-        <!-- Produção individual de hoje: quem já produziu, vs meta individual (BI Individual) -->
+        <!-- Produção individual de hoje: quem já produziu, e o total da equipe x meta total (BI Individual) -->
         <div class="biz-card" data-widget="individual">
           <div class="biz-card-head">
             <h2>Produção Individual Hoje <span class="biz-ind-meta" id="biIndMetaTxt"></span></h2>
@@ -824,30 +824,34 @@ function biRenderOps(ops) {
   }).join('');
 }
 
-// ── Produção individual de hoje: barra vs meta individual + O.P ativa ───────
+// ── Produção individual de hoje: barra de cada pessoa + O.P ativa ──────────
+// A meta é TOTAL da equipe (definida no BI Individual): o cabeçalho mostra o
+// total x meta; a barra de cada pessoa é proporcional a quem mais produziu.
 function biRenderIndividual(funcs, meta) {
+  const total = funcs.reduce((s, f) => s + Number(f.qtd_produzida || 0), 0);
   document.getElementById('biIndCount').textContent = funcs.length;
-  document.getElementById('biIndMetaTxt').textContent = meta > 0 ? '· meta ' + biFmt(meta, 0) + ' por pessoa' : '';
+  document.getElementById('biIndMetaTxt').textContent = '· total ' + biFmt(total, 0)
+    + (meta > 0 ? ' de ' + biFmt(meta, 0) + ' (' + biFmt((total / meta) * 100, 0) + '%)' : '');
   const el = document.getElementById('biIndGrid');
   if (!funcs.length) {
     el.innerHTML = '<div class="biz-empty-msg">Ninguém produziu hoje ainda.</div>';
     return;
   }
+  const maior = Math.max(...funcs.map(f => Number(f.qtd_produzida || 0)), 1);
   el.innerHTML = funcs.map(f => {
     const qtd = Number(f.qtd_produzida || 0);
-    const pct = meta > 0 ? Math.min(100, (qtd / meta) * 100) : 0;
-    const hit = meta > 0 && qtd >= meta;
+    const part = total > 0 ? (qtd / total) * 100 : 0;
     const ativa = (f.ops_detalhe || []).find(o => o.em_producao);
     const op = ativa
       ? `<div class="biz-ind-op"><span class="biz-ind-dot"></span><span>O.P ${ativa.op}${ativa.cliente ? ' - ' + biEsc(ativa.cliente) : ''}</span></div>`
       : '<div class="biz-ind-op off"><span>Nenhuma O.P ativa</span></div>';
     return `
-      <div class="biz-ind-item${hit ? ' hit' : ''}">
+      <div class="biz-ind-item">
         <div class="biz-ind-head">
           <div class="biz-ind-name">${biEsc(f.nome)}</div>
-          <div class="biz-ind-qtd">${biFmt(qtd, 0)}${meta > 0 ? ` <small>/ ${biFmt(meta, 0)}</small>` : ''}</div>
+          <div class="biz-ind-qtd">${biFmt(qtd, 0)} <small>${biFmt(part, 0)}%</small></div>
         </div>
-        ${meta > 0 ? `<div class="biz-op-bar"><div class="biz-op-fill" style="width:${pct}%"></div></div>` : ''}
+        <div class="biz-op-bar"><div class="biz-op-fill" style="width:${(qtd / maior) * 100}%"></div></div>
         ${op}
       </div>
     `;
@@ -961,7 +965,7 @@ function biRenderAll(data) {
   biRenderChart(data.meses || [], data.mensal || []);
   biRenderOps(data.ops_ativas || []);
   biRenderIndicadores(data.indicadores);
-  biRenderIndividual(data.individual || [], Number(data.meta_individual || 0));
+  biRenderIndividual(data.individual || [], Number(data.meta_total_dia || 0));
 
   document.getElementById('biMesTitulo').textContent = 'Produção de ' + (data.mes_nome || '');
   document.getElementById('biMesProduzidoTxt').textContent = biFmt(data.mes_produzido, 0);
