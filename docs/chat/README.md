@@ -102,7 +102,8 @@ ALTER ROLE dombag_ia SET default_transaction_read_only = on;
 ALTER ROLE dombag_ia SET statement_timeout = '15s';
 GRANT CONNECT ON DATABASE "004703_dom_bag_ltda" TO dombag_ia;
 GRANT USAGE ON SCHEMA public TO dombag_ia;
-GRANT SELECT ON vendas, representantes, vw_vendas, producao, itens_producao, estado_pedido TO dombag_ia;
+GRANT SELECT ON vendas, representantes, vw_vendas, producao, itens_producao, estado_pedido, tipo_operacao, empresa TO dombag_ia;
+GRANT SELECT (nf_codigo, emp_codigo, entrada_saida, nf_estadonfe, nf_data_emissao, numero_nota_emitida, cli_codigo, to_codigo, nf_total, total_ipi, total_nota) ON nota TO dombag_ia;
 GRANT SELECT (cli_codigo, cli_nome, cli_nome_fantasia, cli_cidade) ON clientes TO dombag_ia;
 ```
 
@@ -143,7 +144,7 @@ SELECT DATE(CHL_CRIADO) AS dia, COUNT(*) AS chamadas,
 ## Testes
 
 ```bash
-php tests/chat/run.php            # 259 verificações; usa o MySQL local e o ERP (só leitura); as APIs (Claude e Gemini) são simuladas
+php tests/chat/run.php            # 292 verificações; usa o MySQL local e o ERP (só leitura); as APIs (Claude e Gemini) são simuladas
 php tests/chat/gerar_exemplos.php # regera docs/chat/exemplos/ (dados fictícios)
 ```
 

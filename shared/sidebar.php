@@ -893,7 +893,7 @@ if ((dombagConfig('GEMINI_API_KEY') || dombagConfig('ANTHROPIC_API_KEY')) && (!e
     if (empty($_SESSION['chat_csrf'])) {
         $_SESSION['chat_csrf'] = bin2hex(random_bytes(32));
     } ?>
-<script src="/public/js/chat-widget.js?v=5" defer
+<script src="/public/js/chat-widget.js?v=6" defer
         data-csrf="<?= htmlspecialchars($_SESSION['chat_csrf']) ?>"
         data-usuario="<?= (int) ($_SESSION['usu_codigo'] ?? 0) ?>"
         data-max="<?= (int) (dombagConfig('CHAT_MAX_CHARS') ?? 2000) ?>"

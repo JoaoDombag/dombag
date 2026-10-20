@@ -50,6 +50,15 @@ const CHAT_FONTE_DEF = [
         'entrega_prevista' => ['Entrega prevista', 'data'], 'finalizada_em' => ['Finalizada em', 'data'],
         'quantidade' => ['Quantidade', 'numero'], 'quantidade_faturada' => ['Qtd. faturada', 'numero'],
     ]],
+    'faturamento_notas' => ['linhas' => 'grupos', 'colunas' => [
+        'grupo' => ['Grupo', 'texto'], 'notas' => ['NF-e', 'inteiro'], 'valor_produtos' => ['Produtos (R$)', 'moeda'],
+        'ipi' => ['IPI (R$)', 'moeda'], 'total_nota' => ['Total com IPI (R$)', 'moeda'],
+    ]],
+    'conciliar_faturamento' => ['linhas' => 'divergencias', 'colunas' => [
+        'tipo' => ['Divergência', 'texto'], 'documento' => ['Documento', 'texto'], 'data' => ['Data', 'data'],
+        'cliente' => ['Cliente', 'texto'], 'valor_sem_ipi' => ['Valor sem IPI (R$)', 'moeda'], 'ipi' => ['IPI (R$)', 'moeda'],
+        'observacao' => ['Observação', 'texto'],
+    ]],
 ];
 
 // Indicadores (números de destaque) que cada fonte oferece.
@@ -60,6 +69,12 @@ const CHAT_FONTE_INDICADORES = [
                                  'total_valor' => ['Valor faturado', 'moeda'], 'ticket_medio' => ['Ticket médio', 'moeda']],
     'status_producao_pedido' => ['total_ops' => ['OPs', 'inteiro'], 'quantidade' => ['Quantidade', 'numero'],
                                  'quantidade_faturada' => ['Qtd. faturada', 'numero']],
+    'faturamento_notas'      => ['total_notas' => ['NF-e emitidas', 'inteiro'], 'total_produtos' => ['Produtos (sem IPI)', 'moeda'],
+                                 'total_ipi' => ['IPI', 'moeda'], 'total_com_ipi' => ['Total com IPI', 'moeda']],
+    'conciliar_faturamento'  => ['historico_valor' => ['Histórico de Vendas', 'moeda'], 'nfe_valor_sem_ipi' => ['NF-e (sem IPI)', 'moeda'],
+                                 'nfe_valor_com_ipi' => ['NF-e (com IPI)', 'moeda'], 'diferenca_sem_ipi' => ['Diferença (NF-e − Histórico)', 'moeda'],
+                                 'conciliados' => ['Conciliados', 'inteiro'], 'quantidade_divergencias' => ['Divergências', 'inteiro'],
+                                 'outros_cnpjs_valor_com_ipi' => ['NF-e de outros CNPJs', 'moeda']],
 ];
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -121,6 +136,19 @@ function chatFonteTabela(string $ferramenta, array $d): array
             $ind = ['total_ops' => count($linhas), 'quantidade' => array_sum(array_column($linhas, 'quantidade')),
                     'quantidade_faturada' => array_sum(array_column($linhas, 'quantidade_faturada'))];
             $origem = 'Ordens de produção do pedido ' . ($d['pedido'] ?? '');
+            break;
+        case 'faturamento_notas':
+            $rot = ['total' => 'Total', 'mes' => 'Mês', 'operacao' => 'Operação', 'cliente' => 'Cliente', 'empresa' => 'Empresa (CNPJ)'];
+            $colunas['grupo'][0] = $rot[$d['agrupado_por'] ?? 'total'] ?? 'Grupo';
+            $ind = ['total_notas' => array_sum(array_column($linhas, 'notas')),
+                    'total_produtos' => round(array_sum(array_column($linhas, 'valor_produtos')), 2),
+                    'total_ipi' => round(array_sum(array_column($linhas, 'ipi')), 2),
+                    'total_com_ipi' => round(array_sum(array_column($linhas, 'total_nota')), 2)];
+            $origem = 'NF-e emitidas de ' . chatPeriodoBr($d['periodo_emissao'] ?? '') . '. ' . ($d['criterio'] ?? '');
+            break;
+        case 'conciliar_faturamento':
+            $ind = $d['resumo'] ?? [];
+            $origem = 'Cruzamento Histórico de Vendas × NF-e, ' . chatPeriodoBr($d['periodo'] ?? '') . '. ' . ($d['criterio'] ?? '');
             break;
     }
     return ['colunas' => $colunas, 'linhas' => $linhas, 'indicadores' => $ind, 'origem' => $origem];

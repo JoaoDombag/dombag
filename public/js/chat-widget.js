@@ -33,6 +33,8 @@
     resumo_faturamento: 'Calculando faturamento…',
     status_producao_pedido: 'Consultando a produção…',
     gerar_relatorio: 'Gerando o relatório…',
+    faturamento_notas: 'Consultando as notas fiscais…',
+    conciliar_faturamento: 'Cruzando Histórico de Vendas com as NF-e…',
     trocar_modelo: 'O serviço de IA oscilou — refazendo com outro modelo…'
   };
   var SUGESTOES = [

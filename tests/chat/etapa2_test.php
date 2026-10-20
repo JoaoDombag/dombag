@@ -15,7 +15,7 @@ function nomesLiberados(array $ctx): array
 teste('escopo: admin vê tudo, sem filtro de representante', function () {
     $c = chatMontarEscopo(ctxTeste(UID_A, ['admin' => true]), []);
     igual(null, $c['re']);
-    igual(['meu_perfil', 'listar_pedidos', 'detalhe_pedido', 'resumo_faturamento', 'status_producao_pedido', 'gerar_relatorio'], nomesLiberados($c));
+    igual(['meu_perfil', 'listar_pedidos', 'detalhe_pedido', 'resumo_faturamento', 'status_producao_pedido', 'faturamento_notas', 'conciliar_faturamento', 'gerar_relatorio'], nomesLiberados($c));
 });
 
 teste('escopo: representante vinculado só vê os próprios RE_CODIGO', function () {
@@ -33,7 +33,7 @@ teste('escopo: sem vínculo e sem permissão → só meu_perfil', function () {
 
 teste('escopo: sem vínculo, ferramentas conforme páginas do grupo', function () {
     $c = chatMontarEscopo(ctxTeste(UID_A, ['permissoes' => ['/relatorios/historico-faturamento']]), []);
-    igual(['meu_perfil', 'resumo_faturamento', 'gerar_relatorio'], nomesLiberados($c));
+    igual(['meu_perfil', 'resumo_faturamento', 'faturamento_notas', 'conciliar_faturamento', 'gerar_relatorio'], nomesLiberados($c));
     igual(null, $c['re']);
 });
 
@@ -160,7 +160,8 @@ teste('tela inicial: apresentação e sugestões seguem as permissões de cada u
     $adm = chatTextoInicio(chatMontarEscopo(ctxTeste(UID_A, ['admin' => true, 'nome' => 'Ana Lima']), []));
     confere(str_starts_with($adm['texto'], 'Olá, **Ana**!'), 'primeiro nome');
     confere(str_contains($adm['texto'], 'administrador') && str_contains($adm['texto'], 'Status de produção') && str_contains($adm['texto'], 'PDF ou Excel'));
-    igual(4, count($adm['sugestoes']));
+    igual(5, count($adm['sugestoes']));
+    confere(str_contains($adm['texto'], 'Notas fiscais / DRE') && str_contains($adm['texto'], 'Cruzamento'), 'admin vê as consultas de DRE');
 
     $rep = chatTextoInicio(chatMontarEscopo(ctxTeste(UID_A, ['nome' => 'Rep']), [['re_codigo' => 6, 're_nome' => 'DANIELE']]));
     confere(str_contains($rep['texto'], 'representante **DANIELE**') && str_contains($rep['texto'], 'somente os seus pedidos'));

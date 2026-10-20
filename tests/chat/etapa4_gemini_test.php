@@ -110,7 +110,7 @@ teste('gemini: erro de ferramenta vai como {"erro": ...}', function () use ($pdo
 teste('gemini: schema convertido sem campos que o Gemini recusa', function () {
     $ctx  = chatMontarEscopo(ctxTeste(UID_A, ['admin' => true]), []);
     $decl = chatGeminiFerramentas(chatFerramentasDisponiveis($ctx))[0]['functionDeclarations'];
-    igual(['meu_perfil', 'listar_pedidos', 'detalhe_pedido', 'resumo_faturamento', 'status_producao_pedido', 'gerar_relatorio'], array_column($decl, 'name'));
+    igual(['meu_perfil', 'listar_pedidos', 'detalhe_pedido', 'resumo_faturamento', 'status_producao_pedido', 'faturamento_notas', 'conciliar_faturamento', 'gerar_relatorio'], array_column($decl, 'name'));
     $json = json_encode($decl);
     foreach (['additionalProperties', '"pattern"', '"format"', 'eagerInputStreaming', 'inputSchema'] as $proibido) {
         confere(!str_contains($json, $proibido), "schema contém {$proibido}");
@@ -118,7 +118,7 @@ teste('gemini: schema convertido sem campos que o Gemini recusa', function () {
     $lp = $decl[1]['parameters'];
     igual(['data_ini', 'data_fim'], $lp['required']);
     confere(str_contains($lp['properties']['data_ini']['description'], 'AAAA-MM-DD'), 'formato da data vira texto');
-    igual('array', $decl[5]['parameters']['properties']['secoes']['type']);
+    igual('array', $decl[7]['parameters']['properties']['secoes']['type']);
 });
 
 teste('gemini: bloqueio de segurança descarta a saída e não altera o histórico', function () use ($pdo) {
