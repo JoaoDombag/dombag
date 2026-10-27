@@ -101,15 +101,6 @@ for ($i = 13; $i >= 0; $i--) {
 // ── Helpers de formato ────────────────────────────────────────────────
 function fmtNum(float $v): string   { return number_format($v, 0, ',', '.'); }
 function fmtMoeda(float $v): string { return 'R$ ' . number_format($v, 2, ',', '.'); }
-function fmtMoedaCurta(float $v): string
-{
-    $a = abs($v);
-    return match (true) {
-        $a >= 1e6 => 'R$ ' . number_format($v / 1e6, 1, ',', '.') . ' mi',
-        $a >= 1e3 => 'R$ ' . number_format($v / 1e3, 0, ',', '.') . ' mil',
-        default   => fmtMoeda($v),
-    };
-}
 function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); }
 ?>
 <!DOCTYPE html>
@@ -138,7 +129,8 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
     .kpi-meta-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,#2d6aff,#00c9a7); }
     .kpi-footer a { font-weight:600; text-decoration:none; }
     .dash-sec { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin:4px 2px -6px; }
-    @media(max-width:480px) { .dash-kpis { grid-template-columns:1fr 1fr; } .kpi-value { font-size:22px; } }
+    .kpi-value-full { font-size:22px; letter-spacing:-.5px; white-space:nowrap; }
+    @media(max-width:480px) { .dash-kpis { grid-template-columns:1fr 1fr; } .kpi-value { font-size:22px; } .kpi-card-full { grid-column:span 2; } }
 
     /* ── Gráfico ───────────────────────────────────── */
     .chart-wrap { position:relative; height:220px; padding:0 16px 12px; }
@@ -295,14 +287,14 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
             <div class="kpi-footer">pedidos · <?= fmtNum($totMes['bag']) ?> bags · <?= fmtNum($totMes['sac']) ?> sacaria</div>
           </div>
 
-          <div class="kpi-card teal">
+          <div class="kpi-card teal kpi-card-full">
             <div class="kpi-header">
               <span class="kpi-label">Faturado no Mês</span>
               <div class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
             </div>
-            <div class="kpi-value" title="<?= e(fmtMoeda($totMes['valor'])) ?>"><?= e(fmtMoedaCurta($totMes['valor'])) ?></div>
+            <div class="kpi-value kpi-value-full"><?= e(fmtMoeda($totMes['valor'])) ?></div>
             <div class="kpi-footer">
-              <?= $totHoje['valor'] != 0 ? e(fmtMoedaCurta($totHoje['valor'])) . ' hoje' : 'nada faturado hoje' ?>
+              <?= $totHoje['valor'] != 0 ? e(fmtMoeda($totHoje['valor'])) . ' hoje' : 'nada faturado hoje' ?>
               &nbsp;<a href="/relatorios/historico-faturamento" style="color:var(--teal);">Histórico →</a>
             </div>
           </div>
