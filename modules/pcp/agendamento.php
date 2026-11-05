@@ -90,6 +90,8 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
 
   /* ── Legenda: Big Bag e Sacaria também filtram ────────── */
   .ag-legenda { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 12px; font-size: 12px; color: var(--text-muted); }
+  .ag-tipo-btn.tipo-BAG     { --tipo: 34,197,94; }
+  .ag-tipo-btn.tipo-SACARIA { --tipo: 168,85,247; }
   .ag-tipo-btn {
     display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border-radius: 8px; cursor: pointer;
     border: 1px solid rgba(var(--tipo), .45); background: rgba(var(--tipo), .16);

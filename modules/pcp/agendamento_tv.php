@@ -98,8 +98,8 @@ session_write_close();
   #legenda { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-flex: 0 0 auto; flex: 0 0 auto; margin-bottom: .4rem; font-size: .95rem; font-weight: 600; color: #a9b7c6; }
   .leg { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-right: 1.4rem; white-space: nowrap; }
   .leg i { display: block; width: 1.6rem; height: .85rem; margin-right: .45rem; border-radius: .2rem; border: 1px solid #8fa0b3; }
-  .leg .bag { background: #2d6aff; border-color: #2d6aff; }
-  .leg .sac { background: #f59e0b; border-color: #f59e0b; }
+  .leg .bag { background: #22c55e; border-color: #22c55e; }
+  .leg .sac { background: #a855f7; border-color: #a855f7; }
   .leg .agendado { border-style: dashed; }
   .leg .parcial { background: #8fa0b3; background: linear-gradient(90deg, #8fa0b3 55%, transparent 55%); }
   .leg .cumprido { background: #8fa0b3; }
