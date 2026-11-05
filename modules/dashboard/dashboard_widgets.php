@@ -15,13 +15,13 @@ const DASH_WIDGETS_PREFIXO = 'dashboard_widgets_v2_';
 const DASH_WIDGETS = [
     'kpi_producao' => [
         'label' => 'KPIs — Produção',
-        'desc'  => 'Produzido hoje (vs. dia anterior), produção do mês x meta e quem está produzindo agora',
+        'desc'  => 'Bags produzidos hoje (vs. dia anterior), bags do mês x meta e quem está produzindo agora',
         'icon'  => '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
         'pagina' => '/pcp/bi', 'menu' => 'producao',
     ],
     'kpi_saida' => [
         'label' => 'KPIs — Saída',
-        'desc'  => 'Pedidos que saíram hoje e no mês (bags e sacaria) e valor faturado',
+        'desc'  => 'Pedidos que saíram hoje e no mês (bags e sacaria) e valor dos pedidos finalizados',
         'icon'  => '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
         'pagina' => '/relatorios/historico-faturamento', 'menu' => 'relatorios',
     ],

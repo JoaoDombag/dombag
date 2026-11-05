@@ -264,7 +264,7 @@ $qsPdf = http_build_query(array_filter([
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Histórico de Faturamento | DOMBAG</title>
+<title>Histórico de Pedidos Finalizados | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
 <link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
@@ -336,8 +336,8 @@ $qsPdf = http_build_query(array_filter([
     <header class="topbar">
       <div class="topbar-left">
         <div class="page-title">
-          <h1>Histórico de Faturamento</h1>
-          <p>Pedidos que saíram (faturados) no período — pela data de finalização da venda. Somente leitura.</p>
+          <h1>Histórico de Pedidos Finalizados</h1>
+          <p>Pedidos que saíram no período, pela data de finalização da venda. Valores de pedido, sem IPI; não é o total de NF-e autorizadas. Somente leitura.</p>
         </div>
       </div>
       <div class="topbar-actions">
@@ -437,7 +437,7 @@ $qsPdf = http_build_query(array_filter([
               <tr>
                 <th>Saída</th>
                 <th>Pedido</th>
-                <th>NF-e</th>
+                <th>Doc. ERP</th>
                 <th>Cliente</th>
                 <th>Cidade</th>
                 <th>Representante</th>

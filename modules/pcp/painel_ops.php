@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/producao_tipo.php';
 
 // ══════════════════════════════════════════════════════════════
 //  DOMBAG — Painel de OPs (Ordens de Produção)
@@ -150,6 +151,7 @@ function popBuildBaseCte(array $filters): array
                         AND A.PRO_CODIGO  = V.COD_PRODUTO
                         AND NOT A.OIAP_EXCLUIDO
                   ), 0)                                                        AS QTD_PRODUZIDA_REAL
+                 ,(SELECT P.GRP_CODIGO FROM PRODUTO P WHERE P.PRO_CODIGO = V.COD_PRODUTO) AS GRP_CODIGO
              FROM VW_ORDEM_PRODUCAO V
              {$where}
         ),
@@ -491,10 +493,14 @@ $totalOPs = array_sum($contagens);
                     <td><?= popEscape($row['produto'] ?? '—') ?></td>
                     <td class="td-right"><?= number_format($pedido, 0, ',', '.') ?></td>
                     <td>
+                      <?php if ((int) ($row['grp_codigo'] ?? 0) === PROD_GRP_SACARIA): ?>
+                        <span class="td-muted">Sem apontamento</span>
+                      <?php else: ?>
                       <div class="pop-bar-wrap">
                         <div class="pop-bar-bg"><div class="pop-bar-fill<?= $over ? ' over' : '' ?>" style="width:<?= $fillPct ?>%"></div></div>
                         <span class="pop-bar-pct"><?= $pct ?>%</span>
                       </div>
+                      <?php endif; ?>
                     </td>
                     <td class="td-muted">
                       <?= popEscape($row['at_ct_descricao'] ?? '—') ?>
@@ -579,6 +585,7 @@ function abrirDetalheOP(op) {
   const pedido = Number(op.qtd_pedido || 0);
   const pct = pedido > 0 ? Math.round((produzida / pedido) * 100) : 0;
   const over = pct > 100;
+  const sacaria = Number(op.grp_codigo) === <?= PROD_GRP_SACARIA ?>;
 
   document.getElementById('popDrawerBody').innerHTML = `
     <div class="pop-progress${over ? ' over' : ''}">
@@ -587,7 +594,7 @@ function abrirDetalheOP(op) {
         <span class="pop-progress-pct">${pedido > 0 ? pct + '%' : '—'}</span>
       </div>
       <div class="pop-bar-bg" style="height:8px;"><div class="pop-bar-fill${over ? ' over' : ''}" style="width:${Math.min(100, pct)}%"></div></div>
-      <div class="pop-progress-nums">Produzido: <strong>${produzida.toLocaleString('pt-BR')}</strong> / Pedido: <strong>${pedido.toLocaleString('pt-BR')}</strong></div>
+      <div class="pop-progress-nums">${sacaria ? 'Sacaria não tem apontamento no ERP' : 'Bags produzidos: <strong>' + produzida.toLocaleString('pt-BR') + '</strong>'} / Pedido: <strong>${pedido.toLocaleString('pt-BR')}</strong></div>
     </div>
 
     <div class="pop-field-group">
@@ -629,7 +636,7 @@ function abrirDetalheOP(op) {
       el.innerHTML = `
         <div style="overflow-x:auto;">
           <table class="pop-apont-table">
-            <thead><tr><th>Operador</th><th>Centro de Trabalho</th><th>Status</th><th class="td-right">Qtd.</th><th>Início</th><th>Fim</th></tr></thead>
+            <thead><tr><th>Operador</th><th>Centro de Trabalho</th><th>Status</th><th class="td-right">Bags</th><th>Início</th><th>Fim</th></tr></thead>
             <tbody>
               ${lista.map(a => `
                 <tr>

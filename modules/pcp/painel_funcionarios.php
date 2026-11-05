@@ -674,7 +674,7 @@ $jsSimplesHoje = pfJz(['ranking' => $simplesRankingHoje, 'totais' => $simplesTot
         </div>
         <div class="kpi-card teal">
           <div class="kpi-header">
-            <span class="kpi-label">Qtd. Produzida</span>
+            <span class="kpi-label">Bags Produzidos</span>
             <div class="kpi-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/></svg></div>
           </div>
           <div class="kpi-value"><?= number_format($totalQtdProduzida, 0, ',', '.') ?></div>
@@ -686,7 +686,7 @@ $jsSimplesHoje = pfJz(['ranking' => $simplesRankingHoje, 'totais' => $simplesTot
             <div class="kpi-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
           </div>
           <div class="kpi-value"><?= number_format($mediaGeralHora, 1, ',', '.') ?></div>
-          <div class="kpi-footer">unidades / hora produtiva</div>
+          <div class="kpi-footer">bags / hora produtiva</div>
         </div>
         <div class="kpi-card amber">
           <div class="kpi-header">
@@ -859,7 +859,7 @@ $jsSimplesHoje = pfJz(['ranking' => $simplesRankingHoje, 'totais' => $simplesTot
                   <th class="td-right">Apontamentos</th>
                   <th class="td-right">OPs Distintas</th>
                   <th class="td-right">Máquinas</th>
-                  <th class="td-right">Qtd. Produzida</th>
+                  <th class="td-right">Bags Produzidos</th>
                   <th class="td-right">Tempo Produtivo</th>
                   <th class="td-right">Tempo Pausado</th>
                   <th class="td-right">Pausas</th>
@@ -923,7 +923,7 @@ $jsSimplesHoje = pfJz(['ranking' => $simplesRankingHoje, 'totais' => $simplesTot
                   <th>Produto</th>
                   <th>Início</th>
                   <th>Fim</th>
-                  <th class="td-right">Qtd. Produzida</th>
+                  <th class="td-right">Bags Produzidos</th>
                   <th class="td-right">T. Produtivo</th>
                   <th class="td-right">T. Pausado</th>
                   <th class="td-right">Pausas</th>
@@ -1148,7 +1148,7 @@ function pfRenderSimples(data) {
     <div class="pf-simples-kpis">
       <div class="pf-simples-kpi">
         <div class="pf-simples-kpi-val">${Number(t.qtd_produzida || 0).toLocaleString('pt-BR')}</div>
-        <div class="pf-simples-kpi-lbl">Qtd. Produzida</div>
+        <div class="pf-simples-kpi-lbl">Bags Produzidos</div>
       </div>
       <div class="pf-simples-kpi">
         <div class="pf-simples-kpi-val">${Number(t.media_geral_hora || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</div>
@@ -1176,7 +1176,7 @@ function pfRenderSimples(data) {
       <div class="pf-simples-card">
         <div class="pf-simples-card-name">${pfEsc(r.fu_nome)}</div>
         <div class="pf-simples-card-qtd">${qtd.toLocaleString('pt-BR')}</div>
-        <div class="pf-simples-card-lbl">Produzido</div>
+        <div class="pf-simples-card-lbl">Bags produzidos</div>
         <div class="pf-simples-bar-bg"><div class="pf-simples-bar-fill" style="width:${pct}%"></div></div>
         <div class="pf-simples-card-foot">
           <span>Média/h: <b>${mediaHora === null ? '—' : mediaHora.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</b></span>
@@ -1367,7 +1367,7 @@ function abrirDetalheFuncionario(fuCodigo, nome) {
 
       document.getElementById('pfDrawerBody').innerHTML = `
         <div class="pf-mini-kpis">
-          <div class="pf-mini-kpi"><div class="pf-mini-kpi-val">${totalQtd.toLocaleString('pt-BR')}</div><div class="pf-mini-kpi-lbl">Qtd. Produzida</div></div>
+          <div class="pf-mini-kpi"><div class="pf-mini-kpi-val">${totalQtd.toLocaleString('pt-BR')}</div><div class="pf-mini-kpi-lbl">Bags Produzidos</div></div>
           <div class="pf-mini-kpi"><div class="pf-mini-kpi-val">${mediaHora.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</div><div class="pf-mini-kpi-lbl">Média / Hora</div></div>
           <div class="pf-mini-kpi"><div class="pf-mini-kpi-val">${pfSecondsToHms(totalProd)}</div><div class="pf-mini-kpi-lbl">Tempo Produtivo</div></div>
           <div class="pf-mini-kpi"><div class="pf-mini-kpi-val">${pfSecondsToHms(totalPausa)}</div><div class="pf-mini-kpi-lbl">Tempo Pausado</div></div>

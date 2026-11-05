@@ -224,19 +224,19 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
         <div class="dash-kpis">
           <div class="kpi-card teal">
             <div class="kpi-header">
-              <span class="kpi-label">Produzido Hoje</span>
+              <span class="kpi-label">Bags Produzidos Hoje</span>
               <div class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
             </div>
             <div class="kpi-value"><?= fmtNum($prodHoje) ?></div>
             <div class="kpi-footer">
-              peças apontadas
+              bags apontados
               <?php if ($diaAnterior): ?>&nbsp;· <?= date('d/m', strtotime($diaAnterior)) ?>: <b><?= fmtNum($prodAnterior) ?></b><?php endif; ?>
             </div>
           </div>
 
           <div class="kpi-card blue">
             <div class="kpi-header">
-              <span class="kpi-label">Produção do Mês</span>
+              <span class="kpi-label">Bags Produzidos no Mês</span>
               <div class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
             </div>
             <div class="kpi-value"><?= fmtNum($prodMes) ?></div>
@@ -289,12 +289,12 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
 
           <div class="kpi-card teal kpi-card-full">
             <div class="kpi-header">
-              <span class="kpi-label">Faturado no Mês</span>
+              <span class="kpi-label" title="Valor dos pedidos finalizados no ERP, sem IPI. Não é o total de NF-e autorizadas.">Pedidos Finalizados no Mês</span>
               <div class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
             </div>
             <div class="kpi-value kpi-value-full"><?= e(fmtMoeda($totMes['valor'])) ?></div>
             <div class="kpi-footer">
-              <?= $totHoje['valor'] != 0 ? e(fmtMoeda($totHoje['valor'])) . ' hoje' : 'nada faturado hoje' ?>
+              <?= $totHoje['valor'] != 0 ? e(fmtMoeda($totHoje['valor'])) . ' hoje' : 'nenhum pedido finalizado hoje' ?>
               &nbsp;<a href="/relatorios/historico-faturamento" style="color:var(--teal);">Histórico →</a>
             </div>
           </div>
@@ -339,7 +339,7 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
               </div>
               <div class="dash-row-r">
                 <span class="dash-row-v"><?= $o['pedido'] > 0 ? $pct . '%' : '—' ?></span>
-                <span class="dash-row-s"><?= fmtNum($o['lido']) ?> / <?= $o['pedido'] > 0 ? fmtNum($o['pedido']) : '—' ?></span>
+                <span class="dash-row-s"><?= fmtNum($o['lido']) ?> / <?= $o['pedido'] > 0 ? fmtNum($o['pedido']) : '—' ?> bags</span>
               </div>
             </div>
           <?php endforeach; endif; ?>
@@ -620,7 +620,7 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
     data: {
       labels: serie.labels,
       datasets: [
-        { label: 'Produzido', data: serie.producao, backgroundColor: 'rgba(45,106,255,.55)', borderColor: '#2d6aff', borderWidth: 1, borderRadius: 4 },
+        { label: 'Bags produzidos', data: serie.producao, backgroundColor: 'rgba(45,106,255,.55)', borderColor: '#2d6aff', borderWidth: 1, borderRadius: 4 },
         { label: 'Saída (bags)', data: serie.saida, backgroundColor: 'rgba(0,201,167,.6)', borderColor: '#00c9a7', borderWidth: 1, borderRadius: 4 },
       ]
     },

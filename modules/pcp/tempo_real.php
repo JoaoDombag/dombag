@@ -493,7 +493,7 @@ function trProgressBarHtml(qtdProduzida, qtdPedido) {
       <div class="tr-progress-header">
         <span class="tr-progress-title">Progresso da OP</span>
       </div>
-      <div class="tr-progress-nums">Quantidade do pedido não encontrada para esta OP — produzido: <strong>${produzida.toLocaleString('pt-BR')}</strong></div>
+      <div class="tr-progress-nums">Quantidade do pedido não encontrada para esta OP — bags produzidos: <strong>${produzida.toLocaleString('pt-BR')}</strong></div>
     </div>`;
   }
   const pct = Math.round((produzida / pedido) * 100);
@@ -506,7 +506,7 @@ function trProgressBarHtml(qtdProduzida, qtdPedido) {
         <span class="tr-progress-pct${over ? ' over' : ''}">${pct}%</span>
       </div>
       <div class="tr-progress-bar"><div class="tr-progress-fill${over ? ' over' : ''}" style="width:${fillPct}%"></div></div>
-      <div class="tr-progress-nums">Lido (OP completa): <strong>${produzida.toLocaleString('pt-BR')}</strong> / Pedido: <strong>${pedido.toLocaleString('pt-BR')}</strong></div>
+      <div class="tr-progress-nums">Bags lidos (OP completa): <strong>${produzida.toLocaleString('pt-BR')}</strong> / Pedido: <strong>${pedido.toLocaleString('pt-BR')}</strong></div>
     </div>`;
 }
 
@@ -541,7 +541,7 @@ function abrirDetalheAtiva(ctCodigo) {
       <div class="tr-field-row"><span class="tr-field-label">Cód. OP</span><span class="tr-field-value">${trEsc(m.prod_codigo ?? '—')}</span></div>
       <div class="tr-field-row"><span class="tr-field-label">Cliente</span><span class="tr-field-value">${trEsc(m.cli_nome)} (${trEsc(m.cli_codigo)})</span></div>
       <div class="tr-field-row"><span class="tr-field-label">Produto</span><span class="tr-field-value">${trEsc(m.pro_descricao)} (${trEsc(m.pro_codigo)})</span></div>
-      <div class="tr-field-row"><span class="tr-field-label">Qtd. Produzida (neste apontamento)</span><span class="tr-field-value">${Number(m.oiap_qtd_produzida || 0).toLocaleString('pt-BR')}</span></div>
+      <div class="tr-field-row"><span class="tr-field-label">Bags Produzidos (neste apontamento)</span><span class="tr-field-value">${Number(m.oiap_qtd_produzida || 0).toLocaleString('pt-BR')}</span></div>
     </div>
 
     <div class="tr-field-group">
@@ -594,7 +594,7 @@ function abrirDetalheParada(ctCodigo) {
           <div class="tr-field-row"><span class="tr-field-label">Cód. OP</span><span class="tr-field-value">${trEsc(u.prod_codigo ?? '—')}</span></div>
           <div class="tr-field-row"><span class="tr-field-label">Cliente</span><span class="tr-field-value">${trEsc(u.cli_nome)} (${trEsc(u.cli_codigo)})</span></div>
           <div class="tr-field-row"><span class="tr-field-label">Produto</span><span class="tr-field-value">${trEsc(u.pro_descricao)} (${trEsc(u.pro_codigo)})</span></div>
-          <div class="tr-field-row"><span class="tr-field-label">Qtd. Produzida</span><span class="tr-field-value">${Number(u.oiap_qtd_produzida || 0).toLocaleString('pt-BR')}</span></div>
+          <div class="tr-field-row"><span class="tr-field-label">Bags Produzidos</span><span class="tr-field-value">${Number(u.oiap_qtd_produzida || 0).toLocaleString('pt-BR')}</span></div>
         </div>
         <div class="tr-field-group">
           <div class="tr-field-group-title">Operador</div>

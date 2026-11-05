@@ -56,6 +56,7 @@ RewriteRule ^yzidro/producao$          modules/yzidro/producao.php             [
 # PCP — Produção
 RewriteRule ^pcp/planejamento$         modules/pcp/planejamento.php            [L,QSA]
 RewriteRule ^pcp/reuniao$              modules/pcp/planejamento2.php           [L,QSA]
+RewriteRule ^pcp/agendamento$          modules/pcp/agendamento.php             [L,QSA]
 RewriteRule ^pcp/etapas$               modules/pcp/etapas_producao.php         [L,QSA]
 RewriteRule ^pcp/ordens$               modules/pcp/pcp_ordens.php              [L,QSA]
 RewriteRule ^pcp/fila$                 modules/pcp/fila_maquinas.php           [L,QSA]
@@ -67,6 +68,8 @@ RewriteRule ^pcp/painel-funcionarios$  modules/pcp/painel_funcionarios.php      
 RewriteRule ^pcp/painel-funcionarios-pdf$ modules/pcp/painel_funcionarios_pdf.php [L,QSA]
 RewriteRule ^pcp/bi$                   modules/pcp/bi_producao.php              [L,QSA]
 RewriteRule ^pcp/bi-individual$        modules/pcp/bi_individual.php            [L,QSA]
+RewriteRule ^pcp/tv$                   modules/pcp/agendamento_tv.php           [L,QSA]
+RewriteRule ^pcp/rastreabilidade$      modules/pcp/rastreabilidade.php          [L,QSA]
 
 # Relatórios
 RewriteRule ^relatorios/producao$          modules/relatorios/rel_producao.php         [L,QSA]
@@ -78,6 +81,8 @@ RewriteRule ^relatorios/controle-estoque$  modules/relatorios/rel_controle_estoq
 RewriteRule ^relatorios/analise-bag$       modules/relatorios/rel_analise_bag.php      [L,QSA]
 RewriteRule ^relatorios/historico-faturamento$     modules/relatorios/rel_historico_faturamento.php     [L,QSA]
 RewriteRule ^relatorios/historico-faturamento/pdf$ modules/relatorios/rel_historico_faturamento_pdf.php [L,QSA]
+RewriteRule ^relatorios/defeitos$          modules/relatorios/rel_defeitos.php         [L,QSA]
+RewriteRule ^relatorios/defeitos/pdf$      modules/relatorios/rel_defeitos_pdf.php     [L,QSA]
 
 # Máquinas
 RewriteRule ^maquinas$                 modules/maquinas/consulta_maquinas.php  [L,QSA]

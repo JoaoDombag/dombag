@@ -65,8 +65,8 @@ const CHAT_FONTE_DEF = [
 const CHAT_FONTE_INDICADORES = [
     'listar_pedidos'         => ['total_pedidos' => ['Pedidos', 'inteiro'], 'valor_total' => ['Valor total', 'moeda']],
     'detalhe_pedido'         => ['valor' => ['Valor do pedido', 'moeda']],
-    'resumo_faturamento'     => ['total_pedidos' => ['Pedidos faturados', 'inteiro'], 'total_pecas' => ['Peças', 'numero'],
-                                 'total_valor' => ['Valor faturado', 'moeda'], 'ticket_medio' => ['Ticket médio', 'moeda']],
+    'resumo_faturamento'     => ['total_pedidos' => ['Pedidos finalizados', 'inteiro'], 'total_pecas' => ['Peças', 'numero'],
+                                 'total_valor' => ['Valor dos pedidos', 'moeda'], 'ticket_medio' => ['Ticket médio', 'moeda']],
     'status_producao_pedido' => ['total_ops' => ['OPs', 'inteiro'], 'quantidade' => ['Quantidade', 'numero'],
                                  'quantidade_faturada' => ['Qtd. faturada', 'numero']],
     'faturamento_notas'      => ['total_notas' => ['NF-e emitidas', 'inteiro'], 'total_produtos' => ['Produtos (sem IPI)', 'moeda'],

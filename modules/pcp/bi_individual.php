@@ -170,16 +170,16 @@ if (!$pg) {
   .biz-ind { flex: 1 1 0; }
   /* As linhas dividem a altura do card igualmente (1fr); com muita gente
      a lista vira 2 colunas (JS define grid-template-columns). */
-  .biz-ind-list { flex: 1 1 auto; min-height: 0; display: grid; grid-auto-rows: minmax(0, 1fr); gap: 8px 18px; }
-  .biz-ind-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; align-content: center; gap: 4px 16px;
-                 background: var(--biz-card2); border: 1px solid var(--biz-border); border-radius: 10px; padding: 6px 16px; min-height: 0; overflow: hidden; }
-  .biz-ind-name { font-size: clamp(14px, 1.35cqw, 26px); font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .biz-ind-list { flex: 1 1 auto; min-height: 0; display: grid; grid-auto-rows: minmax(0, 1fr); gap: calc(8px * var(--biz-ind-esc, 1)) 18px; }
+  .biz-ind-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; align-content: center; gap: calc(4px * var(--biz-ind-esc, 1)) 16px;
+                 background: var(--biz-card2); border: 1px solid var(--biz-border); border-radius: 10px; padding: calc(6px * var(--biz-ind-esc, 1)) 16px; min-height: 0; overflow: hidden; }
+  .biz-ind-name { font-size: calc(clamp(14px, 1.35cqw, 26px) * var(--biz-ind-esc, 1)); font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .biz-ind-qtd { grid-row: span 3; text-align: right; font-variant-numeric: tabular-nums; }
-  .biz-ind-qtd b { display: block; font-size: clamp(20px, 2.1cqw, 40px); font-weight: 900; color: #fff; line-height: 1.05; }
-  .biz-ind-qtd span { font-size: clamp(10px, .85cqw, 15px); font-weight: 700; color: var(--biz-muted); }
-  .biz-ind-bar { height: clamp(6px, .55cqw, 11px); background: rgba(255,255,255,.07); border-radius: 6px; overflow: hidden; }
+  .biz-ind-qtd b { display: block; font-size: calc(clamp(20px, 2.1cqw, 40px) * var(--biz-ind-esc, 1)); font-weight: 900; color: #fff; line-height: 1.05; }
+  .biz-ind-qtd span { font-size: calc(clamp(10px, .85cqw, 15px) * var(--biz-ind-esc, 1)); font-weight: 700; color: var(--biz-muted); }
+  .biz-ind-bar { height: calc(clamp(6px, .55cqw, 11px) * var(--biz-ind-esc, 1)); background: rgba(255,255,255,.07); border-radius: 6px; overflow: hidden; }
   .biz-ind-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--biz-blue), var(--biz-teal)); transition: width .5s ease; }
-  .biz-ind-op { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: clamp(11px, .95cqw, 17px); font-weight: 700; color: var(--biz-teal); }
+  .biz-ind-op { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: calc(clamp(11px, .95cqw, 17px) * var(--biz-ind-esc, 1)); font-weight: 700; color: var(--biz-teal); }
   .biz-ind-op > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .biz-ind-op.off { color: var(--biz-muted); font-weight: 600; }
   .biz-live-dot-sm { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--biz-teal); animation: bizPulse 1.8s infinite; }
@@ -196,9 +196,9 @@ if (!$pg) {
   body.bi-vertical .biz-total-msg { font-size: clamp(14px, 2.4cqw, 26px); }
   body.bi-vertical .biz-total-stats { max-width: 520px; }
   body.bi-vertical .biz-stat span { font-size: clamp(9px, 1.5cqw, 13px); }
-  body.bi-vertical .biz-ind-name { font-size: clamp(14px, 2.2cqw, 24px); }
-  body.bi-vertical .biz-ind-qtd b { font-size: clamp(20px, 3.4cqw, 38px); }
-  body.bi-vertical .biz-ind-qtd span, body.bi-vertical .biz-ind-op { font-size: clamp(11px, 1.6cqw, 16px); }
+  body.bi-vertical .biz-ind-name { font-size: calc(clamp(14px, 2.2cqw, 24px) * var(--biz-ind-esc, 1)); }
+  body.bi-vertical .biz-ind-qtd b { font-size: calc(clamp(20px, 3.4cqw, 38px) * var(--biz-ind-esc, 1)); }
+  body.bi-vertical .biz-ind-qtd span, body.bi-vertical .biz-ind-op { font-size: calc(clamp(11px, 1.6cqw, 16px) * var(--biz-ind-esc, 1)); }
 
   /* ── Topbar: quebra em 2 linhas assim que título + ações não cabem lado a
      lado (antes só no celular, e em tablet o título ficava sobre o "Ao vivo") ── */
@@ -231,7 +231,7 @@ if (!$pg) {
   /* Lista no celular: 1 coluna, linhas com altura do conteúdo. Os !important
      anulam o que o JS define pro painel de TV (linhas de altura fixa e fluxo
      por coluna) — sem isso as linhas ficavam com altura zero, empilhadas. */
-  body.bi-mobile .biz-ind-list { grid-template-columns: 1fr !important; grid-template-rows: none !important; grid-auto-flow: row !important; grid-auto-rows: auto !important; flex: none; }
+  body.bi-mobile .biz-ind-list { grid-template-columns: 1fr !important; grid-template-rows: none !important; grid-auto-flow: row !important; grid-auto-rows: auto !important; --biz-ind-esc: 1 !important; flex: none; }
   body.bi-mobile .biz-ind-row { padding: 10px 12px; overflow: visible; }
   body.bi-mobile .biz-ind-name { font-size: 15px; }
   body.bi-mobile .biz-ind-qtd b { font-size: 24px; }
@@ -344,7 +344,7 @@ if (!$pg) {
         <!-- Esquerda: total de bags produzidos no dia x meta total da equipe -->
         <div class="biz-card biz-total" id="biTotalCard">
           <div class="biz-card-head">
-            <h2>Total Produzido <span id="biDiaTitulo"><?= biiEscape($payload['dia_label']) ?></span></h2>
+            <h2>Total de Bags Produzidos <span id="biDiaTitulo"><?= biiEscape($payload['dia_label']) ?></span></h2>
             <div class="biz-head-right">
               <button type="button" class="biz-meta-btn" id="biMetaEditBtn" title="Editar meta total do dia" aria-label="Editar meta total do dia">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
@@ -498,7 +498,6 @@ function biRenderFuncs(funcs) {
     list.innerHTML = '<div class="biz-empty-msg">Ninguém produziu ' + (biDiaLabel === 'HOJE' ? 'hoje' : 'em ' + biEsc(biDiaLabel)) + '.</div>';
     return;
   }
-  biAjustaLinhas(funcs.length);
   const maior = Math.max(...funcs.map(f => Number(f.qtd_produzida || 0)), 1);
   list.innerHTML = funcs.map(f => {
     const qtd = Number(f.qtd_produzida || 0);
@@ -511,27 +510,46 @@ function biRenderFuncs(funcs) {
         ${biFuncOpAtiva(f)}
       </div>`;
   }).join('');
+  biAjustaLinhas(funcs.length);
 }
 
-// ── Grade da lista: colunas e altura das linhas conforme o espaço real ──────
+// ── Grade da lista: colunas, escala e altura das linhas conforme o espaço ───
 // Mais de 10 pessoas → 2 colunas (preenchidas coluna por coluna, pra ler o
-// ranking de cima pra baixo). As linhas dividem a altura do card, mas nunca
+// ranking de cima pra baixo). Nome e O.P nunca podem ser cortados: se não
+// couberem, reduz a escala das fontes aos poucos, tentando também 2 colunas,
+// até caber tudo sem rolagem. As linhas dividem a altura do card, mas nunca
 // passam de ~110px: em tela alta (retrato) ou com pouca gente, sobra espaço
 // embaixo em vez de linhas enormes e vazias. No celular o CSS ignora isto.
 const BI_LINHA_MAX_H = 110;
+const BI_ESCALA_MIN = 40; // %
+function biGradeLista(list, cols, linhas, altura) {
+  list.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+  list.style.gridTemplateRows = `repeat(${linhas}, ${altura})`;
+  list.style.gridAutoFlow = cols > 1 ? 'column' : 'row';
+}
+function biListaCabe(list) {
+  if (list.scrollHeight > list.clientHeight) return false;
+  return ![...list.querySelectorAll('.biz-ind-name, .biz-ind-op > span:last-child')]
+    .some(el => el.scrollWidth > el.clientWidth);
+}
 function biAjustaLinhas(n) {
   const list = document.getElementById('biIndList');
   if (!n) return;
-  const cols = n > 10 ? 2 : 1;
+  let cols = 2;
+  procura:
+  for (let esc = 100; esc >= BI_ESCALA_MIN; esc -= 5) {
+    list.style.setProperty('--biz-ind-esc', esc / 100);
+    for (cols = n > 10 ? 2 : 1; cols <= 2; cols++) {
+      biGradeLista(list, cols, Math.ceil(n / cols), 'max-content');
+      if (biListaCabe(list)) break procura;
+    }
+  }
+  cols = Math.min(cols, 2);
   const linhas = Math.ceil(n / cols);
   const cabem = Math.floor((list.clientHeight || 0) / BI_LINHA_MAX_H);
-  list.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
   // Sobra altura: linhas de altura fixa (colunas equilibradas, espaço livre
   // embaixo). Senão: dividem a altura igualmente.
-  list.style.gridTemplateRows = cabem > linhas
-    ? `repeat(${linhas}, ${BI_LINHA_MAX_H}px)`
-    : `repeat(${linhas}, minmax(0, 1fr))`;
-  list.style.gridAutoFlow = cols > 1 ? 'column' : 'row';
+  biGradeLista(list, cols, linhas, cabem > linhas ? `${BI_LINHA_MAX_H}px` : 'minmax(0, 1fr)');
 }
 
 // ── Editar meta total (lápis no card do total) ───────────────────────────────

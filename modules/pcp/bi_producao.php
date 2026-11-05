@@ -605,7 +605,7 @@ if (!$pg) {
               <div class="biz-kpi-mini-foot">com apontamentos</div>
             </div>
             <div class="biz-kpi-mini k-teal">
-              <div class="biz-kpi-mini-label">Qtd. Produzida</div>
+              <div class="biz-kpi-mini-label">Bags Produzidos</div>
               <div class="biz-kpi-mini-value" id="biKpiQtdProduzida">0</div>
               <div class="biz-kpi-mini-foot">total no dia</div>
             </div>
@@ -630,7 +630,7 @@ if (!$pg) {
         <!-- Gráfico: Total Produzido por Mês (opcional) -->
         <div class="biz-chart-card" data-widget="grafico_mensal">
           <div class="biz-card-head">
-            <h2>Total Produzido por Mês (<?= (int) date('Y') ?>)</h2>
+            <h2>Bags Produzidos por Mês (<?= (int) date('Y') ?>)</h2>
           </div>
           <div class="biz-chart-wrap"><svg id="biChartSvg" viewBox="0 0 1200 360" preserveAspectRatio="xMidYMid meet"></svg></div>
         </div>
@@ -649,7 +649,7 @@ if (!$pg) {
           <!-- Produção do mês x meta -->
           <div class="biz-card" data-widget="meta_mes">
             <div class="biz-card-head">
-              <h2 id="biMesTitulo">Produção do Mês</h2>
+              <h2 id="biMesTitulo">Bags Produzidos no Mês</h2>
               <button type="button" class="biz-meta-btn" id="biMetaEditBtn" title="Editar meta">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
               </button>
@@ -657,7 +657,7 @@ if (!$pg) {
             <div class="biz-meta-body">
               <div class="biz-gauge-svg-wrap"><svg id="biGaugeMeta" viewBox="0 0 300 175"></svg></div>
               <div class="biz-gauge-scale"><span>0,00%</span><span>100,00%</span></div>
-              <div class="biz-meta-hint">Produzido: <strong id="biMesProduzidoTxt">0</strong> / Meta: <span id="biMetaAtualTxt">0</span> unidades</div>
+              <div class="biz-meta-hint">Produzido: <strong id="biMesProduzidoTxt">0</strong> / Meta: <span id="biMetaAtualTxt">0</span> bags</div>
               <div class="biz-meta-hint">Ritmo: <strong id="biMediaHoraTxt">0</strong> bags/hora (média do mês)</div>
               <form class="biz-meta-form" id="biMetaForm">
                 <input type="number" min="0" step="1" id="biMetaInput" value="<?= biEscape((string) (int) $payload['meta']) ?>">
@@ -672,7 +672,7 @@ if (!$pg) {
         <!-- Produção individual de hoje: quem já produziu, e o total da equipe x meta total (BI Individual) -->
         <div class="biz-card" data-widget="individual">
           <div class="biz-card-head">
-            <h2>Produção Individual Hoje <span class="biz-ind-meta" id="biIndMetaTxt"></span></h2>
+            <h2>Bags por Pessoa Hoje <span class="biz-ind-meta" id="biIndMetaTxt"></span></h2>
             <span class="biz-count-badge" id="biIndCount">0</span>
           </div>
           <div class="biz-ind-grid" id="biIndGrid"></div>
@@ -818,7 +818,7 @@ function biRenderOps(ops) {
           <div class="biz-op-pct${over ? ' over' : ''}">${temPedido ? pct + '%' : '—'}</div>
         </div>
         <div class="biz-op-bar"><div class="biz-op-fill${over ? ' over' : ''}" style="width:${fillPct}%"></div></div>
-        <div class="biz-op-nums">Lido: <strong>${produzido.toLocaleString('pt-BR')}</strong> / Total: <strong>${temPedido ? pedido.toLocaleString('pt-BR') : '—'}</strong></div>
+        <div class="biz-op-nums">Bags lidos: <strong>${produzido.toLocaleString('pt-BR')}</strong> / Total: <strong>${temPedido ? pedido.toLocaleString('pt-BR') : '—'}</strong></div>
       </div>
     `;
   }).join('');
@@ -967,7 +967,7 @@ function biRenderAll(data) {
   biRenderIndicadores(data.indicadores);
   biRenderIndividual(data.individual || [], Number(data.meta_total_dia || 0));
 
-  document.getElementById('biMesTitulo').textContent = 'Produção de ' + (data.mes_nome || '');
+  document.getElementById('biMesTitulo').textContent = 'Bags Produzidos em ' + (data.mes_nome || '');
   document.getElementById('biMesProduzidoTxt').textContent = biFmt(data.mes_produzido, 0);
   document.getElementById('biMediaHoraTxt').textContent = biFmt(data.media_bags_hora, 1);
 
@@ -1097,8 +1097,8 @@ document.getElementById('biFsExit').addEventListener('click', () => {
 const BI_WIDGET_CATALOG = [
   { id: 'indicadores',    label: 'Indicadores do Dia',             default: true },
   { id: 'ops_ativas',     label: 'OPs Ativas — Bags Lidos',        default: true },
-  { id: 'meta_mes',       label: 'Produção do Mês x Meta',         default: true },
-  { id: 'individual',     label: 'Produção Individual Hoje',       default: true },
+  { id: 'meta_mes',       label: 'Bags do Mês x Meta',             default: true },
+  { id: 'individual',     label: 'Bags por Pessoa Hoje',           default: true },
   { id: 'grafico_mensal', label: 'Gráfico Mensal (linha)',         default: false },
 ];
 const BI_WIDGET_STORAGE_KEY = 'bi_widget_config';

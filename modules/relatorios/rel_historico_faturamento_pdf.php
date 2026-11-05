@@ -210,7 +210,7 @@ $filtroStr = $filtroDesc ? implode(' · ', $filtroDesc) : 'Sem filtros adicionai
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<title>Histórico de Faturamento — PDF</title>
+<title>Histórico de Pedidos Finalizados — PDF</title>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: Arial, sans-serif; font-size: 10px; color: #111; background: #fff; padding: 16px 20px; }
@@ -247,7 +247,7 @@ tfoot td { border: 1px solid #bbb; padding: 5px 6px; font-weight: bold; backgrou
 
 <div class="header">
   <div>
-    <div class="header-title">Histórico de Faturamento</div>
+    <div class="header-title">Histórico de Pedidos Finalizados</div>
     <div class="header-sub">Período de saída: <?= hfpEsc($periodo) ?></div>
     <div class="header-sub"><?= hfpEsc($filtroStr) ?></div>
   </div>
@@ -275,7 +275,7 @@ tfoot td { border: 1px solid #bbb; padding: 5px 6px; font-weight: bold; backgrou
     <tr>
       <th>Saída</th>
       <th>Pedido</th>
-      <th>NF-e</th>
+      <th>Doc. ERP</th>
       <th>Cliente</th>
       <th>Cidade</th>
       <th>Representante</th>

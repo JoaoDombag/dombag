@@ -398,7 +398,7 @@ $totalVendas = count($vendas);
       <div class="topbar-left">
         <div class="page-title">
           <h1>Consulta de Vendas</h1>
-          <p>Pedidos faturados do ERP — somente leitura. Clique para ver os itens.</p>
+          <p>Pedidos aprovados no ERP, ainda não finalizados — somente leitura. Clique para ver os itens.</p>
         </div>
       </div>
     </header>
@@ -474,7 +474,7 @@ $totalVendas = count($vendas);
       <!-- Tabela de pedidos -->
       <div class="panel-table">
         <div class="panel-header">
-          <span class="panel-title">Pedidos faturados</span>
+          <span class="panel-title">Pedidos aprovados</span>
           <span class="source-badge src-erp">ERP</span>
         </div>
         <div class="cv-table-wrap table-wrap">

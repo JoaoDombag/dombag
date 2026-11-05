@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/producao_tipo.php';
 // ══════════════════════════════════════════════════
 //  DOMBAG — Produção (dados reais + cards por máquina)
 // ══════════════════════════════════════════════════
@@ -99,6 +100,7 @@ try {
         SELECT
             pd.MAQ_CODIGO AS maq_codigo,
             m.MAQ_DESCRICAO AS maq_descricao,
+            " . prodTipoMaquinaSql('m') . " AS tipo,
             d.DP_DESCRICAO AS dp_descricao,
             COALESCE(m.MAQ_QTDE, 1)                                          AS qtde_maquinas,
             COALESCE(m.MAQ_HORAS_DIA, 8)                                     AS horas_dia,
@@ -445,7 +447,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
           <div class="chart-panel" id="panelDiario">
             <div class="chart-head">
               <div>
-                <div class="chart-title">Produção de Hoje por Hora</div>
+                <div class="chart-title">Produção de Hoje por Hora (Bag + Sacaria)</div>
                 <div class="chart-sub" id="subtitleDiario"></div>
               </div>
               <button class="chart-export-btn" onclick="exportarCanvas('chartDiario','producao_diaria')">
@@ -457,7 +459,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
           <div class="chart-panel" id="panelMensal">
             <div class="chart-head">
               <div>
-                <div class="chart-title">Produção Mensal</div>
+                <div class="chart-title">Produção Mensal (Bag + Sacaria)</div>
                 <div class="chart-sub" id="subtitleMensal"></div>
               </div>
               <button class="chart-export-btn" onclick="exportarCanvas('chartMensal','producao_mensal')">
@@ -649,7 +651,7 @@ function switchTab(id) {
       <div class="maq-card-stats">
         <div class="card-stat highlight">
           <div class="card-stat-val" style="color:${cor};">${und.toLocaleString('pt-BR')}</div>
-          <div class="card-stat-lbl">Real</div>
+          <div class="card-stat-lbl">${r.tipo === 'BAG' ? 'Bags' : r.tipo === 'SACARIA' ? 'Sacaria' : 'Real'}</div>
         </div>
         <div class="card-stat">
           <div class="card-stat-val" style="color:var(--text-muted);">${capUnd > 0 ? Math.round(capUnd).toLocaleString('pt-BR') : '—'}</div>
@@ -801,7 +803,7 @@ function initGraficosGlobais() {
     const acum   = qtds.reduce((acc,v,i)=>{ acc.push((acc[i-1]||0)+v); return acc; }, []);
     new Chart(ctx, {
       type:'line', data:{ labels, datasets:[
-        { label:'Produção diária', data:qtds, yAxisID:'y',
+        { label:'Produção diária (Bag + Sacaria)', data:qtds, yAxisID:'y',
           backgroundColor:'rgba(45,106,255,.15)', borderColor:'#2d6aff',
           borderWidth:2, fill:true, tension:0.35, pointRadius:4, pointHoverRadius:6, pointBackgroundColor:'#2d6aff' },
         { label:'Acumulado', data:acum, yAxisID:'y2',
@@ -903,7 +905,7 @@ function initGraficosGlobais() {
   const eficTotal = somaMeta > 0 ? Math.min(999,(somaReal/somaMeta*100)).toFixed(1)+'%' : '—';
 
   html += `</tbody><tfoot><tr style="background:rgba(0,0,0,.15);">
-    <td colspan="2" style="padding:11px 16px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;">TOTAL GERAL</td>
+    <td colspan="2" style="padding:11px 16px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.6px;">TOTAL GERAL (BAG + SACARIA)</td>
     <td style="text-align:right;padding:11px 16px;"><span class="num-big" style="font-size:17px;">${Math.round(somaReal).toLocaleString('pt-BR')}</span></td>
     <td style="text-align:right;padding:11px 16px;" class="td-muted">${somaMeta > 0 ? Math.round(somaMeta).toLocaleString('pt-BR') : '—'}</td>
     <td style="text-align:right;padding:11px 16px;" class="td-muted">${somaEsp > 0 ? Math.round(somaEsp).toLocaleString('pt-BR') : '—'}</td>

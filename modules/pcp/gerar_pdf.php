@@ -1,6 +1,7 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/vendor/autoload.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/producao_tipo.php';
 
 use Dompdf\Dompdf;
 use Dompdf\Options;
@@ -68,6 +69,7 @@ try {
         SELECT
             pd.MAQ_CODIGO AS maq_codigo,
             m.MAQ_DESCRICAO AS maq_descricao,
+            " . prodTipoMaquinaSql('m') . " AS tipo,
             d.DP_DESCRICAO AS dp_descricao,
             COALESCE(m.MAQ_QTDE,1)          AS qtde_maquinas,
             COALESCE(m.MAQ_HORAS_DIA,8)     AS horas_dia,
@@ -150,6 +152,7 @@ function capClr(float $p): string
 }
 
 $total_und = (float) ($kpi['total_und'] ?? 0);
+$por_tipo = prodSomaPorTipo($maquinas ?? []);
 $total_apt = (int) ($kpi['apontamentos'] ?? 0);
 $maq_ativas = (int) ($kpi['maquinas_ativas'] ?? 0);
 $total_min_dia = (int) ($kpi['total_minutos'] ?? 0);
@@ -633,9 +636,9 @@ $efic_klass = $efic_global === null ? 'k-blue' : ($efic_global >= 90 ? 'k-green'
 <div class="kpi-row">
   <div class="kpi-cell">
     <div class="kpi-box k-teal">
-      <div class="kpi-lbl">Total Produzido</div>
+      <div class="kpi-lbl">Total Bag + Sacaria</div>
       <div class="kpi-val"><?= fmtN($total_und) ?></div>
-      <div class="kpi-sub">unidades no dia</div>
+      <div class="kpi-sub"><?= fmtN($por_tipo['bag']) ?> bags · <?= fmtN($por_tipo['sacaria']) ?> sacaria<?= $por_tipo['outros'] > 0 ? ' · ' . fmtN($por_tipo['outros']) . ' outros' : '' ?></div>
     </div>
   </div>
   <div class="kpi-cell">
@@ -692,7 +695,7 @@ $efic_klass = $efic_global === null ? 'k-blue' : ($efic_global >= 90 ? 'k-green'
   <thead>
     <tr>
       <th>Hora</th>
-      <th>Unidades</th>
+      <th>Unidades (Bag + Sacaria)</th>
       <th style="width:110px;">Distribuição</th>
       <th>% do Dia</th>
     </tr>
@@ -840,7 +843,7 @@ $efic_klass = $efic_global === null ? 'k-blue' : ($efic_global >= 90 ? 'k-green'
     <div class="bk" style="background:#f0fdf4;">
       <div class="bk-lbl">Real</div>
       <div class="bk-val" style="color:#0f766e;"><?= fmtN($und) ?></div>
-      <div class="bk-sub">unidades produzidas</div>
+      <div class="bk-sub"><?= match ($m['tipo'] ?? null) { PROD_TIPO_BAG => 'bags produzidos', PROD_TIPO_SACARIA => 'sacarias produzidas', default => 'unidades produzidas' } ?></div>
     </div>
     <div class="bk">
       <div class="bk-lbl">Meta Dia</div>

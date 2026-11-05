@@ -241,7 +241,7 @@ table.dias td { padding: 4px 6px; font-size: 9px; border-bottom: 1px solid #eef1
   </div>
   <div class="kpi-cell">
     <div class="kpi-val"><?= number_format($totalQtdProduzida, 0, ',', '.') ?></div>
-    <div class="kpi-lbl">Qtd. Produzida</div>
+    <div class="kpi-lbl">Bags Produzidos</div>
   </div>
   <div class="kpi-cell">
     <div class="kpi-val"><?= number_format($mediaGeralHora, 1, ',', '.') ?></div>
@@ -272,7 +272,7 @@ table.dias td { padding: 4px 6px; font-size: 9px; border-bottom: 1px solid #eef1
       <th class="r">Apont.</th>
       <th class="r">OPs</th>
       <th class="r">Máquinas</th>
-      <th class="r">Qtd. Produzida</th>
+      <th class="r">Bags Produzidos</th>
       <th class="r">T. Produtivo</th>
       <th class="r">T. Pausado</th>
       <th class="r">Pausas</th>
@@ -336,7 +336,7 @@ table.dias td { padding: 4px 6px; font-size: 9px; border-bottom: 1px solid #eef1
         <tr>
           <th>Dia</th>
           <th class="r">Apont.</th>
-          <th class="r">Qtd. Produzida</th>
+          <th class="r">Bags Produzidos</th>
           <th class="r">T. Produtivo</th>
           <th class="r">T. Pausado</th>
           <th class="r">Média/h</th>

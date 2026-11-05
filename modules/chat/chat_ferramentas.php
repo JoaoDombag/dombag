@@ -151,7 +151,7 @@ function chatDefinicoes(): array
             'required'    => ['pedido'],
         ],
         'resumo_faturamento' => [
-            'description' => 'Resume o faturamento (pedidos que SAÍRAM/foram faturados, pela data de finalização) no período: nº de pedidos, peças, valor e ticket médio, agrupado por mês, cliente, representante, tipo de produto (Bag/Sacaria) ou total. Devoluções entram com sinal negativo. Mesmos critérios do relatório Histórico de Faturamento.',
+            'description' => 'Resume os pedidos finalizados (que SAÍRAM, pela data de finalização; não é faturamento fiscal) no período: nº de pedidos, peças, valor e ticket médio, agrupado por mês, cliente, representante, tipo de produto (Bag/Sacaria) ou total. Devoluções entram com sinal negativo. Mesmos critérios do relatório Histórico de Pedidos Finalizados.',
             'properties'  => $periodo + [
                 'agrupar_por' => ['type' => 'string', 'enum' => ['total', 'mes', 'cliente', 'representante', 'tipo'], 'description' => 'Agrupamento (padrão: total).'],
             ],
@@ -165,7 +165,7 @@ function chatDefinicoes(): array
         'faturamento_notas' => [
             'description' => 'Faturamento pela visão das NOTAS FISCAIS / DRE: NF-e de saída AUTORIZADAS pela SEFAZ, pela data de EMISSÃO, '
                 . 'com valor dos produtos, IPI e total da nota (com IPI). É a base do DRE. Diferente do resumo_faturamento '
-                . '(Histórico de Vendas: pedidos faturados, sem IPI, pela data de finalização). Por padrão considera só operações de venda; '
+                . '(Histórico de Pedidos Finalizados: sem IPI, pela data de finalização). Por padrão considera só operações de venda; '
                 . 'use agrupar_por "operacao" para ver também remessas, amostras e devoluções.',
             'properties'  => $periodo + [
                 'agrupar_por' => ['type' => 'string', 'enum' => ['total', 'mes', 'operacao', 'cliente', 'empresa'], 'description' => 'Agrupamento (padrão: total). "empresa" separa por CNPJ do grupo.'],
@@ -175,8 +175,8 @@ function chatDefinicoes(): array
             'required' => ['data_ini', 'data_fim'],
         ],
         'conciliar_faturamento' => [
-            'description' => 'Cruza o Histórico de Vendas (pedidos faturados) com as NF-e de venda autorizadas (base do DRE) no período e aponta as '
-                . 'DIVERGÊNCIAS: pedidos faturados sem NF-e correspondente e NF-e sem pedido correspondente. A correspondência é feita por '
+            'description' => 'Cruza o Histórico de Pedidos Finalizados com as NF-e de venda autorizadas (base do DRE) no período e aponta as '
+                . 'DIVERGÊNCIAS: pedidos finalizados sem NF-e correspondente e NF-e sem pedido correspondente. A correspondência é feita por '
                 . 'cliente + valor sem IPI, com até 10 dias entre as datas (não existe vínculo direto no ERP). Traz também os totais dos dois '
                 . 'lados (sem IPI, IPI e com IPI) e a diferença. Use quando pedirem para comparar/conferir/cruzar o faturamento com o DRE.',
             'properties'  => $periodo,
@@ -869,7 +869,7 @@ function chatFerConciliarFaturamento($pg, array $a): array
         if (!isset($par[$n['id']])) {
             $div[] = ['tipo' => 'NF-e sem pedido', 'documento' => 'NF-e ' . $n['numero'], 'data' => $n['data'],
                       'cliente' => $n['cliente'], 'valor_sem_ipi' => chatNum($n['sem_ipi']), 'ipi' => chatNum($n['ipi']),
-                      'observacao' => 'Operação: ' . $n['operacao'] . ". Nenhum pedido faturado do mesmo cliente e valor em até {$d} dias."];
+                      'observacao' => 'Operação: ' . $n['operacao'] . ". Nenhum pedido finalizado do mesmo cliente e valor em até {$d} dias."];
             continue;
         }
         $p = $pedidos[$par[$n['id']]];
@@ -903,7 +903,7 @@ function chatFerConciliarFaturamento($pg, array $a): array
 
     return [
         'periodo'   => "{$ini} a {$fim}",
-        'criterio'  => 'Histórico = pedidos faturados (data de finalização, sem IPI, devoluções abatidas). '
+        'criterio'  => 'Histórico = pedidos finalizados (data de finalização, sem IPI, devoluções abatidas). '
                      . 'NF-e = notas de venda autorizadas pela SEFAZ (data de emissão). Correspondência por cliente + valor sem IPI, '
                      . "até {$d} dias, um para um — não há vínculo direto entre pedido e NF-e no ERP.",
         'resumo'    => [

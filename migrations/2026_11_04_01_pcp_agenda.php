@@ -1,0 +1,16 @@
+<?php
+// ── 2026-11-04 · Agendamento de Produção: dias previstos de cada pedido ───────
+
+adicionartabela('PCP_AGENDA', "
+    `AGD_CODIGO`        INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+    `PRG_CODIGO`        INT UNSIGNED  NOT NULL,
+    `PROD_CODIGO`       INT UNSIGNED  NOT NULL,
+    `AGD_TIPO`          VARCHAR(10)   NOT NULL,
+    `AGD_DATA`          DATE          NOT NULL,
+    `AGD_QTD`           DECIMAL(14,2) NOT NULL,
+    `AGD_USUARIO`       VARCHAR(120)  NULL,
+    `AGD_ATUALIZADO_EM` DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`AGD_CODIGO`),
+    UNIQUE KEY `UQ_AGD_DIA` (`PRG_CODIGO`, `AGD_TIPO`, `AGD_DATA`),
+    KEY `IDX_AGD_DATA` (`AGD_DATA`)
+");

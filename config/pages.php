@@ -138,6 +138,7 @@ $DOMBAG_PAGINAS = [
     // ── Produção ──────────────────────────────────────────────────────────────
     ['href' => '/pcp/planejamento','label' => 'Planejamento',            'grupo' => 'producao', 'menu' => true,  'publico' => false],
     ['href' => '/pcp/reuniao',     'label' => 'Reunião de Planejamento', 'grupo' => 'producao', 'menu' => true,  'publico' => false],
+    ['href' => '/pcp/agendamento', 'label' => 'Agendamento de Produção', 'grupo' => 'producao', 'menu' => true,  'publico' => false],
     ['href' => '/pcp/etapas',      'label' => 'Etapas de Produção',      'grupo' => 'producao', 'menu' => false, 'publico' => false],
     ['href' => '/pcp/ordens',      'label' => 'Ordens de Produção',      'grupo' => 'producao', 'menu' => true,  'publico' => false],
     ['href' => '/pcp/pdf',         'label' => 'PDF de Produção',         'grupo' => 'producao', 'menu' => false, 'publico' => false],
@@ -148,6 +149,8 @@ $DOMBAG_PAGINAS = [
     ['href' => '/pcp/painel-funcionarios-pdf', 'label' => 'Relatório de Funcionários (PDF)', 'grupo' => 'producao', 'menu' => false, 'publico' => false],
     ['href' => '/pcp/bi',                  'label' => 'BI da Produção',           'grupo' => 'producao', 'menu' => true,  'publico' => false],
     ['href' => '/pcp/bi-individual',       'label' => 'BI Individual',            'grupo' => 'producao', 'menu' => true,  'publico' => false],
+    ['href' => '/pcp/tv',                  'label' => 'Agendamento na TV',        'grupo' => 'producao', 'menu' => false, 'publico' => false],
+    ['href' => '/pcp/rastreabilidade',     'label' => 'Rastreabilidade',          'grupo' => 'producao', 'menu' => true,  'publico' => false],
 
     // ── Máquinas ──────────────────────────────────────────────────────────────
     ['href' => '/maquinas',           'label' => 'Máquinas',             'grupo' => 'maquinas', 'menu' => true,  'publico' => false],
@@ -162,7 +165,8 @@ $DOMBAG_PAGINAS = [
     ['href' => '/relatorios/posicao-estoque',  'label' => 'Posição de Estoque',     'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
     ['href' => '/relatorios/controle-estoque', 'label' => 'Controle de Estoque',    'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
     ['href' => '/relatorios/analise-bag',      'label' => 'Análise de Apontamento', 'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
-    ['href' => '/relatorios/historico-faturamento', 'label' => 'Histórico de Faturamento', 'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
+    ['href' => '/relatorios/historico-faturamento', 'label' => 'Histórico de Pedidos Finalizados', 'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
+    ['href' => '/relatorios/defeitos',         'label' => 'Relatório de Defeitos',  'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
 
     // ── Usuários ──────────────────────────────────────────────────────────────
     ['href' => '/minha-senha',              'label' => 'Minha Senha',          'grupo' => 'usuarios', 'menu' => true,  'publico' => true,  'admin_only' => false],

@@ -1,0 +1,476 @@
+<?php
+declare(strict_types=1);
+require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/producao_tipo.php';
+
+// ══════════════════════════════════════════════════════════════════════
+//  DOMBAG — Dados do Agendamento de Produção
+//
+//  Previsto = PCP_AGENDA (MySQL), um registro por pedido, tipo e dia.
+//  Produzido = ERP, somente leitura:
+//    Bag: apontamentos, mesma regra do BI, no dia da leitura.
+//    Sacaria: OP_ITENS_PRODUZIDOS, no dia do lançamento. A fábrica costuma
+//    lançar a OP de uma vez, então a data é a do lançamento, não a da
+//    fabricação. Status 'E' ainda é a quantidade esperada: fica como
+//    "em aberto" e não conta como produzido.
+//
+//  Dias passados são registro: só hoje e os dias à frente podem mudar.
+//  O que faltou num dia passado volta sozinho para o saldo a agendar.
+// ══════════════════════════════════════════════════════════════════════
+
+const AG_GRP_BAG = 6; // GRUPOS.GRP_CODIGO no ERP
+
+function agPgAll($pg, string $sql, array $params = []): array
+{
+    $res = @pg_query_params($pg, $sql, $params);
+    if (!$res) {
+        throw new RuntimeException('Não foi possível consultar a produção no ERP: ' . pg_last_error($pg));
+    }
+    $rows = pg_fetch_all($res) ?: [];
+    pg_free_result($res);
+    return $rows;
+}
+
+function agTipoValido(string $tipo): bool
+{
+    return in_array($tipo, [PROD_TIPO_BAG, PROD_TIPO_SACARIA], true);
+}
+
+function agData(string $valor): ?string
+{
+    $dt = DateTime::createFromFormat('!Y-m-d', $valor);
+    return $dt && $dt->format('Y-m-d') === $valor ? $valor : null;
+}
+
+function agMes(string $valor): string
+{
+    return agData($valor . '-01') !== null ? $valor : date('Y-m');
+}
+
+// Semanas completas (segunda a domingo) que cobrem o mês
+function agGrade(string $mes): array
+{
+    $ini = new DateTimeImmutable($mes . '-01');
+    $fim = $ini->modify('last day of this month');
+    return [
+        $ini->modify('-' . ((int) $ini->format('N') - 1) . ' days')->format('Y-m-d'),
+        $fim->modify('+' . (7 - (int) $fim->format('N')) . ' days')->format('Y-m-d'),
+    ];
+}
+
+// Produção por dia, OP e tipo. $cond recebe as colunas de data e de OP e devolve o filtro.
+function agProducaoSql(callable $cond): string
+{
+    $grpBag = AG_GRP_BAG;
+    $grpSac = PROD_GRP_SACARIA;
+    return "
+        SELECT A.OIAP_DATA_HORA_INICIO::date AS dia, A.PROD_CODIGO AS op, '" . PROD_TIPO_BAG . "' AS tipo,
+               SUM(A.OIAP_QTD_PRODUZIDA) AS qtd, 0 AS aberto
+          FROM OP_ITENS_ATIVIDADES_APONTADAS A
+          JOIN PRODUTO P ON P.PRO_CODIGO = A.PRO_CODIGO
+         WHERE NOT A.OIAP_EXCLUIDO
+           AND TRIM(A.OIAP_STATUS) <> 'C'
+           AND P.GRP_CODIGO = {$grpBag}
+           AND " . $cond('A.OIAP_DATA_HORA_INICIO', 'A.PROD_CODIGO') . "
+         GROUP BY 1, 2
+        UNION ALL
+        SELECT I.OIP_DATA_INICIAL::date, I.PROD_CODIGO, '" . PROD_TIPO_SACARIA . "',
+               COALESCE(SUM(I.OIP_QTD) FILTER (WHERE TRIM(I.OIP_STATUS) = 'F'), 0),
+               COALESCE(SUM(I.OIP_QTD) FILTER (WHERE TRIM(I.OIP_STATUS) = 'E'), 0)
+          FROM OP_ITENS_PRODUZIDOS I
+          JOIN PRODUTO P ON P.PRO_CODIGO = I.PRO_CODIGO
+         WHERE P.GRP_CODIGO = {$grpSac}
+           AND " . $cond('I.OIP_DATA_INICIAL', 'I.PROD_CODIGO') . "
+         GROUP BY 1, 2
+    ";
+}
+
+function agProducaoPeriodo($pg, string $ini, string $fim): array
+{
+    return agPgAll($pg, agProducaoSql(
+        fn (string $data) => "{$data} >= \$1::date AND {$data} < \$2::date + 1"
+    ), [$ini, $fim]);
+}
+
+function agProducaoOps($pg, array $ops): array
+{
+    if (!$ops) {
+        return [];
+    }
+    return agPgAll($pg, agProducaoSql(
+        fn (string $data, string $op) => "{$op} = ANY(\$1::int[])"
+    ), ['{' . implode(',', array_map('intval', $ops)) . '}']);
+}
+
+// Pedido, cliente e quantidade por tipo de cada OP
+function agOpsInfo($pg, array $ops): array
+{
+    if (!$ops) {
+        return [];
+    }
+    $rows = agPgAll($pg, "
+        SELECT PR.PROD_CODIGO AS op, TRIM(PR.VENDA_REF) AS pedido, TRIM(PR.FINALIZADO) AS finalizado,
+               COALESCE(NULLIF(TRIM(C.CLI_NOME_FANTASIA), ''), C.CLI_NOME, '') AS cliente,
+               CASE P.GRP_CODIGO WHEN " . AG_GRP_BAG . " THEN '" . PROD_TIPO_BAG . "'
+                                 WHEN " . PROD_GRP_SACARIA . " THEN '" . PROD_TIPO_SACARIA . "' END AS tipo,
+               SUM(IP.ITE_QTD) AS qtd, MIN(P.PRO_DESCRICAO) AS produto, COUNT(*) AS itens
+          FROM PRODUCAO PR
+          LEFT JOIN CLIENTES C        ON C.CLI_CODIGO = PR.CLI_CODIGO
+          LEFT JOIN ITENS_PRODUCAO IP ON IP.PROD_CODIGO = PR.PROD_CODIGO
+          LEFT JOIN PRODUTO P         ON P.PRO_CODIGO = IP.PRO_CODIGO
+                                     AND P.GRP_CODIGO IN (" . AG_GRP_BAG . ', ' . PROD_GRP_SACARIA . ")
+         WHERE PR.EMP_CODIGO = 1
+           AND PR.PROD_CODIGO = ANY(\$1::int[])
+         GROUP BY 1, 2, 3, 4, 5
+    ", ['{' . implode(',', array_map('intval', $ops)) . '}']);
+
+    $info = [];
+    foreach ($rows as $r) {
+        $op = (int) $r['op'];
+        $info[$op] ??= [
+            'pedido'     => $r['pedido'] ?? '',
+            'cliente'    => $r['cliente'],
+            'finalizado' => $r['finalizado'] === 'Y',
+            'tipos'      => [],
+        ];
+        if ($r['tipo'] !== null) {
+            $info[$op]['tipos'][$r['tipo']] = [
+                'qtd'     => (float) $r['qtd'],
+                'produto' => (int) $r['itens'] > 1 ? $r['produto'] . ' +' . ((int) $r['itens'] - 1) : $r['produto'],
+            ];
+        }
+    }
+    return $info;
+}
+
+// Monta tudo o que a tela mostra para o mês
+function agMontar(PDO $db, $pg, string $mes): array
+{
+    $hoje = date('Y-m-d');
+    [$ini, $fim] = agGrade($mes);
+
+    $programados = $db->query('
+        SELECT PRG_CODIGO, PROD_CODIGO, VENDA_REF, CLI_NOME, DATA_ENTREGA_ESPERADA, PRG_FINALIZADO
+          FROM PCP_PROGRAMACAO
+    ')->fetchAll(PDO::FETCH_ASSOC);
+
+    $stmt = $db->prepare('
+        SELECT a.AGD_CODIGO, a.PRG_CODIGO, a.PROD_CODIGO, a.AGD_TIPO, a.AGD_DATA, a.AGD_QTD, a.AGD_USUARIO
+          FROM PCP_AGENDA a
+          JOIN PCP_PROGRAMACAO p ON p.PRG_CODIGO = a.PRG_CODIGO
+         WHERE p.PRG_FINALIZADO = 0 OR a.AGD_DATA BETWEEN ? AND ?
+    ');
+    $stmt->execute([$ini, $fim]);
+    $prgFinalizado = array_column($programados, 'PRG_FINALIZADO', 'PRG_CODIGO');
+    // Pedido encerrado na Reunião não tem mais o que produzir: some dos dias à frente
+    $slots = array_filter($stmt->fetchAll(PDO::FETCH_ASSOC), static fn ($s) =>
+        !$prgFinalizado[$s['PRG_CODIGO']] || $s['AGD_DATA'] < $hoje);
+
+    $prgPorCodigo = array_column($programados, null, 'PRG_CODIGO');
+    $prgPorOp = [];
+    foreach ($programados as $p) {
+        $op = (int) $p['PROD_CODIGO'];
+        if (!isset($prgPorOp[$op]) || !$p['PRG_FINALIZADO']) {
+            $prgPorOp[$op] = $p;
+        }
+    }
+    $ativos = array_filter($programados, static fn ($p) => !$p['PRG_FINALIZADO']);
+
+    // ── ERP ──────────────────────────────────────────────────────────────
+    $producaoGrade = [];
+    $producaoOps   = [];
+    $info          = [];
+    if ($pg) {
+        $producaoGrade = agProducaoPeriodo($pg, $ini, $fim);
+        $codigos = array_unique(array_merge(
+            array_map('intval', array_column($ativos, 'PROD_CODIGO')),
+            array_map('intval', array_column($slots, 'PROD_CODIGO'))
+        ));
+        $producaoOps = agProducaoOps($pg, $codigos);
+        $info = agOpsInfo($pg, array_unique(array_merge($codigos, array_map('intval', array_column($producaoGrade, 'op')))));
+    }
+
+    $realDia = [];   // [op][tipo][dia] => qtd confirmada
+    foreach ($producaoOps as $r) {
+        $realDia[(int) $r['op']][$r['tipo']][$r['dia']] = (float) $r['qtd'];
+    }
+
+    // ── Cards do calendário: previsto + produzido por OP, tipo e dia ─────
+    $cards = [];
+    $novoCard = static function (int $op, string $tipo, string $dia) use (&$cards, &$info, &$prgPorOp): void {
+        $k = "{$dia}|{$op}|{$tipo}";
+        if (isset($cards[$k])) {
+            return;
+        }
+        $prg = $prgPorOp[$op] ?? null;
+        $cards[$k] = [
+            'dia' => $dia, 'op' => $op, 'tipo' => $tipo,
+            'pedido'  => ($info[$op]['pedido'] ?? '') ?: (string) ($prg['VENDA_REF'] ?? ''),
+            'cliente' => ($info[$op]['cliente'] ?? '') ?: (string) ($prg['CLI_NOME'] ?? ''),
+            'produto' => $info[$op]['tipos'][$tipo]['produto'] ?? '',
+            'total'   => $info[$op]['tipos'][$tipo]['qtd'] ?? 0.0,
+            'prg'     => $prg ? (int) $prg['PRG_CODIGO'] : 0,
+            'programado' => $prg !== null,
+            'entrega' => $prg['DATA_ENTREGA_ESPERADA'] ?? null,
+            'agd' => 0, 'usuario' => '', 'plan' => 0.0, 'real' => 0.0, 'aberto' => 0.0,
+        ];
+    };
+
+    foreach ($slots as $s) {
+        if ($s['AGD_DATA'] < $ini || $s['AGD_DATA'] > $fim) {
+            continue;
+        }
+        $novoCard((int) $s['PROD_CODIGO'], $s['AGD_TIPO'], $s['AGD_DATA']);
+        $k = "{$s['AGD_DATA']}|{$s['PROD_CODIGO']}|{$s['AGD_TIPO']}";
+        $cards[$k]['agd']     = (int) $s['AGD_CODIGO'];
+        $cards[$k]['prg']     = (int) $s['PRG_CODIGO'];
+        $cards[$k]['plan']    = (float) $s['AGD_QTD'];
+        $cards[$k]['usuario'] = (string) $s['AGD_USUARIO'];
+        $cards[$k]['entrega'] = $prgPorCodigo[$s['PRG_CODIGO']]['DATA_ENTREGA_ESPERADA'] ?? null;
+    }
+    foreach ($producaoGrade as $r) {
+        $op = (int) $r['op'];
+        if (!isset($info[$op]) || ((float) $r['qtd'] <= 0 && (float) $r['aberto'] <= 0)) {
+            continue; // outra empresa, ou linha zerada
+        }
+        $novoCard($op, $r['tipo'], $r['dia']);
+        $k = "{$r['dia']}|{$op}|{$r['tipo']}";
+        $cards[$k]['real']   = (float) $r['qtd'];
+        $cards[$k]['aberto'] = (float) $r['aberto'];
+    }
+
+    foreach ($cards as &$c) {
+        $temPlano = $c['plan'] > 0;
+        $c['status'] = match (true) {
+            !$temPlano                => 'produzido',
+            $c['real'] >= $c['plan']  => 'cumprido',
+            $c['dia'] < $hoje         => 'abaixo',
+            default                   => 'agendado',
+        };
+        $c['editavel'] = $temPlano && $c['dia'] >= $hoje;
+        $c['tarde']    = $temPlano && $c['status'] !== 'cumprido' && $c['entrega'] && $c['dia'] > $c['entrega'];
+    }
+    unset($c);
+
+    // ── Saldo a agendar de cada pedido ativo, por tipo ───────────────────
+    $slotsPorChave = [];
+    foreach ($slots as $s) {
+        $slotsPorChave[$s['PRG_CODIGO'] . '|' . $s['AGD_TIPO']][] = $s;
+    }
+
+    $pendentes = [];
+    foreach ($ativos as $p) {
+        $op = (int) $p['PROD_CODIGO'];
+        foreach ($info[$op]['tipos'] ?? [] as $tipo => $t) {
+            $reais     = $realDia[$op][$tipo] ?? [];
+            $produzido = array_sum($reais);
+            $previsto  = 0.0;
+            $atrasado  = false;
+            foreach ($slotsPorChave[$p['PRG_CODIGO'] . '|' . $tipo] ?? [] as $s) {
+                $qtd  = (float) $s['AGD_QTD'];
+                $real = $reais[$s['AGD_DATA']] ?? 0.0;
+                if ($s['AGD_DATA'] > $hoje) {
+                    $previsto += $qtd;
+                } elseif ($s['AGD_DATA'] === $hoje) {
+                    $previsto += max(0.0, $qtd - $real);
+                } elseif ($real < $qtd) {
+                    $atrasado = true;
+                }
+            }
+            $saldo = max(0.0, $t['qtd'] - $produzido - $previsto);
+            if ($saldo <= 0) {
+                continue;
+            }
+            $pendentes[] = [
+                'prg' => (int) $p['PRG_CODIGO'], 'op' => $op, 'tipo' => $tipo,
+                'pedido'     => $info[$op]['pedido'] ?: (string) $p['VENDA_REF'],
+                'cliente'    => $info[$op]['cliente'] ?: (string) $p['CLI_NOME'],
+                'produto'    => $t['produto'],
+                'total'      => $t['qtd'],
+                'produzido'  => $produzido,
+                'saldo'      => $saldo,
+                'entrega'    => $p['DATA_ENTREGA_ESPERADA'],
+                'atrasado'   => $atrasado,
+                'erp_finalizada' => $info[$op]['finalizado'],
+            ];
+        }
+    }
+    usort($pendentes, static fn ($a, $b) =>
+        [$a['entrega'] === null, $a['entrega']] <=> [$b['entrega'] === null, $b['entrega']]);
+
+    // ── Totais do mês e resumo por pedido ────────────────────────────────
+    $totais = [
+        PROD_TIPO_BAG     => ['produzido' => 0.0, 'agendado' => 0.0, 'a_agendar' => 0.0],
+        PROD_TIPO_SACARIA => ['produzido' => 0.0, 'agendado' => 0.0, 'a_agendar' => 0.0],
+    ];
+    foreach ($pendentes as $p) {
+        $totais[$p['tipo']]['a_agendar'] += $p['saldo'];
+    }
+
+    $resumo = [];
+    foreach ($cards as $c) {
+        if (!str_starts_with($c['dia'], $mes)) {
+            continue;
+        }
+        $totais[$c['tipo']]['produzido'] += $c['real'];
+        $totais[$c['tipo']]['agendado']  += $c['plan'];
+
+        $k = "{$c['op']}|{$c['tipo']}";
+        $resumo[$k] ??= [
+            'op' => $c['op'], 'tipo' => $c['tipo'], 'pedido' => $c['pedido'], 'cliente' => $c['cliente'],
+            'programado' => $c['programado'], 'entrega' => $c['entrega'],
+            'total' => $c['total'], 'agendado' => 0.0, 'produzido' => 0.0, 'aberto' => 0.0,
+        ];
+        $resumo[$k]['agendado']  += $c['plan'];
+        $resumo[$k]['produzido'] += $c['real'];
+        $resumo[$k]['aberto']    += $c['aberto'];
+    }
+    $resumo = array_values($resumo);
+    usort($resumo, static fn ($a, $b) =>
+        [$b['programado'], $a['cliente'], $a['op']] <=> [$a['programado'], $b['cliente'], $b['op']]);
+
+    // Prazo de entrega de cada pedido ativo, para aparecer no dia
+    $entregas = [];
+    foreach ($ativos as $p) {
+        $dia = $p['DATA_ENTREGA_ESPERADA'];
+        if ($dia && $dia >= $ini && $dia <= $fim) {
+            $op = (int) $p['PROD_CODIGO'];
+            $entregas[$dia][] = [
+                'pedido'  => ($info[$op]['pedido'] ?? '') ?: (string) $p['VENDA_REF'],
+                'cliente' => ($info[$op]['cliente'] ?? '') ?: (string) $p['CLI_NOME'],
+                'op'      => $op,
+            ];
+        }
+    }
+
+    return [
+        'mes'       => $mes,
+        'hoje'      => $hoje,
+        'ini'       => $ini,
+        'fim'       => $fim,
+        'erp'       => (bool) $pg,
+        'cards'     => array_values($cards),
+        'pendentes' => $pendentes,
+        'entregas'  => $entregas,
+        'resumo'    => $resumo,
+        'totais'    => $totais,
+    ];
+}
+
+// ── Escrita ──────────────────────────────────────────────────────────────
+
+function agSincronizarPrevia(PDO $db, int $prg): void
+{
+    // Kanban e Status das OPs leem a previsão desta coluna
+    $db->prepare('
+        UPDATE PCP_PROGRAMACAO
+           SET DATA_PREVIA_PRODUCAO = (SELECT MAX(AGD_DATA) FROM PCP_AGENDA WHERE PRG_CODIGO = ?)
+         WHERE PRG_CODIGO = ?
+    ')->execute([$prg, $prg]);
+}
+
+function agSomarNoDia(PDO $db, int $prg, int $op, string $tipo, string $dia, float $qtd): void
+{
+    $db->prepare('
+        INSERT INTO PCP_AGENDA (PRG_CODIGO, PROD_CODIGO, AGD_TIPO, AGD_DATA, AGD_QTD, AGD_USUARIO)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE AGD_QTD = AGD_QTD + VALUES(AGD_QTD), AGD_USUARIO = VALUES(AGD_USUARIO)
+    ')->execute([$prg, $op, $tipo, $dia, $qtd, usuNome()]);
+}
+
+function agExigirDiaAberto(string $dia): void
+{
+    if ($dia < date('Y-m-d')) {
+        throw new RuntimeException('Dias passados não podem ser alterados.');
+    }
+}
+
+// Agendamento ainda editável, ou erro
+function agSlotAberto(PDO $db, int $agd): array
+{
+    $stmt = $db->prepare('
+        SELECT a.*, p.PRG_FINALIZADO
+          FROM PCP_AGENDA a
+          JOIN PCP_PROGRAMACAO p ON p.PRG_CODIGO = a.PRG_CODIGO
+         WHERE a.AGD_CODIGO = ?
+    ');
+    $stmt->execute([$agd]);
+    $slot = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$slot || $slot['PRG_FINALIZADO']) {
+        throw new RuntimeException('Este agendamento não existe mais. A tela foi atualizada.');
+    }
+    agExigirDiaAberto($slot['AGD_DATA']);
+    return $slot;
+}
+
+function agAgendar(PDO $db, int $prg, string $tipo, string $dia, float $qtd): void
+{
+    agExigirDiaAberto($dia);
+    if (!agTipoValido($tipo) || $qtd <= 0) {
+        throw new RuntimeException('Informe uma quantidade maior que zero.');
+    }
+    $stmt = $db->prepare('SELECT PROD_CODIGO FROM PCP_PROGRAMACAO WHERE PRG_CODIGO = ? AND PRG_FINALIZADO = 0');
+    $stmt->execute([$prg]);
+    $op = $stmt->fetchColumn();
+    if ($op === false) {
+        throw new RuntimeException('Este pedido não está mais na programação.');
+    }
+    agSomarNoDia($db, $prg, (int) $op, $tipo, $dia, $qtd);
+    agSincronizarPrevia($db, $prg);
+}
+
+// Hoje com produção já lançada: o que foi feito fica no dia, só o restante muda de data
+function agMover(PDO $db, $pg, array $slot, string $destino): void
+{
+    agExigirDiaAberto($destino);
+    if ($destino === $slot['AGD_DATA']) {
+        return;
+    }
+    $agd  = (int) $slot['AGD_CODIGO'];
+    $qtd  = (float) $slot['AGD_QTD'];
+    $fica = 0.0;
+    if ($slot['AGD_DATA'] === date('Y-m-d') && $pg) {
+        foreach (agProducaoOps($pg, [(int) $slot['PROD_CODIGO']]) as $r) {
+            if ($r['dia'] === $slot['AGD_DATA'] && $r['tipo'] === $slot['AGD_TIPO']) {
+                $fica = min($qtd, (float) $r['qtd']);
+            }
+        }
+    }
+    if ($fica >= $qtd) {
+        throw new RuntimeException('Este agendamento já foi produzido hoje.');
+    }
+
+    $db->beginTransaction();
+    try {
+        agSomarNoDia($db, (int) $slot['PRG_CODIGO'], (int) $slot['PROD_CODIGO'], $slot['AGD_TIPO'], $destino, $qtd - $fica);
+        if ($fica > 0) {
+            $db->prepare('UPDATE PCP_AGENDA SET AGD_QTD = ? WHERE AGD_CODIGO = ?')->execute([$fica, $agd]);
+        } else {
+            $db->prepare('DELETE FROM PCP_AGENDA WHERE AGD_CODIGO = ?')->execute([$agd]);
+        }
+        agSincronizarPrevia($db, (int) $slot['PRG_CODIGO']);
+        $db->commit();
+    } catch (Throwable $e) {
+        $db->rollBack();
+        throw $e;
+    }
+}
+
+function agEditar(PDO $db, $pg, int $agd, float $qtd, string $dia): void
+{
+    if ($qtd <= 0) {
+        throw new RuntimeException('Informe uma quantidade maior que zero.');
+    }
+    $slot = agSlotAberto($db, $agd);
+    agExigirDiaAberto($dia);
+    $db->prepare('UPDATE PCP_AGENDA SET AGD_QTD = ?, AGD_USUARIO = ? WHERE AGD_CODIGO = ?')
+       ->execute([$qtd, usuNome(), $agd]);
+    $slot['AGD_QTD'] = $qtd;
+    agMover($db, $pg, $slot, $dia);
+}
+
+function agRemover(PDO $db, int $agd): void
+{
+    $slot = agSlotAberto($db, $agd);
+    $db->prepare('DELETE FROM PCP_AGENDA WHERE AGD_CODIGO = ?')->execute([$agd]);
+    agSincronizarPrevia($db, (int) $slot['PRG_CODIGO']);
+}
