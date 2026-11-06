@@ -101,9 +101,28 @@ if (isset($cards[$amanha])) {
     confere('dia futuro segue previsto', [$cards[$amanha]['feito'], $cards[$amanha]['status']], [null, 'agendado']);
 }
 
+confere('pedido com dia na agenda é planejado', array_values(array_unique(array_column($cards, 'planejado'))), [true]);
+
 // ── O realizado não some com o agendamento ───────────────────────────────
 confere('remover recusa dia com realizado', recusa(fn () => agRemover($db, 2)), 'Este dia tem realizado marcado. Apague o realizado antes de remover.');
 confere('mover recusa dia já realizado', recusa(fn () => agMover($db, null, agSlotAberto($db, 2), $amanha)), 'Este agendamento já foi produzido hoje.');
+
+// ── Dia passado: só sai o pedido que não iniciou ─────────────────────────
+confere('nada produzido não iniciou', agNaoIniciou(null, 0.0, 0.0), true);
+confere('realizado zero não iniciou', agNaoIniciou(0.0, 0.0, 0.0), true);
+confere('realizado marcado iniciou', agNaoIniciou(5.0, 0.0, 0.0), false);
+confere('produção no ERP iniciou', agNaoIniciou(null, 5.0, 0.0), false);
+confere('lançamento em aberto iniciou', agNaoIniciou(null, 0.0, 5.0), false);
+confere('zero marcado com produção no ERP iniciou', agNaoIniciou(0.0, 5.0, 0.0), false);
+confere('editar segue recusando dia passado', recusa(fn () => agSlotAberto($db, 1)), 'Dias passados não podem ser alterados.');
+$movePassado = static fn (string $dia) => agMover($db, null, agSlotAberto($db, 1, true), $dia);
+confere('dia com realizado não sai', recusa(fn () => $movePassado($amanha)), 'Este dia já tem produção e não pode ser movido.');
+agMarcarRealizado($db, 1, '0');
+confere('sem ERP não sai', recusa(fn () => $movePassado($amanha)), 'Sem conexão com o ERP não é possível confirmar que o pedido não iniciou neste dia.');
+confere('destino passado recusa', recusa(fn () => $movePassado($anteon)), 'Dias passados não podem ser alterados.');
+agMarcarRealizado($db, 1, '250');
+$semErp = agMontar($db, null, date('Y-m'))['cards'];
+confere('sem ERP o card passado não arrasta', array_values(array_filter($semErp, static fn ($c) => $c['dia'] < $hoje && $c['movel'])), []);
 
 // ── Andamento fora do calendário ─────────────────────────────────────────
 $p = ['proximo' => '2026-12-03', 'concluido' => false, 'tipos' => [

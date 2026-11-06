@@ -14,6 +14,8 @@ require_once dirname(__DIR__, 2) . '/config/config.php';
 require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
 require_once __DIR__ . '/chat_lib.php';
 require_once __DIR__ . '/chat_ferramentas.php';
+require_once dirname(__DIR__, 2) . '/config/pages.php';
+require_once dirname(__DIR__, 2) . '/modules/documentacao/documentacao_dados.php';
 
 header('X-Content-Type-Options: nosniff');
 header('Cache-Control: no-store');
@@ -161,6 +163,9 @@ $emitirComArquivos = function (string $evento, array $dados) use ($emitir, &$arq
 
 // Escopo de dados: SEMPRE a partir do uid da sessão.
 $ctx = chatMontarEscopo($ctx, $ctx['admin'] ? [] : chatRepresentantesDoUsuario($uid));
+if ($ctx['so_site']) {
+    $ctx['documentacao'] = docTextoParaIa($DOMBAG_PAGINAS, docMenusDesativados($pdo));
+}
 $ctx['ip'] = $ip;
 $ferramentas = chatFerramentasDisponiveis($ctx);
 $ctx['ferramentas'] = array_column($ferramentas, 'name');

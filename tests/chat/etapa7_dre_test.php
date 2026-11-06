@@ -8,10 +8,6 @@ echo "\nNotas fiscais / DRE e conciliação\n";
 teste('DRE: só gestão — representante vinculado nunca recebe as consultas de NF-e', function () {
     $rep = chatMontarEscopo(ctxTeste(UID_A, ['permissoes' => ['/relatorios/historico-faturamento']]), [['re_codigo' => 6, 're_nome' => 'X']]);
     confere(!in_array('faturamento_notas', $rep['liberadas'], true) && !in_array('conciliar_faturamento', $rep['liberadas'], true), 'representante recebeu visão gerencial');
-    $grupo = chatMontarEscopo(ctxTeste(UID_A, ['permissoes' => ['/relatorios/historico-faturamento']]), []);
-    confere(in_array('faturamento_notas', $grupo['liberadas'], true) && in_array('conciliar_faturamento', $grupo['liberadas'], true), 'grupo com a página deveria receber');
-    $semPagina = chatMontarEscopo(ctxTeste(UID_A, ['permissoes' => ['/yzidro/consulta']]), []);
-    confere(!in_array('conciliar_faturamento', $semPagina['liberadas'], true), 'sem a página do Histórico não recebe');
     // e a execução recusa mesmo se a IA chamar
     $r = chatExecutarFerramenta('conciliar_faturamento', ['data_ini' => '2026-09-01', 'data_fim' => '2026-09-30'], $rep, 'x', dbPDO());
     igual(false, $r['ok']);

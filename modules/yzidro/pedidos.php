@@ -688,6 +688,7 @@ $totalNovos = count(array_filter($vendas, fn ($r) => !$r['no_mysql']));
   .status-sel.is-urgente { border-color: rgba(239,68,68,.5); color: var(--red); }
 
   /* Linha de detalhe */
+  .yz-detail-saida { margin-bottom: 8px; font-size: 12px; color: var(--text-muted); }
   .yz-detail-row { display: none; }
   .yz-detail-row.open { display: table-row; }
   .yz-detail-cell {
@@ -866,11 +867,11 @@ $totalNovos = count(array_filter($vendas, fn ($r) => !$r['no_mysql']));
               <input type="date" id="emissao_fim" name="emissao_fim" value="<?= yzEscape($filters['emissao_fim']) ?>">
             </div>
             <div class="filter-field">
-              <label for="fatura_ini">Faturamento inicial</label>
+              <label for="fatura_ini">Saída/Faturamento inicial</label>
               <input type="date" id="fatura_ini" name="fatura_ini" value="<?= yzEscape($filters['fatura_ini']) ?>">
             </div>
             <div class="filter-field">
-              <label for="fatura_fim">Faturamento final</label>
+              <label for="fatura_fim">Saída/Faturamento final</label>
               <input type="date" id="fatura_fim" name="fatura_fim" value="<?= yzEscape($filters['fatura_fim']) ?>">
             </div>
             <div class="filter-field">
@@ -936,7 +937,7 @@ $totalNovos = count(array_filter($vendas, fn ($r) => !$r['no_mysql']));
                 <th>Pedido</th>
                 <th>Cliente</th>
                 <th>Emissão</th>
-                <th>Faturamento</th>
+                <th>Saída/Faturamento</th>
                 <th>Representante</th>
                 <th class="yz-right">Itens</th>
                 <th>Tipo</th>
@@ -980,6 +981,7 @@ $totalNovos = count(array_filter($vendas, fn ($r) => !$r['no_mysql']));
                         data-detail-id="<?= yzEscape($detailId) ?>"
                         data-cliente="<?= yzEscape($row['cliente'] ?? '—') ?>"
                         data-rep="<?= yzEscape($row['representante'] ?? '—') ?>"
+                        data-saida="<?= yzEscape(yzFmtDate($row['datafatura'] ?? '')) ?>"
                         aria-expanded="false"
                         title="Ver itens"
                       >+</button>
@@ -1160,7 +1162,7 @@ $totalNovos = count(array_filter($vendas, fn ($r) => !$r['no_mysql']));
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.msg || 'Falha ao carregar os itens.');
-      container.innerHTML  = buildItemsTable(data.itens);
+      container.innerHTML  = `<div class="yz-detail-saida">Saída/Faturamento: <strong>${escHtml(button.dataset.saida)}</strong></div>` + buildItemsTable(data.itens);
       container.dataset.loaded = '1';
     } catch (err) {
       container.innerHTML = `<div class="yz-detail-error">${escHtml(err.message)}</div>`;

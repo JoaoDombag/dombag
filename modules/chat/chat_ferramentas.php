@@ -9,9 +9,9 @@
 //  Escopo de dados (montado da SESSÃO em chatMontarEscopo, nunca da IA):
 //    • admin                              → vê tudo
 //    • representante vinculado (não admin) → só pedidos dos seus RE_CODIGO
-//    • demais                             → tudo, mas só nas ferramentas cujas
-//                                           páginas o grupo pode acessar
-//    • ERP fora do ar ao montar o escopo  → não admin fica sem ferramentas
+//    • demais                             → sem consultas: só tira dúvidas
+//                                           sobre o site, pela Documentação
+//    • ERP fora do ar ao montar o escopo  → não admin cai no caso acima
 // ══════════════════════════════════════════════════════════════════════════════
 
 require_once __DIR__ . '/chat_relatorio.php';
@@ -19,15 +19,10 @@ require_once __DIR__ . '/chat_relatorio.php';
 const CHAT_MAX_DIAS   = 366;
 const CHAT_MAX_LINHAS = 200;
 
-// Páginas do sistema que liberam cada ferramenta (para quem não é admin nem
-// representante vinculado). Ter acesso a QUALQUER uma delas basta.
-const CHAT_PAGINAS_FERRAMENTA = [
-    'listar_pedidos'         => ['/yzidro/consulta', '/yzidro/pedidos', '/vendas'],
-    'detalhe_pedido'         => ['/yzidro/consulta', '/yzidro/pedidos', '/vendas'],
-    'resumo_faturamento'     => ['/relatorios/historico-faturamento'],
-    'status_producao_pedido' => ['/pcp/status-ops', '/pcp/painel-ops', '/yzidro/consulta', '/yzidro/pedidos'],
-    'faturamento_notas'      => ['/relatorios/historico-faturamento'],
-    'conciliar_faturamento'  => ['/relatorios/historico-faturamento'],
+// Consultas ao ERP: só para administrador e representante vinculado.
+const CHAT_FERRAMENTAS_CONSULTA = [
+    'listar_pedidos', 'detalhe_pedido', 'resumo_faturamento',
+    'status_producao_pedido', 'faturamento_notas', 'conciliar_faturamento',
 ];
 
 // Visões gerenciais da empresa inteira (notas fiscais/DRE): nunca liberadas a
@@ -84,23 +79,15 @@ function chatMontarEscopo(array $ctx, ?array $representantes): array
     $ctx['representantes'] = $representantes ?? [];
     $ctx['re']             = null;          // null = sem filtro de representante
     $ctx['liberadas']      = ['meu_perfil'];
+    // meu_perfil fica: conversas antigas têm chamadas de ferramenta, e a API
+    // recusa esse histórico numa requisição sem nenhuma ferramenta.
+    $ctx['so_site']        = !$ctx['admin'] && !$representantes;
 
     if ($ctx['admin']) {
-        $ctx['liberadas'] = array_merge($ctx['liberadas'], array_keys(CHAT_PAGINAS_FERRAMENTA));
-    } elseif ($representantes === null) {
-        // falha fechada: sem consultas
+        $ctx['liberadas'] = array_merge($ctx['liberadas'], CHAT_FERRAMENTAS_CONSULTA);
     } elseif ($representantes) {
         $ctx['re']        = array_map(fn($r) => (int) $r['re_codigo'], $representantes);
-        $ctx['liberadas'] = array_merge($ctx['liberadas'], array_diff(array_keys(CHAT_PAGINAS_FERRAMENTA), CHAT_FERRAMENTAS_SO_GESTAO));
-    } else {
-        foreach (CHAT_PAGINAS_FERRAMENTA as $ferramenta => $paginas) {
-            foreach ($paginas as $p) {
-                if (chatTemPermissao($ctx, $p)) {
-                    $ctx['liberadas'][] = $ferramenta;
-                    break;
-                }
-            }
-        }
+        $ctx['liberadas'] = array_merge($ctx['liberadas'], array_diff(CHAT_FERRAMENTAS_CONSULTA, CHAT_FERRAMENTAS_SO_GESTAO));
     }
     // Relatório só para quem tem ao menos uma consulta (ele só usa dados delas).
     if (count($ctx['liberadas']) > 1) {
@@ -362,7 +349,14 @@ function chatTextoInicio(array $ctx): array
         $quem = 'Você está vinculado ao representante **' . implode(', ', array_column($ctx['representantes'], 're_nome'))
               . '**: as consultas mostram somente os seus pedidos.';
     } else {
-        $quem = 'Você tem acesso às consultas liberadas para o seu grupo de usuários.';
+        return [
+            'texto'     => "Olá, **{$nome}**! Posso tirar suas dúvidas sobre como usar o DOMBAG, com base na Documentação do sistema.\n\nComo posso ajudar hoje?",
+            'sugestoes' => [
+                'Como funciona a tela Agendamento de Produção?',
+                'Como programar e agendar um pedido?',
+                'O que é uma OP?',
+            ],
+        ];
     }
 
     $itens = [
@@ -380,21 +374,12 @@ function chatTextoInicio(array $ctx): array
         }
     }
 
-    if (!$lista && !$ctx['admin'] && empty($ctx['re'])) {
-        $quem = '';                       // evita "tem acesso..." seguido de "não tem acesso"
-    }
     $texto = trim("Olá, **{$nome}**! {$quem}") . "\n\n";
-    if ($lista) {
-        $texto .= "Comigo, você pode consultar:\n" . implode("\n", $lista) . "\n\n";
-        if (in_array('gerar_relatorio', $l, true)) {
-            $texto .= "Também posso gerar **relatórios em PDF ou Excel** com esses dados.\n\n";
-        }
-        $texto .= 'Como posso ajudar hoje?';
-    } else {
-        $texto .= 'No momento o seu grupo não tem acesso às consultas de vendas ou produção. '
-                . 'Peça a um administrador para liberar as páginas de vendas, faturamento ou produção no seu grupo. '
-                . 'Enquanto isso, posso tirar dúvidas sobre como usar o DOMBAG.';
+    $texto .= "Comigo, você pode consultar:\n" . implode("\n", $lista) . "\n\n";
+    if (in_array('gerar_relatorio', $l, true)) {
+        $texto .= "Também posso gerar **relatórios em PDF ou Excel** com esses dados.\n\n";
     }
+    $texto .= 'Como posso ajudar hoje?';
 
     // Sugestões só do que o usuário pode consultar.
     $sugestoes = [];

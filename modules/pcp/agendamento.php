@@ -43,7 +43,7 @@ if ($acao !== '') {
             }
             match ($acao) {
                 'agendar' => agAgendar($pdo, (int) ($_POST['prg'] ?? 0), (string) ($_POST['tipo'] ?? ''), $dia, $qtd),
-                'mover'   => agMover($pdo, $pg, agSlotAberto($pdo, $agd), $dia),
+                'mover'   => agMover($pdo, $pg, agSlotAberto($pdo, $agd, true), $dia),
                 'editar'  => agEditar($pdo, $pg, $agd, $qtd, $dia),
                 'remover' => agRemover($pdo, $agd),
                 'realizado' => agMarcarRealizado($pdo, $agd, (string) ($_POST['realizado'] ?? '')),
@@ -331,7 +331,6 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
         </div>
         <div class="ag-filtros">
           <input type="search" id="agBusca" placeholder="Buscar pedido, OP ou cliente" aria-label="Buscar pedido, OP ou cliente">
-          <label class="ag-check"><input type="checkbox" id="agSoProg"> Só pedidos da Reunião</label>
           <button type="button" class="ag-btn-cheia" id="agTelaCheia">Tela cheia</button>
         </div>
       </div>
@@ -428,7 +427,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
 
   let dados = null;
   let mes = <?= json_encode($mesInicial) ?>;
-  const filtro = { BAG: true, SACARIA: true, busca: '', soProg: false };
+  const filtro = { BAG: true, SACARIA: true, busca: '' };
   let arrastando = null;
   let toastTimer = 0;
   let selecionado = null;
@@ -493,7 +492,6 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
   // ── Filtros ─────────────────────────────────────────────────────────────
   function passa(item) {
     if (!filtro[item.tipo]) return false;
-    if (filtro.soProg && item.programado === false) return false;
     if (!filtro.busca) return true;
     return `${item.pedido} ${item.op} ${item.cliente}`.toLowerCase().includes(filtro.busca);
   }
@@ -542,7 +540,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     const passado = c.dia < dados.hoje;
     const pct = c.plan > 0 ? Math.min(100, c.real / c.plan * 100) : (c.real > 0 ? 100 : 0);
     const classes = ['ag-card', 'tipo-' + c.tipo, c.status];
-    if (c.editavel) classes.push('pode-mover');
+    if (c.movel) classes.push('pode-mover');
     if (!c.programado) classes.push('fora');
 
     // A quantidade produzida vem primeiro; o previsto aparece ao lado quando existe
@@ -554,7 +552,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     } else {
       qtd = `${nf.format(c.aberto)} ${unidade[c.tipo]} <small>em aberto</small>`;
     }
-    return `<div class="${classes.join(' ')}" ${c.editavel ? 'draggable="true"' : ''} tabindex="0" role="button" data-card="${i}"
+    return `<div class="${classes.join(' ')}" ${c.movel ? 'draggable="true"' : ''} tabindex="0" role="button" data-card="${i}"
         title="${esc((c.pedido ? 'Pedido ' + c.pedido + ', ' : '') + 'OP ' + c.op + ': ' + c.cliente)}">
       <span class="ag-enche" style="width:${pct}%"></span>
       <span class="ag-qtd">${qtd}</span>
@@ -571,7 +569,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     const porDia = {};
     const soAgendado = document.body.classList.contains('ag-cheia');
     dados.cards.forEach((c, i) => {
-      if (passa(c) && (!soAgendado || c.plan > 0)) (porDia[c.dia] ??= []).push([c, i]);
+      if (c.planejado && passa(c) && (!soAgendado || c.plan > 0)) (porDia[c.dia] ??= []).push([c, i]);
     });
     $('agSemAgenda').hidden = !soAgendado || Object.keys(porDia).length > 0;
 
@@ -585,8 +583,8 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     $('agGrade').innerHTML = dias.map(dia => {
       const dt = new Date(dia + 'T12:00:00');
       const itens = (porDia[dia] || []).sort(([a], [b]) => a.tipo.localeCompare(b.tipo) || (b.real + b.plan) - (a.real + a.plan));
-      const entregas = (soAgendado ? [] : dados.entregas[dia] || []).filter(e => filtro.busca === '' || `${e.pedido} ${e.op} ${e.cliente}`.toLowerCase().includes(filtro.busca));
-      const marcos = (dados.marcos[dia] || []).filter(m => filtro.busca === '' || `${m.pedido} ${m.op} ${m.cliente}`.toLowerCase().includes(filtro.busca));
+      const entregas = (soAgendado ? [] : dados.entregas[dia] || []).filter(e => e.planejado).filter(e => filtro.busca === '' || `${e.pedido} ${e.op} ${e.cliente}`.toLowerCase().includes(filtro.busca));
+      const marcos = (dados.marcos[dia] || []).filter(m => m.planejado).filter(m => filtro.busca === '' || `${m.pedido} ${m.op} ${m.cliente}`.toLowerCase().includes(filtro.busca));
       const classes = ['ag-dia'];
       if (!dia.startsWith(dados.mes)) classes.push('outro-mes');
       if (dia < dados.hoje) classes.push('passado');
@@ -660,7 +658,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
   area.addEventListener('dragover', e => {
     if (!arrastando) return;
     if (e.target.closest('#agFila')) {
-      if (arrastando.tipo === 'card') {
+      if (arrastando.tipo === 'card' && arrastando.item.editavel) {
         e.preventDefault();
         $('agFila').classList.add('solta');
       }
@@ -683,7 +681,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     const naFila = e.target.closest('#agFila');
     limparArraste();
 
-    if (naFila && tipo === 'card') {
+    if (naFila && tipo === 'card' && item.editavel) {
       enviar('remover', { agd: item.agd }, 'Agendamento removido. O saldo voltou para A agendar.');
     } else if (cel && diaAberto(cel.dataset.dia)) {
       const dia = cel.dataset.dia;
@@ -724,6 +722,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
 
     let nota = '';
     if (!novo && !item.programado) nota = 'Este pedido não está na Reunião de Planejamento. Para agendá-lo, adicione-o lá primeiro.';
+    else if (!novo && item.movel && !item.editavel) nota = 'O pedido não iniciou neste dia. Arraste o card para hoje ou um dia à frente.';
     else if (!novo && item.status === 'abaixo') nota = 'Dia encerrado. O que faltou voltou para A agendar.';
     else if (!novo && !editavel && item.plan > 0) nota = 'Dia encerrado: dia e previsto não mudam mais.';
     else if (!novo && editavel) nota = 'Para dividir em vários dias, reduza o previsto aqui: o restante volta para A agendar.';
@@ -836,7 +835,6 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     $('agBusca').value = buscaLink;
     filtro.busca = buscaLink.toLowerCase();
   }
-  $('agSoProg').addEventListener('change', e => { filtro.soProg = e.target.checked; render(); });
 
   // ── Tela cheia ──────────────────────────────────────────────────────────
   // Sem suporte do navegador (iPhone), ainda esconde os menus para dar mais espaço

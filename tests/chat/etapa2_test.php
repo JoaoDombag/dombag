@@ -27,14 +27,26 @@ teste('escopo: representante vinculado só vê os próprios RE_CODIGO', function
     igual([6], $c['re']);
 });
 
-teste('escopo: sem vínculo e sem permissão → só meu_perfil', function () {
+teste('escopo: sem vínculo → só meu_perfil, mesmo com páginas no grupo', function () {
     igual(['meu_perfil'], nomesLiberados(chatMontarEscopo(ctxTeste(), [])));
+    $c = chatMontarEscopo(ctxTeste(UID_A, ['permissoes' => ['/relatorios/historico-faturamento', '/yzidro/consulta']]), []);
+    igual(['meu_perfil'], nomesLiberados($c));
+    igual(true, $c['so_site']);
+    $r = chatExecutarFerramenta('listar_pedidos', ['data_ini' => '2026-09-01', 'data_fim' => '2026-09-30'], $c, 'x', dbPDO());
+    igual(false, $r['ok']);
+    igual(['meu_perfil'], array_column(chatFerramentasDisponiveis($c), 'name'));
 });
 
-teste('escopo: sem vínculo, ferramentas conforme páginas do grupo', function () {
-    $c = chatMontarEscopo(ctxTeste(UID_A, ['permissoes' => ['/relatorios/historico-faturamento']]), []);
-    igual(['meu_perfil', 'resumo_faturamento', 'faturamento_notas', 'conciliar_faturamento', 'gerar_relatorio'], nomesLiberados($c));
-    igual(null, $c['re']);
+teste('escopo: admin e representante não ficam restritos ao site', function () {
+    igual(false, chatMontarEscopo(ctxTeste(UID_A, ['admin' => true]), [])['so_site']);
+    igual(false, chatMontarEscopo(ctxTeste(), [['re_codigo' => 6, 're_nome' => 'X']])['so_site']);
+});
+
+teste('contexto: a documentação só vai para quem está restrito ao site', function () {
+    $doc = chatContextoTexto(chatMontarEscopo(ctxTeste(), []) + ['documentacao' => 'TEXTO DA DOC']);
+    confere(str_contains($doc, "<documentacao>\nTEXTO DA DOC\n</documentacao>") && str_contains($doc, 'só pode tirar dúvidas sobre como usar o site'));
+    $adm = chatContextoTexto(chatMontarEscopo(ctxTeste(UID_A, ['admin' => true]), []) + ['documentacao' => 'TEXTO DA DOC']);
+    confere(!str_contains($adm, 'TEXTO DA DOC') && !str_contains($adm, 'só pode tirar dúvidas'));
 });
 
 teste('escopo: ERP fora do ar → não admin fica sem consultas (falha fechada)', function () {
@@ -166,11 +178,8 @@ teste('tela inicial: apresentação e sugestões seguem as permissões de cada u
     $rep = chatTextoInicio(chatMontarEscopo(ctxTeste(UID_A, ['nome' => 'Rep']), [['re_codigo' => 6, 're_nome' => 'DANIELE']]));
     confere(str_contains($rep['texto'], 'representante **DANIELE**') && str_contains($rep['texto'], 'somente os seus pedidos'));
 
-    $fat = chatTextoInicio(chatMontarEscopo(ctxTeste(UID_A, ['permissoes' => ['/relatorios/historico-faturamento']]), []));
-    confere(str_contains($fat['texto'], 'Resumo de faturamento') && !str_contains($fat['texto'], 'Lista de pedidos'), 'só o que o grupo libera');
-    confere(!in_array('Liste os pedidos emitidos nos últimos 7 dias', $fat['sugestoes'], true), 'sugestão de consulta não liberada');
-
-    $nada = chatTextoInicio(chatMontarEscopo(ctxTeste(UID_A, ['nome' => 'Maria']), []));
-    igual([], $nada['sugestoes']);
-    confere(str_contains($nada['texto'], 'não tem acesso') && !str_contains($nada['texto'], 'Você tem acesso'), 'texto contraditório');
+    $site = chatTextoInicio(chatMontarEscopo(ctxTeste(UID_A, ['nome' => 'Maria', 'permissoes' => ['/relatorios/historico-faturamento']]), []));
+    confere(str_starts_with($site['texto'], 'Olá, **Maria**!') && str_contains($site['texto'], 'dúvidas sobre como usar o DOMBAG'));
+    confere(!str_contains($site['texto'], 'Resumo de faturamento'), 'grupo não libera consulta');
+    igual('Como funciona a tela Agendamento de Produção?', $site['sugestoes'][0]);
 });

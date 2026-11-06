@@ -55,6 +55,7 @@ RewriteRule ^yzidro/producao$          modules/yzidro/producao.php             [
 
 # PCP — Produção
 RewriteRule ^pcp/planejamento$         modules/pcp/planejamento.php            [L,QSA]
+RewriteRule ^documentacao$             modules/documentacao/documentacao.php   [L,QSA]
 RewriteRule ^pcp/reuniao$              modules/pcp/planejamento2.php           [L,QSA]
 RewriteRule ^pcp/agendamento$          modules/pcp/agendamento.php             [L,QSA]
 RewriteRule ^pcp/etapas$               modules/pcp/etapas_producao.php         [L,QSA]

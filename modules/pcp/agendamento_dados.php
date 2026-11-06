@@ -14,8 +14,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/producao_tipo.php';
 //    fabricação. Status 'E' ainda é a quantidade esperada: fica como
 //    "em aberto" e não conta como produzido.
 //
-//  Dias passados são registro: só hoje e os dias à frente podem mudar. O
-//  realizado é a exceção: marca-se em hoje e nos dias passados.
+//  Dias passados são registro: só hoje e os dias à frente podem mudar. Há
+//  duas exceções: o realizado marca-se em hoje e nos dias passados, e o pedido
+//  que não iniciou no dia pode ser arrastado de lá para hoje ou um dia à frente.
 //  O que faltou num dia passado volta sozinho para o saldo a agendar.
 // ══════════════════════════════════════════════════════════════════════
 
@@ -270,6 +271,9 @@ function agMontar(PDO $db, $pg, string $mes): array
     $slots = array_filter($stmt->fetchAll(PDO::FETCH_ASSOC), static fn ($s) =>
         !$prgFinalizado[$s['PRG_CODIGO']] || $s['AGD_DATA'] < $hoje);
 
+    // Pedido planejado é o que tem dia na agenda. A TV segue mostrando também o que está em produção hoje.
+    $opsPlanejadas = array_fill_keys(array_map('intval', array_column($slots, 'PROD_CODIGO')), true);
+
     $prgPorCodigo = array_column($programados, null, 'PRG_CODIGO');
     $prgPorOp = [];
     foreach ($programados as $p) {
@@ -352,6 +356,7 @@ function agMontar(PDO $db, $pg, string $mes): array
 
     foreach ($cards as &$c) {
         $c['erp']  = $c['real'];
+        $c['planejado'] = isset($opsPlanejadas[$c['op']]);
         $c['real'] = $c['feito'] ?? $c['real'];
         $temPlano = $c['plan'] > 0;
         $c['status'] = match (true) {
@@ -361,6 +366,8 @@ function agMontar(PDO $db, $pg, string $mes): array
             default                   => 'agendado',
         };
         $c['editavel'] = $temPlano && $c['dia'] >= $hoje;
+        $c['movel']    = $c['editavel'] || ($pg && $temPlano && empty($prgFinalizado[$c['prg']])
+            && agNaoIniciou($c['feito'], $c['erp'], $c['aberto']));
         $c['tarde']    = $temPlano && $c['status'] !== 'cumprido' && $c['entrega'] && $c['dia'] > $c['entrega'];
     }
     unset($c);
@@ -414,7 +421,7 @@ function agMontar(PDO $db, $pg, string $mes): array
 
     $resumo = [];
     foreach ($cards as $c) {
-        if (!str_starts_with($c['dia'], $mes)) {
+        if (!str_starts_with($c['dia'], $mes) || !$c['planejado']) {
             continue;
         }
         // Totais ficam no ERP: o marcado à mão pode repetir um lançamento de outro dia
@@ -446,6 +453,7 @@ function agMontar(PDO $db, $pg, string $mes): array
                 'pedido'  => ($info[$op]['pedido'] ?? '') ?: (string) $p['VENDA_REF'],
                 'cliente' => ($info[$op]['cliente'] ?? '') ?: (string) $p['CLI_NOME'],
                 'op'      => $op,
+                'planejado' => isset($opsPlanejadas[$op]),
             ];
         }
     }
@@ -462,6 +470,7 @@ function agMontar(PDO $db, $pg, string $mes): array
             $op = (int) $p['PROD_CODIGO'];
             $marcos[$dia][] = [
                 'marco'   => $marco,
+                'planejado' => isset($opsPlanejadas[$op]),
                 'pedido'  => ($info[$op]['pedido'] ?? '') ?: (string) $p['VENDA_REF'],
                 'cliente' => ($info[$op]['cliente'] ?? '') ?: (string) $p['CLI_NOME'],
                 'op'      => $op,
@@ -565,8 +574,31 @@ function agExigirDiaAberto(string $dia): void
     }
 }
 
-// Agendamento ainda editável, ou erro
-function agSlotAberto(PDO $db, int $agd): array
+// Sem produção marcada, confirmada ou em aberto. Realizado zero é "nada produzido".
+function agNaoIniciou(?float $feito, float $erp, float $aberto): bool
+{
+    return ($feito ?? 0.0) <= 0 && $erp <= 0 && $aberto <= 0;
+}
+
+function agExigirNaoIniciado($pg, array $slot): void
+{
+    $erro = 'Este dia já tem produção e não pode ser movido.';
+    if ((float) $slot['AGD_REALIZADO'] > 0) {
+        throw new RuntimeException($erro);
+    }
+    if (!$pg) {
+        throw new RuntimeException('Sem conexão com o ERP não é possível confirmar que o pedido não iniciou neste dia.');
+    }
+    foreach (agProducaoOps($pg, [(int) $slot['PROD_CODIGO']]) as $r) {
+        if ($r['dia'] === $slot['AGD_DATA'] && $r['tipo'] === $slot['AGD_TIPO']
+            && !agNaoIniciou(null, (float) $r['qtd'], (float) $r['aberto'])) {
+            throw new RuntimeException($erro);
+        }
+    }
+}
+
+// Agendamento ainda editável, ou erro. $passado aceita dia passado, para mover.
+function agSlotAberto(PDO $db, int $agd, bool $passado = false): array
 {
     $stmt = $db->prepare('
         SELECT a.*, p.PRG_FINALIZADO
@@ -579,7 +611,9 @@ function agSlotAberto(PDO $db, int $agd): array
     if (!$slot || $slot['PRG_FINALIZADO']) {
         throw new RuntimeException('Este agendamento não existe mais. A tela foi atualizada.');
     }
-    agExigirDiaAberto($slot['AGD_DATA']);
+    if (!$passado) {
+        agExigirDiaAberto($slot['AGD_DATA']);
+    }
     return $slot;
 }
 
@@ -599,10 +633,14 @@ function agAgendar(PDO $db, int $prg, string $tipo, string $dia, float $qtd): vo
     agSincronizarPrevia($db, $prg);
 }
 
-// Hoje com produção já lançada: o que foi feito fica no dia, só o restante muda de data
+// Hoje com produção já lançada: o que foi feito fica no dia, só o restante muda de data.
+// De dia passado, só o pedido que não iniciou sai, e sai inteiro.
 function agMover(PDO $db, $pg, array $slot, string $destino): void
 {
     agExigirDiaAberto($destino);
+    if ($slot['AGD_DATA'] < date('Y-m-d')) {
+        agExigirNaoIniciado($pg, $slot);
+    }
     if ($destino === $slot['AGD_DATA']) {
         return;
     }

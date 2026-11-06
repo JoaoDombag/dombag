@@ -120,6 +120,29 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'itens') {
     exit;
 }
 
+// A coluna local é copiada na importação; o ERP tem a data atual da venda atacado
+function piSaidasErp($pg, array $pedidos): array
+{
+    $numeros = array_filter(array_map('strval', $pedidos), 'ctype_digit');
+    if (!$pg || !$numeros) {
+        return [];
+    }
+    $res = @pg_query_params($pg, "
+        SELECT VEN_COD_PEDIDO::TEXT AS pedido, TO_CHAR(DATA_FINALIZA, 'YYYY-MM-DD') AS saida
+          FROM VENDAS
+         WHERE EMP_CODIGO = 1
+           AND DATA_FINALIZA IS NOT NULL
+           AND VEN_COD_PEDIDO = ANY(\$1::int[])
+    ", ['{' . implode(',', $numeros) . '}']);
+    if (!$res) {
+        error_log('[PEDIDOS] ' . pg_last_error($pg));
+        return [];
+    }
+    $saidas = array_column(pg_fetch_all($res) ?: [], 'saida', 'pedido');
+    pg_free_result($res);
+    return $saidas;
+}
+
 // ── Filtros ───────────────────────────────────────────────────────────────────
 $filters = [
     'entrega_ini' => piSanitizeDate($_GET['entrega_ini'] ?? ''),
@@ -210,6 +233,12 @@ $stmt = $pdo->prepare("
 $stmt->execute($params);
 $vendas = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
+$saidasErp = piSaidasErp(dbPG(), array_column($vendas, 'pedido'));
+foreach ($vendas as &$venda) {
+    $venda['datafatura'] = $saidasErp[$venda['pedido']] ?? $venda['datafatura'];
+}
+unset($venda);
+
 $totalVendas = count($vendas);
 $totalFin = count(array_filter($vendas, fn ($r) => (int) $r['qtd_itens'] > 0 && (int) $r['qtd_fin'] === (int) $r['qtd_itens']));
 $totalAndamento = $totalVendas - $totalFin;
@@ -284,6 +313,7 @@ $totalAndamento = $totalVendas - $totalFin;
   }
 
   /* Linha de detalhe */
+  .pi-detail-saida { margin-bottom: 8px; font-size: 12px; color: var(--text-muted); }
   .pi-detail-row { display: none; }
   .pi-detail-row.open { display: table-row; }
   .pi-detail-cell {
@@ -435,11 +465,11 @@ $totalAndamento = $totalVendas - $totalFin;
         <form method="get" action="<?= piEscape(piBaseUrl()) ?>">
           <div class="filter-grid">
             <div class="filter-field">
-              <label for="entrega_ini">Entrega inicial</label>
+              <label for="entrega_ini">Saída/Faturamento inicial</label>
               <input type="date" id="entrega_ini" name="entrega_ini" value="<?= piEscape($filters['entrega_ini']) ?>">
             </div>
             <div class="filter-field">
-              <label for="entrega_fim">Entrega final</label>
+              <label for="entrega_fim">Saída/Faturamento final</label>
               <input type="date" id="entrega_fim" name="entrega_fim" value="<?= piEscape($filters['entrega_fim']) ?>">
             </div>
             <div class="filter-field">
@@ -513,7 +543,7 @@ $totalAndamento = $totalVendas - $totalFin;
                 <th>Pedido</th>
                 <th>Cliente</th>
                 <th>Emissão</th>
-                <th>Entrega</th>
+                <th>Saída/Faturamento</th>
                 <th>Representante</th>
                 <th class="pi-right">Itens</th>
                 <th>Prazo produção</th>
@@ -567,6 +597,7 @@ $totalAndamento = $totalVendas - $totalFin;
                         data-pedido="<?= piEscape($pedido) ?>"
                         data-cliente="<?= piEscape($row['cliente'] ?? '—') ?>"
                         data-rep="<?= piEscape($row['representante'] ?? '—') ?>"
+                        data-saida="<?= piEscape(piFmtDate($row['datafatura'] ?? '')) ?>"
                         aria-expanded="false"
                         title="Ver itens"
                       >+</button>
@@ -742,7 +773,7 @@ $totalAndamento = $totalVendas - $totalFin;
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.msg || 'Falha ao carregar os itens.');
-      container.innerHTML      = buildItemsTable(data.itens);
+      container.innerHTML      = `<div class="pi-detail-saida">Saída/Faturamento: <strong>${escHtml(button.dataset.saida)}</strong></div>` + buildItemsTable(data.itens);
       container.dataset.loaded = '1';
     } catch (err) {
       container.innerHTML = `<div class="pi-detail-error">${escHtml(err.message)}</div>`;

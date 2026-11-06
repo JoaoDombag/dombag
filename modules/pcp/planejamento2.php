@@ -465,7 +465,7 @@ if (!$pg && $error === '') {
   .p2-filter-field input { height: 36px; padding: 0 10px; font-size: 12.5px; font-family: 'Segoe UI', sans-serif; width: 170px; }
   #p2ResultsBody td:nth-child(2) { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .p2-progresso { min-width: 190px; font-size: 12px; line-height: 1.5; }
-  .p2-progresso a { font-weight: 600; white-space: nowrap; }
+  .p2-progresso a { white-space: nowrap; }
   #p2ResultsBody input[type="date"], #p2Tbody input[type="date"] { width: 130px; height: 30px; padding: 0 6px; font-size: 11.5px; }
   .p2-add-btn { padding: 5px 12px; height: 28px; border-radius: 7px; border: none; background: var(--blue-accent, #1e4fc9); color: #fff; font-family: 'Segoe UI', sans-serif; font-size: 11.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
   .p2-add-btn:hover { background: var(--blue-light); }
@@ -570,7 +570,7 @@ if (!$pg && $error === '') {
                     <td class="p2-progresso">
                       <?php $prog = $progresso[(int) $row['prg_codigo']] ?? null; ?>
                       <?php foreach (agProgressoLinhas($prog) as $linha): ?><div><?= p2Escape($linha) ?></div><?php endforeach; ?>
-                      <a href="<?= p2Escape(agLinkCalendario((int) $row['prod_codigo'], $prog)) ?>">Ver no calendário</a>
+                      <a class="panel-action" href="<?= p2Escape(agLinkCalendario((int) $row['prod_codigo'], $prog)) ?>">Ver no calendário</a>
                     </td>
                     <td>
                       <select class="status-sel"
