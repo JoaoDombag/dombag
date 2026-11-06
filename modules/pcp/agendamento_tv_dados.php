@@ -11,8 +11,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/agendamento_dados.php';
 // ══════════════════════════════════════════════════════════════
 
 const AGTV_UNIDADE = [PROD_TIPO_BAG => 'bags', PROD_TIPO_SACARIA => 'sacarias'];
-const AGTV_TIPO = [PROD_TIPO_BAG => 'Big Bag', PROD_TIPO_SACARIA => 'Sacaria'];
-const AGTV_MARCOS = ['inicio' => 'Início'];
+const AGTV_MARCOS = ['inicio' => 'Início', 'finalizado' => 'Finalizado'];
 const AGTV_MESES   = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho',
                       'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -54,7 +53,7 @@ function agTvQtd(array $c, string $hoje): string
     return match (true) {
         $c['real'] > 0   => agTvNum($c['real']) . " {$un} s/ agenda",
         $c['aberto'] > 0 => agTvNum($c['aberto']) . " {$un} em aberto",
-        default          => AGTV_TIPO[$c['tipo']] . ' sem agenda',
+        default          => AG_TIPO_NOME[$c['tipo']] . ' sem agenda',
     };
 }
 
@@ -130,7 +129,62 @@ function agTvComAtivas(array $cards, array $ativas, array $info, string $hoje): 
 function agTvMarco(array $m): array
 {
     $pedido = $m['pedido'] !== '' ? $m['pedido'] : 'OP ' . $m['op'];
-    return ['marco' => $m['marco'], 'texto' => trim(AGTV_MARCOS[$m['marco']] . " {$pedido} {$m['cliente']}")];
+    return [
+        'marco'    => $m['marco'],
+        'texto'    => trim(AGTV_MARCOS[$m['marco']] . " {$pedido} {$m['cliente']}"),
+        'tipo'     => $m['tipo'] ?? null,
+        'iniciada' => $m['iniciada'] ?? null,
+        'detalhe'  => $m['detalhe'] ?? '',
+    ];
+}
+
+// Pedidos da Reunião finalizados no período. Sem FATURADO = 'Y', DATA_FINALIZA é
+// só a previsão de saída: há pedidos com data futura e OP ainda aberta.
+function agTvBuscarFinalizados(PDO $db, $pg, string $ini, string $fim): array
+{
+    $ops = array_map('intval', $db->query('SELECT PROD_CODIGO FROM PCP_PROGRAMACAO')->fetchAll(PDO::FETCH_COLUMN));
+    if (!$ops) {
+        return [];
+    }
+    return agPgAll($pg, "
+        SELECT PR.PROD_CODIGO AS op, TRIM(PR.VENDA_REF) AS pedido, V.DATA_FINALIZA::date AS dia
+          FROM PRODUCAO PR
+          JOIN VENDAS V ON V.EMP_CODIGO = PR.EMP_CODIGO AND V.VEN_COD_PEDIDO::TEXT = TRIM(PR.VENDA_REF)
+         WHERE PR.EMP_CODIGO = 1
+           AND PR.PROD_CODIGO = ANY(\$1::int[])
+           AND TRIM(V.FATURADO) = 'Y'
+           AND V.DATA_FINALIZA >= \$2::date AND V.DATA_FINALIZA < \$3::date + 1
+         ORDER BY 3, 2, 1
+    ", ['{' . implode(',', array_unique($ops)) . '}', $ini, $fim]);
+}
+
+// Um marcador por pedido, mesmo com mais de uma OP. $info vem de agOpsInfo.
+function agTvMarcosFinalizados(array $linhas, array $info): array
+{
+    $pedidos = [];
+    foreach ($linhas as $l) {
+        $op = (int) $l['op'];
+        $k  = "{$l['dia']}|{$l['pedido']}";
+        $pedidos[$k] ??= ['dia' => $l['dia'], 'pedido' => $l['pedido'], 'op' => $op,
+                          'cliente' => $info[$op]['cliente'] ?? '', 'tipos' => []];
+        $pedidos[$k]['tipos'] += $info[$op]['tipos'] ?? [];
+    }
+
+    $marcos = [];
+    foreach ($pedidos as $p) {
+        $tipos = array_keys($p['tipos']);
+        sort($tipos);
+        $marcos[$p['dia']][] = [
+            'marco'    => 'finalizado',
+            'pedido'   => $p['pedido'],
+            'cliente'  => $p['cliente'],
+            'op'       => $p['op'],
+            'tipo'     => count($tipos) === 1 ? $tipos[0] : null,
+            'iniciada' => true,
+            'detalhe'  => implode(' e ', array_map(static fn ($t) => AG_TIPO_NOME[$t], $tipos)),
+        ];
+    }
+    return $marcos;
 }
 
 // Dias passados seguem só com o agendado: produção fora da agenda aparece no
@@ -230,7 +284,16 @@ function agTvDemo(string $mes): array
     ];
 
     $marcos = [
-        $hoje => [['marco' => 'inicio', 'pedido' => '7999', 'cliente' => $clientes[0], 'op' => 8999]],
+        $hoje => [
+            ['marco' => 'inicio', 'pedido' => '7999', 'cliente' => $clientes[0], 'op' => 8999,
+             'tipo' => PROD_TIPO_BAG, 'iniciada' => true, 'detalhe' => agMarcoDetalhe(PROD_TIPO_BAG, true)],
+            ['marco' => 'inicio', 'pedido' => '7998', 'cliente' => $clientes[1], 'op' => 8998,
+             'tipo' => PROD_TIPO_SACARIA, 'iniciada' => false, 'detalhe' => agMarcoDetalhe(PROD_TIPO_SACARIA, false)],
+        ],
+        date('Y-m-d', strtotime($hoje . ' -1 weekday')) => [
+            ['marco' => 'finalizado', 'pedido' => '7001', 'cliente' => $clientes[1], 'op' => 9001,
+             'tipo' => PROD_TIPO_BAG, 'iniciada' => true, 'detalhe' => AG_TIPO_NOME[PROD_TIPO_BAG]],
+        ],
     ];
 
     return ['demo' => true] + agTvPainel(['mes' => $mes, 'hoje' => $hoje, 'ini' => $ini, 'fim' => $fim, 'cards' => $cards, 'marcos' => $marcos]);
@@ -246,5 +309,11 @@ function agTvBuscar(PDO $pdo, $pg, string $mes): array
     $d      = agMontar($pdo, $pg, $mes);
     $ativas = agTvOpsAtivas($pg);
     $d['cards'] = agTvComAtivas($d['cards'], $ativas, agOpsInfo($pg, $ativas), $d['hoje']);
+
+    $finalizados = agTvBuscarFinalizados($pdo, $pg, $d['ini'], $d['fim']);
+    $info = agOpsInfo($pg, array_column($finalizados, 'op'));
+    foreach (agTvMarcosFinalizados($finalizados, $info) as $dia => $marcos) {
+        $d['marcos'][$dia] = array_merge($d['marcos'][$dia] ?? [], $marcos);
+    }
     return agTvPainel($d);
 }

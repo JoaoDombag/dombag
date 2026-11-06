@@ -44,7 +44,7 @@ const DOC_TELAS = [
 
     '/pcp/reuniao'       => ['planejar', 'Programação dos pedidos. Na linha de cada um você altera entrega esperada, início da produção e etapa, e vê o andamento com o link para o calendário.'],
     '/pcp/agendamento'   => ['planejar', 'Calendário do mês com os pedidos planejados. Arraste de "A agendar" para definir o dia, divida a quantidade em vários dias e marque o realizado. Pedido sem dia na agenda fica só em "A agendar". Big Bag aparece em verde e Sacaria em roxo.'],
-    '/pcp/tv'            => ['planejar', 'O calendário do Agendamento para a TV da fábrica, somente leitura. No dia de hoje mostra também o que está em produção sem agendamento.', '/pcp/agendamento'],
+    '/pcp/tv'            => ['planejar', 'O calendário do Agendamento para a TV da fábrica, somente leitura. No dia de hoje mostra também o que está em produção sem agendamento. Os pedidos da Reunião que já saíram aparecem como Finalizado, no dia da Saída/Faturamento do Yzidro.', '/pcp/agendamento'],
     '/pcp/kanban'        => ['planejar', 'Quadro com os pedidos por etapa. Arraste um card para mudar a etapa. Cada card mostra o andamento e o link para o calendário.'],
     '/pcp/planejamento'  => ['planejar', 'Pedidos em produção, marcados no kanban antes da reunião.'],
     '/pcp/etapas'        => ['planejar', 'Cadastro das etapas usadas na Reunião de Planejamento.', '/pcp/reuniao'],
@@ -115,6 +115,7 @@ const DOC_GUIAS = [
         'Na Reunião de Planejamento, altere as datas na linha do pedido. Cada data salva ao ser alterada.',
         'No Agendamento, clique no pedido, altere as datas e clique em Salvar datas.',
         'As duas datas aparecem no calendário. O início aparece também na TV, com a cor da legenda.',
+        'O marcador de início mostra Big Bag ou Sacaria e se a produção daquele tipo já foi iniciada. Pedido com os dois tipos tem um marcador para cada.',
         'O início pode ficar vazio. A entrega esperada é obrigatória.',
     ]],
     ['Encontrar um bag, uma OP, um pedido ou um lote', [
@@ -171,6 +172,7 @@ const DOC_TERMOS = [
     ['NSU', 'Número que identifica um bag individual e permite rastreá-lo.'],
     ['Lote', 'Identificação do material consumido ou do produto gerado em uma OP.'],
     ['Agendado', 'Quantidade prevista para um dia no Agendamento de Produção.'],
+    ['Produção do dia', 'Legenda dos cards do calendário. A cor preenche o card conforme o produzido alcança o previsto: vazio com borda tracejada é ainda não produzido, parte preenchida é parte produzida e cheio é tudo produzido. Borda vermelha indica dia passado abaixo do previsto.'],
     ['A agendar', 'Saldo do pedido sem dia marcado. Inclui o que faltou produzir em dias passados.'],
     ['Realizado', 'Quantidade marcada à mão como produzida no dia. No card, vale no lugar do número do ERP.'],
     ['Andamento', 'Quanto do pedido já foi produzido e quanto falta agendar, por exemplo "550 de 1.000 bags, 350 a agendar".'],

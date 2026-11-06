@@ -889,6 +889,10 @@ const BI_LISTA_MAX_W = 900;
 function biApplyScale() {
   const stage = document.getElementById('bizDashboard');
   const wrap = stage.parentElement; // .content
+  // Mede sempre sem a barra de rolagem que este cálculo pode ligar lá embaixo;
+  // senão cada rodada partiria de uma largura diferente.
+  const topo = wrap.scrollTop;
+  wrap.style.overflowY = '';
   const availW = wrap.clientWidth;
   const availH = wrap.clientHeight;
   if (!availW || !availH) return;
@@ -907,7 +911,7 @@ function biApplyScale() {
     stage.style.width = '';
     stage.style.height = '';
     wrap.style.alignItems = '';
-    wrap.style.overflowY = '';
+    wrap.style.justifyContent = '';
     return;
   }
 
@@ -938,7 +942,7 @@ function biApplyScale() {
     stage.style.transformOrigin = '';
     stage.style.marginBottom = '';
     wrap.style.alignItems = '';
-    wrap.style.overflowY = '';
+    wrap.style.justifyContent = '';
     stage.style.transform = `scale(${scale})`;
     return;
   }
@@ -947,17 +951,27 @@ function biApplyScale() {
   // em janelas mais estreitas/altas, cobrir a altura cortava os indicadores
   // das pontas). Se ficar mais alto que a área, rola na vertical; a margem
   // negativa/positiva corrige a altura de layout, que o transform não altera.
-  const scale = Math.max(BI_SCALE_MIN, Math.min(BI_SCALE_MAX, availW / natW));
+  // O painel parte do canto da área e a posição é calculada aqui: com
+  // transform o centro do layout não acompanha o tamanho que aparece na tela.
+  const ajuste = largura => Math.max(BI_SCALE_MIN, Math.min(BI_SCALE_MAX, largura / natW));
+  let scale = ajuste(availW);
   const sobraAltura = natH * scale > availH;
-  wrap.style.alignItems = sobraAltura ? 'flex-start' : '';
-  wrap.style.overflowY = sobraAltura ? 'auto' : '';
-  stage.style.transformOrigin = sobraAltura ? 'top center' : '';
+  wrap.style.alignItems = 'flex-start';
+  wrap.style.justifyContent = 'flex-start';
+  stage.style.transformOrigin = '0 0';
+  if (sobraAltura) {
+    // A barra de rolagem ocupa largura: reescala com o que sobrou
+    wrap.style.overflowY = 'auto';
+    scale = ajuste(wrap.clientWidth);
+  }
+  const margemLateral = Math.max(0, (wrap.clientWidth - natW * scale) / 2);
   stage.style.marginBottom = sobraAltura ? (natH * (scale - 1)) + 'px' : '';
   // Mais baixo que a área: estica o painel na altura (a linha de OPs/Meta
   // absorve a sobra, ver .biz-toprow) pra preencher tudo, sem faixas vazias
   // em cima e embaixo.
   stage.style.height = sobraAltura ? '' : (availH / scale) + 'px';
-  stage.style.transform = `scale(${scale})`;
+  stage.style.transform = `translateX(${margemLateral}px) scale(${scale})`;
+  wrap.scrollTop = topo; // a atualização a cada 15s não pode pular pro topo
 }
 window.addEventListener('resize', biApplyScale);
 
@@ -1069,6 +1083,8 @@ function biReflowChart() {
   requestAnimationFrame(biApplyScale);
 }
 window.addEventListener('resize', biReflowChart);
+// Abrir ou recolher o menu lateral muda a área do painel sem redimensionar a janela
+new ResizeObserver(biReflowChart).observe(document.querySelector('.content'));
 // Ao cruzar o breakpoint (girar o celular), troca entre lista rolável e painel de TV
 biMqMobile.addEventListener('change', biReflowChart);
 

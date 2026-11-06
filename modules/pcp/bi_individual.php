@@ -612,6 +612,8 @@ function biApplyScale() {
 }
 window.addEventListener('resize', biApplyScale);
 biMqMobile.addEventListener('change', biApplyScale);
+// Abrir ou recolher o menu lateral muda a área do painel sem redimensionar a janela
+new ResizeObserver(() => requestAnimationFrame(biApplyScale)).observe(document.querySelector('.content'));
 
 function biRenderAll(data) {
   biMetaAtual = Number(data.meta || 0);

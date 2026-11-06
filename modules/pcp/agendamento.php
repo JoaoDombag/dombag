@@ -101,10 +101,11 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
   .ag-tipo-btn::before { content: ''; width: 11px; height: 11px; border-radius: 3px; background: rgb(var(--tipo)); }
   .ag-tipo-btn[aria-pressed="false"] { background: none; border-color: var(--border); color: var(--text-muted); text-decoration: line-through; }
   .ag-tipo-btn[aria-pressed="false"]::before { opacity: .3; }
+  .ag-leg-grupo { font-weight: 700; color: var(--text-primary); }
   .ag-amostra { display: inline-flex; align-items: center; gap: 6px; }
-  .ag-amostra i { width: 26px; height: 13px; border-radius: 3px; display: block; background: var(--card-bg); }
+  .ag-amostra i { width: 34px; height: 14px; border-radius: 3px; display: block; background: var(--card-bg); }
   .ag-amostra .s-agendado { border: 1px dashed var(--text-muted); }
-  .ag-amostra .s-parcial  { border: 1px solid var(--text-muted); background: linear-gradient(90deg, var(--text-muted) 55%, transparent 55%); }
+  .ag-amostra .s-parcial  { border: 1px dashed var(--text-muted); background: linear-gradient(90deg, var(--text-muted) 45%, transparent 45%); }
   .ag-amostra .s-produzido { background: var(--text-muted); }
   .ag-amostra .s-abaixo { border: 1px solid var(--red); }
   .ag-amostra .s-inicio { background: #a3e635; }
@@ -178,6 +179,11 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .ag-marco.inicio { background: rgba(163,230,53,.16); border-left: 3px solid #a3e635; }
+  .ag-marco.BAG { border-left-color: #22c55e; }
+  .ag-marco.SACARIA { border-left-color: #a855f7; }
+  .ag-marco-sub { display: block; font-size: 10px; font-weight: 500; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; }
+  .ag-marco-sub.pendente { color: var(--amber); }
+  :root[data-theme="claro"] .ag-marco-sub.pendente { color: #a16207; }
 
   /* O card é um medidor: a cor enche conforme o produzido alcança o previsto */
   .ag-card {
@@ -334,10 +340,12 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
       <div class="ag-legenda">
         <button type="button" class="ag-tipo-btn tipo-BAG" data-tipo="BAG" aria-pressed="true">Big Bag</button>
         <button type="button" class="ag-tipo-btn tipo-SACARIA" data-tipo="SACARIA" aria-pressed="true">Sacaria</button>
-        <span class="ag-amostra"><i class="s-agendado"></i> Agendado</span>
-        <span class="ag-amostra"><i class="s-parcial"></i> Em produção</span>
-        <span class="ag-amostra"><i class="s-produzido"></i> Produzido</span>
+        <span class="ag-leg-grupo">Produção do dia:</span>
+        <span class="ag-amostra"><i class="s-agendado"></i> Ainda não produzido</span>
+        <span class="ag-amostra"><i class="s-parcial"></i> Parte produzida</span>
+        <span class="ag-amostra"><i class="s-produzido"></i> Tudo produzido</span>
         <span class="ag-amostra"><i class="s-abaixo"></i> Abaixo do previsto</span>
+        <span class="ag-leg-grupo">Pedido:</span>
         <span class="ag-amostra"><i class="s-inicio"></i> Início da produção</span>
       </div>
 
@@ -578,7 +586,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
       const dt = new Date(dia + 'T12:00:00');
       const itens = (porDia[dia] || []).sort(([a], [b]) => a.tipo.localeCompare(b.tipo) || (b.real + b.plan) - (a.real + a.plan));
       const entregas = (soAgendado ? [] : dados.entregas[dia] || []).filter(e => e.planejado).filter(e => filtro.busca === '' || `${e.pedido} ${e.op} ${e.cliente}`.toLowerCase().includes(filtro.busca));
-      const marcos = (dados.marcos[dia] || []).filter(m => m.planejado).filter(m => filtro.busca === '' || `${m.pedido} ${m.op} ${m.cliente}`.toLowerCase().includes(filtro.busca));
+      const marcos = (dados.marcos[dia] || []).filter(m => m.planejado && (!m.tipo || filtro[m.tipo])).filter(m => filtro.busca === '' || `${m.pedido} ${m.op} ${m.cliente}`.toLowerCase().includes(filtro.busca));
       const classes = ['ag-dia'];
       if (!dia.startsWith(dados.mes)) classes.push('outro-mes');
       if (dia < dados.hoje) classes.push('passado');
@@ -598,7 +606,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
           <span class="ag-num">${dt.getDate()}<span class="ag-rotulo-dia"> ${esc(rotulo)}</span></span>
           <span class="ag-dia-soma">${somaHtml}</span>
         </div>
-        ${marcos.map(m => `<div class="ag-marco ${m.marco}" title="${marcoNome[m.marco]}: ${esc(m.cliente)}">${marcoNome[m.marco]} ${esc(m.pedido || 'OP ' + m.op)} ${esc(m.cliente)}</div>`).join('')}
+        ${marcos.map(m => `<div class="ag-marco ${m.marco} ${m.tipo || ''}" title="${marcoNome[m.marco]}: ${esc(m.cliente)}${m.detalhe ? ' (' + esc(m.detalhe) + ')' : ''}">${marcoNome[m.marco]} ${esc(m.pedido || 'OP ' + m.op)} ${esc(m.cliente)}${m.detalhe ? `<span class="ag-marco-sub${m.iniciada ? '' : ' pendente'}">${esc(m.detalhe)}</span>` : ''}</div>`).join('')}
         ${entregas.map(e => `<div class="ag-entrega" title="Entrega esperada: ${esc(e.cliente)}">Entrega ${esc(e.pedido || 'OP ' + e.op)} ${esc(e.cliente)}</div>`).join('')}
         ${itens.map(([c, i]) => htmlCard(c, i)).join('')}
       </div>`;

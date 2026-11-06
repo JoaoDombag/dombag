@@ -94,6 +94,11 @@ $comMarco = agTvPainel($base + ['cards' => [], 'marcos' => ['2026-11-04' => [
     ['marco' => 'inicio', 'pedido' => '', 'cliente' => 'Cliente', 'op' => 3187],
 ]]]);
 confere('marcos no dia', array_column($comMarco['semanas'][1][2]['marcos'], 'texto'), ['Início 3829 Cliente', 'Início OP 3187 Cliente']);
+confere('sem ERP não há situação', $comMarco['semanas'][1][2]['marcos'][0]['detalhe'], '');
+confere('bag iniciada', agMarcoDetalhe(PROD_TIPO_BAG, true), 'Big Bag · Iniciada');
+confere('sacaria não iniciada', agMarcoDetalhe(PROD_TIPO_SACARIA, false), 'Sacaria · Não iniciada');
+confere('marco leva o tipo para a tela', agTvMarco(['marco' => 'inicio', 'pedido' => '1', 'cliente' => 'C', 'op' => 1, 'tipo' => 'SACARIA', 'iniciada' => false, 'detalhe' => 'x']),
+    ['marco' => 'inicio', 'texto' => 'Início 1 C', 'tipo' => 'SACARIA', 'iniciada' => false, 'detalhe' => 'x']);
 confere('dia sem marco', $comMarco['semanas'][1][3]['marcos'], []);
 confere('marco não conta como agendado', $comMarco['tem_agenda'], false);
 
@@ -135,8 +140,27 @@ $db->exec("INSERT INTO PCP_AGENDA VALUES (1, 1, 3187, 'BAG', '{$diaDepois}', 10,
 $m = agMontar($db, null, $mesTeste);
 confere('início dos dois pedidos', array_column($m['marcos'][$diaAntes], 'pedido'), ['3829', '3830']);
 confere('início futuro só do ativo', array_column($m['marcos'][$diaDepois], 'pedido'), ['3831']);
+confere('sem ERP o marco fica sem tipo', [$m['marcos'][$diaDepois][0]['tipo'], $m['marcos'][$diaDepois][0]['iniciada']], [null, null]);
 confere('card leva o início do pedido', $m['cards'][0]['inicio'], $diaAntes);
 confere('card não traz saída', isset($m['cards'][0]['saida']), false);
+
+// Pedido finalizado no ERP
+$infoFim = [
+    10 => ['cliente' => 'Cliente A', 'tipos' => ['BAG' => ['qtd' => 1.0, 'produto' => 'x']]],
+    11 => ['cliente' => 'Cliente B', 'tipos' => ['SACARIA' => ['qtd' => 1.0, 'produto' => 'y']]],
+    12 => ['cliente' => 'Cliente B', 'tipos' => ['BAG' => ['qtd' => 1.0, 'produto' => 'z']]],
+];
+$fins = agTvMarcosFinalizados([
+    ['op' => 10, 'pedido' => '100', 'dia' => '2026-11-05'],
+    ['op' => 11, 'pedido' => '101', 'dia' => '2026-11-05'],
+    ['op' => 12, 'pedido' => '101', 'dia' => '2026-11-05'],
+], $infoFim);
+confere('um marcador por pedido', array_column($fins['2026-11-05'], 'pedido'), ['100', '101']);
+confere('finalizado mostra o tipo', [$fins['2026-11-05'][0]['tipo'], $fins['2026-11-05'][0]['detalhe']], ['BAG', 'Big Bag']);
+confere('pedido com os dois tipos', [$fins['2026-11-05'][1]['tipo'], $fins['2026-11-05'][1]['detalhe']], [null, 'Big Bag e Sacaria']);
+confere('finalizado não fica pendente', $fins['2026-11-05'][1]['iniciada'], true);
+confere('texto do finalizado', agTvMarco($fins['2026-11-05'][0])['texto'], 'Finalizado 100 Cliente A');
+confere('finalizado sem OP conhecida', agTvMarcosFinalizados([['op' => 99, 'pedido' => '102', 'dia' => '2026-11-05']], [])['2026-11-05'][0]['detalhe'], '');
 
 // Demonstração: precisa se identificar e cobrir os estados do calendário
 $demo = agTvDemo(date('Y-m'));

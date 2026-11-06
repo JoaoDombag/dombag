@@ -95,17 +95,20 @@ session_write_close();
   #btnTela:focus { outline: none; border-color: #58d6c9; }
 
   /* ── Legenda: discreta, no canto inferior esquerdo ── */
-  #legenda { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-flex: 0 0 auto; flex: 0 0 auto; margin-top: .25rem; font-size: .65rem; font-weight: 600; color: #66727f; }
-  .leg { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-right: .9rem; white-space: nowrap; }
-  .leg i { display: block; width: 1rem; height: .5rem; margin-right: .3rem; border-radius: .12rem; border: 1px solid #66727f; opacity: .8; }
+  #legenda { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-flex: 0 0 auto; flex: 0 0 auto; margin-top: .25rem; font-size: .7rem; font-weight: 600; color: #a9b6c4; }
+  .legGrupo { margin: 0 .45rem 0 .6rem; font-weight: 800; color: #eef2f7; white-space: nowrap; }
+  .legGrupo:first-child { margin-left: 0; }
+  .leg { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-right: .7rem; white-space: nowrap; }
+  .leg i { display: block; width: 1.6rem; height: .7rem; margin-right: .3rem; border-radius: .12rem; border: 1px solid #a9b6c4; }
   .leg .bag { background: #22c55e; border-color: #22c55e; }
   .leg .sac { background: #a855f7; border-color: #a855f7; }
   .leg .agendado { border-style: dashed; }
-  .leg .parcial { background: #66727f; background: linear-gradient(90deg, #66727f 55%, transparent 55%); }
-  .leg .cumprido { background: #66727f; }
+  .leg .parcial { border-style: dashed; background: #a9b6c4; background: linear-gradient(90deg, #a9b6c4 45%, transparent 45%); }
+  .leg .cumprido { background: #a9b6c4; }
   .leg .abaixo { border-color: #ef4444; }
   .leg .agora { border-color: #58d6c9; }
   .leg .inicio { background: #a3e635; border-color: #a3e635; }
+  .leg .finalizado { background: #38bdf8; border-color: #38bdf8; }
   #vazio { display: none; margin-left: auto; font-size: .8rem; color: #8fa0b3; }
 
   /* ── Aviso de dados desatualizados / erro ── */
@@ -138,6 +141,11 @@ session_write_close();
 
   .marco { margin-top: .15em; padding: 0 .3em; border-radius: .2em; font-size: .8em; font-weight: 700; line-height: 1.25; color: #eef2f7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .marco.inicio { background: rgba(163,230,53,.18); border-left: .25em solid #a3e635; }
+  .marco.finalizado { background: rgba(56,189,248,.2); border-left: .25em solid #38bdf8; }
+  .marco.BAG { border-left-color: #22c55e; }
+  .marco.SACARIA { border-left-color: #a855f7; }
+  .marcoSub { font-size: .85em; font-weight: 600; color: #a9b6c4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .marcoSub.pendente { color: #fbbf24; }
   .dia.outro .marco { opacity: .55; }
 
   .cartao { position: relative; overflow: hidden; margin-top: .2em; padding: .1em .35em .1em .5em; border-radius: .25em; border: 1px solid #36404c; background: #161d26; line-height: 1.2; }
@@ -213,14 +221,18 @@ setTimeout(function () {
   </div>
 
   <div id="legenda">
+    <span class="legGrupo">Cor:</span>
     <span class="leg"><i class="bag"></i>Big Bag</span>
     <span class="leg"><i class="sac"></i>Sacaria</span>
-    <span class="leg"><i class="agendado"></i>Agendado</span>
-    <span class="leg"><i class="parcial"></i>Em andamento</span>
-    <span class="leg"><i class="cumprido"></i>Produzido</span>
+    <span class="legGrupo">Produção do dia:</span>
+    <span class="leg"><i class="agendado"></i>Ainda não produzido</span>
+    <span class="leg"><i class="parcial"></i>Parte produzida</span>
+    <span class="leg"><i class="cumprido"></i>Tudo produzido</span>
     <span class="leg"><i class="abaixo"></i>Abaixo do previsto</span>
     <span class="leg"><i class="agora"></i>Produzindo agora</span>
+    <span class="legGrupo">Pedido:</span>
     <span class="leg"><i class="inicio"></i>Início da produção</span>
+    <span class="leg"><i class="finalizado"></i>Pedido finalizado</span>
     <span id="vazio">Nenhum pedido agendado neste mês.</span>
   </div>
 </div>
@@ -242,6 +254,7 @@ setTimeout(function () {
   var ALT_COMPACTO = 1.5;
   var ALT_AVISO = 1.05;
   var ALT_MARCO = 1.15;
+  var ALT_MARCO_SUB = 0.9;
   var ALT_SEMANA_MIN = 3.2;
   var FONTE_MIN_REM = 0.7;     // abaixo disso os cards passam a ter uma linha só
   var FONTE_MAX_REM = 1.25;
@@ -292,6 +305,9 @@ setTimeout(function () {
 
   function altDia(d, compacto) {
     var alt = ALT_TOPO + d.marcos.length * ALT_MARCO;
+    for (var m = 0; m < d.marcos.length; m++) {
+      if (d.marcos[m].detalhe) { alt += ALT_MARCO_SUB; }
+    }
     for (var i = 0; i < d.cards.length; i++) { alt += altCard(d.cards[i], compacto); }
     return alt;
   }
@@ -336,9 +352,17 @@ setTimeout(function () {
     el.appendChild(topo);
 
     for (var m = 0; m < d.marcos.length; m++) {
-      el.appendChild(criar('div', 'marco ' + d.marcos[m].marco, d.marcos[m].texto));
+      el.appendChild(criaMarco(d.marcos[m]));
     }
     for (var i = 0; i < d.cards.length; i++) { el.appendChild(criaCartao(d.cards[i], compacto)); }
+    return el;
+  }
+
+  function criaMarco(m) {
+    var el = criar('div', 'marco ' + m.marco + (m.tipo ? ' ' + m.tipo : ''), m.texto);
+    if (m.detalhe) {
+      el.appendChild(criar('div', 'marcoSub' + (m.iniciada ? '' : ' pendente'), m.detalhe));
+    }
     return el;
   }
 

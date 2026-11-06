@@ -22,6 +22,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/producao_tipo.php';
 
 const AG_GRP_BAG = 6; // GRUPOS.GRP_CODIGO no ERP
 const AG_MARCOS  = ['inicio' => 'DATA_INICIO_PRODUCAO'];
+const AG_TIPO_NOME = [PROD_TIPO_BAG => 'Big Bag', PROD_TIPO_SACARIA => 'Sacaria'];
 
 function agPgAll($pg, string $sql, array $params = []): array
 {
@@ -290,17 +291,35 @@ function agMontar(PDO $db, $pg, string $mes): array
     $info          = [];
     if ($pg) {
         $producaoGrade = agProducaoPeriodo($pg, $ini, $fim);
+        $comMarco = array_filter($programados, static function ($p) use ($ini, $fim): bool {
+            foreach (AG_MARCOS as $coluna) {
+                if ($p[$coluna] && $p[$coluna] >= $ini && $p[$coluna] <= $fim) {
+                    return true;
+                }
+            }
+            return false;
+        });
         $codigos = array_unique(array_merge(
             array_map('intval', array_column($ativos, 'PROD_CODIGO')),
-            array_map('intval', array_column($slots, 'PROD_CODIGO'))
+            array_map('intval', array_column($slots, 'PROD_CODIGO')),
+            array_map('intval', array_column($comMarco, 'PROD_CODIGO'))
         ));
         $producaoOps = agProducaoOps($pg, $codigos);
         $info = agOpsInfo($pg, array_unique(array_merge($codigos, array_map('intval', array_column($producaoGrade, 'op')))));
     }
 
     $realDia = [];   // [op][tipo][dia] => qtd confirmada
+    $iniciou = [];   // [op][tipo] => produção em qualquer dia, na mesma regra de agNaoIniciou
     foreach ($producaoOps as $r) {
         $realDia[(int) $r['op']][$r['tipo']][$r['dia']] = (float) $r['qtd'];
+        if (!agNaoIniciou(null, (float) $r['qtd'], (float) $r['aberto'])) {
+            $iniciou[(int) $r['op']][$r['tipo']] = true;
+        }
+    }
+    foreach ($slots as $s) {
+        if (!agNaoIniciou((float) $s['AGD_REALIZADO'], 0.0, 0.0)) {
+            $iniciou[(int) $s['PROD_CODIGO']][$s['AGD_TIPO']] = true;
+        }
     }
 
     // ── Cards do calendário: previsto + produzido por OP, tipo e dia ─────
@@ -455,8 +474,8 @@ function agMontar(PDO $db, $pg, string $mes): array
         }
     }
 
-    // Início da produção marcado no pedido. Como nos agendamentos, o
-    // pedido encerrado na Reunião some dos dias à frente.
+    // Início da produção marcado no pedido, um marcador por tipo. Como nos
+    // agendamentos, o pedido encerrado na Reunião some dos dias à frente.
     $marcos = [];
     foreach ($programados as $p) {
         foreach (AG_MARCOS as $marco => $coluna) {
@@ -465,13 +484,20 @@ function agMontar(PDO $db, $pg, string $mes): array
                 continue;
             }
             $op = (int) $p['PROD_CODIGO'];
-            $marcos[$dia][] = [
-                'marco'   => $marco,
-                'planejado' => isset($opsPlanejadas[$op]),
-                'pedido'  => ($info[$op]['pedido'] ?? '') ?: (string) $p['VENDA_REF'],
-                'cliente' => ($info[$op]['cliente'] ?? '') ?: (string) $p['CLI_NOME'],
-                'op'      => $op,
-            ];
+            // Sem ERP não se sabe o tipo nem a situação: o marcador fica só com a data
+            foreach (array_keys($info[$op]['tipos'] ?? []) ?: [null] as $tipo) {
+                $iniciada = $tipo === null ? null : isset($iniciou[$op][$tipo]);
+                $marcos[$dia][] = [
+                    'marco'    => $marco,
+                    'planejado' => isset($opsPlanejadas[$op]),
+                    'pedido'   => ($info[$op]['pedido'] ?? '') ?: (string) $p['VENDA_REF'],
+                    'cliente'  => ($info[$op]['cliente'] ?? '') ?: (string) $p['CLI_NOME'],
+                    'op'       => $op,
+                    'tipo'     => $tipo,
+                    'iniciada' => $iniciada,
+                    'detalhe'  => agMarcoDetalhe($tipo, $iniciada),
+                ];
+            }
         }
     }
 
@@ -562,6 +588,11 @@ function agExigirDiaAberto(string $dia): void
     if ($dia < date('Y-m-d')) {
         throw new RuntimeException('Dias passados não podem ser alterados.');
     }
+}
+
+function agMarcoDetalhe(?string $tipo, ?bool $iniciada): string
+{
+    return $tipo === null ? '' : AG_TIPO_NOME[$tipo] . ' · ' . ($iniciada ? 'Iniciada' : 'Não iniciada');
 }
 
 // Sem produção marcada, confirmada ou em aberto. Realizado zero é "nada produzido".
