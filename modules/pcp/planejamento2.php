@@ -72,7 +72,7 @@ function p2EnsureTabela(PDO $db): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
-    foreach (['DATA_ENTREGA_VENDEDOR', 'DATA_ENTREGA_ESPERADA', 'DATA_INICIO_PRODUCAO', 'DATA_SAIDA'] as $coluna) {
+    foreach (['DATA_ENTREGA_VENDEDOR', 'DATA_ENTREGA_ESPERADA', 'DATA_INICIO_PRODUCAO'] as $coluna) {
         $chk = $db->prepare(
             'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
@@ -204,7 +204,7 @@ function p2FetchProgramacao(PDO $db, $pg): array
     $stmt = $db->query('
         SELECT p.PRG_CODIGO, p.PROD_CODIGO, p.VENDA_REF, p.VEN_COD_PEDIDO, p.CLI_CODIGO, p.CLI_NOME,
                p.PROD_DATA, p.DATA_ENTREGA, p.DATA_ENTREGA_ESPERADA,
-               p.DATA_INICIO_PRODUCAO, p.DATA_SAIDA, p.PROD_TOTAL, p.TIPO_PRODUCAO,
+               p.DATA_INICIO_PRODUCAO, p.PROD_TOTAL, p.TIPO_PRODUCAO,
                p.PRG_ADICIONADO_EM, p.PRG_ADICIONADO_POR,
                p.ETP_CODIGO, e.ETP_DESCRICAO
         FROM PCP_PROGRAMACAO p
@@ -399,14 +399,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') ==
     header('Content-Type: application/json; charset=utf-8');
     $prgCodigo = (int) ($_POST['prg_codigo'] ?? 0);
     try {
-        $stmt = $pdo->prepare('SELECT DATA_INICIO_PRODUCAO, DATA_SAIDA, DATA_ENTREGA_ESPERADA FROM PCP_PROGRAMACAO WHERE PRG_CODIGO = ?');
+        $stmt = $pdo->prepare('SELECT DATA_INICIO_PRODUCAO FROM PCP_PROGRAMACAO WHERE PRG_CODIGO = ?');
         $stmt->execute([$prgCodigo]);
-        [$inicio, $saida, $entrega] = array_map('strval', $stmt->fetch(PDO::FETCH_NUM) ?: ['', '', '']);
+        $inicio = (string) $stmt->fetchColumn();
         $valor = (string) ($_POST['valor'] ?? '');
         match ((string) ($_POST['campo'] ?? '')) {
-            'inicio'  => agMarcarDatas($pdo, $prgCodigo, $valor, $saida),
-            'saida'   => agMarcarDatas($pdo, $prgCodigo, $inicio, $valor),
-            'entrega' => agMarcarDatas($pdo, $prgCodigo, $inicio, $saida, $valor),
+            'inicio'  => agMarcarDatas($pdo, $prgCodigo, $valor),
+            'entrega' => agMarcarDatas($pdo, $prgCodigo, $inicio, $valor),
             default   => throw new RuntimeException('Data desconhecida.'),
         };
         echo json_encode(['ok' => true]);
@@ -527,7 +526,6 @@ if (!$pg && $error === '') {
                 <th>Entrega</th>
                 <th>Entrega Esperada</th>
                 <th>Início da Produção</th>
-                <th>Saída</th>
                 <th>Andamento</th>
                 <th>Etapa de Produção</th>
                 <th>Adicionado em</th>
@@ -537,7 +535,7 @@ if (!$pg && $error === '') {
             </thead>
             <tbody id="p2Tbody">
               <?php if (!$programacao): ?>
-                <tr class="p2-empty-row"><td colspan="13">Nenhum pedido na programação. Clique em "Adicionar Pedido à Programação" para começar.</td></tr>
+                <tr class="p2-empty-row"><td colspan="12">Nenhum pedido na programação. Clique em "Adicionar Pedido à Programação" para começar.</td></tr>
               <?php else: ?>
                 <?php foreach ($programacao as $row): ?>
                   <tr id="p2-row-<?= (int) $row['prg_codigo'] ?>">
@@ -559,13 +557,6 @@ if (!$pg && $error === '') {
                         data-prg="<?= (int) $row['prg_codigo'] ?>"
                         data-prev="<?= p2Escape($row['data_inicio_producao'] ?? '') ?>"
                         onchange="p2AtualizarData(this, 'inicio')">
-                    </td>
-                    <td>
-                      <input type="date" aria-label="Saída"
-                        value="<?= p2Escape($row['data_saida'] ?? '') ?>"
-                        data-prg="<?= (int) $row['prg_codigo'] ?>"
-                        data-prev="<?= p2Escape($row['data_saida'] ?? '') ?>"
-                        onchange="p2AtualizarData(this, 'saida')">
                     </td>
                     <td class="p2-progresso">
                       <?php $prog = $progresso[(int) $row['prg_codigo']] ?? null; ?>
@@ -775,7 +766,7 @@ function p2Finalizar(prgCodigo) {
       if (badge) badge.textContent = Math.max(0, (parseInt(badge.textContent, 10) || 1) - 1);
       const tbody = document.getElementById('p2Tbody');
       if (tbody && !tbody.querySelector('tr:not(.p2-empty-row)')) {
-        tbody.innerHTML = '<tr class="p2-empty-row"><td colspan="13">Nenhum pedido na programação. Clique em "Adicionar Pedido à Programação" para começar.</td></tr>';
+        tbody.innerHTML = '<tr class="p2-empty-row"><td colspan="12">Nenhum pedido na programação. Clique em "Adicionar Pedido à Programação" para começar.</td></tr>';
       }
     })
     .catch(() => alert('Erro ao finalizar o pedido.'));

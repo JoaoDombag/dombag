@@ -106,7 +106,6 @@ session_write_close();
   .leg .abaixo { border-color: #ef4444; }
   .leg .agora { border-color: #58d6c9; }
   .leg .inicio { background: #a3e635; border-color: #a3e635; }
-  .leg .saida { background: #f472b6; border-color: #f472b6; }
   #vazio { display: none; margin-left: auto; font-size: .8rem; color: #8fa0b3; }
 
   /* ── Aviso de dados desatualizados / erro ── */
@@ -134,12 +133,11 @@ session_write_close();
   .topoDia { display: -webkit-flex; display: flex; -webkit-justify-content: space-between; justify-content: space-between; line-height: 1.3; height: 1.3em; white-space: nowrap; overflow: hidden; }
   .num { font-weight: 700; color: #8fa0b3; }
   .hoje .num { color: #fff; font-weight: 900; }
-  .somaBag { color: #7db3ff; font-weight: 800; margin-left: .5em; }
-  .somaSac { color: #f59e0b; font-weight: 800; margin-left: .5em; }
+  .somaBag { color: #4ade80; font-weight: 800; margin-left: .5em; }
+  .somaSac { color: #c084fc; font-weight: 800; margin-left: .5em; }
 
   .marco { margin-top: .15em; padding: 0 .3em; border-radius: .2em; font-size: .8em; font-weight: 700; line-height: 1.25; color: #eef2f7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .marco.inicio { background: rgba(163,230,53,.18); border-left: .25em solid #a3e635; }
-  .marco.saida { background: rgba(244,114,182,.18); border-left: .25em solid #f472b6; }
   .dia.outro .marco { opacity: .55; }
 
   .cartao { position: relative; overflow: hidden; margin-top: .2em; padding: .1em .35em .1em .5em; border-radius: .25em; border: 1px solid #36404c; background: #161d26; line-height: 1.2; }
@@ -148,11 +146,11 @@ session_write_close();
   .cartao.agora { border: 1px solid #58d6c9; }
   .agora .cliCard:before { content: '\25CF\00A0'; color: #58d6c9; }
   .cartao .faixa { position: absolute; left: 0; top: 0; bottom: 0; width: .2em; }
-  .cartao.BAG .faixa { background: #2d6aff; }
-  .cartao.SACARIA .faixa { background: #f59e0b; }
+  .cartao.BAG .faixa { background: #22c55e; }
+  .cartao.SACARIA .faixa { background: #a855f7; }
   .cartao .enche { position: absolute; left: 0; top: 0; bottom: 0; }
-  .cartao.BAG .enche { background: rgba(45,106,255,.3); }
-  .cartao.SACARIA .enche { background: rgba(245,158,11,.3); }
+  .cartao.BAG .enche { background: rgba(34,197,94,.3); }
+  .cartao.SACARIA .enche { background: rgba(168,85,247,.3); }
   .cartao div { position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cartao .faixa, .cartao .enche { position: absolute; }
   .cliCard { font-weight: 800; color: #fff; }
@@ -223,7 +221,6 @@ setTimeout(function () {
     <span class="leg"><i class="abaixo"></i>Abaixo do previsto</span>
     <span class="leg"><i class="agora"></i>Produzindo agora</span>
     <span class="leg"><i class="inicio"></i>Início da produção</span>
-    <span class="leg"><i class="saida"></i>Saída</span>
     <span id="vazio">Nenhum pedido agendado neste mês.</span>
   </div>
 </div>

@@ -64,11 +64,11 @@ confere('ERP maior que o marcado prevalece no total', $a['produzido'], 480.0);
 $db = new PDO('sqlite::memory:');
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $db->exec("CREATE TABLE PCP_PROGRAMACAO (PRG_CODIGO INT, PROD_CODIGO INT, VENDA_REF TEXT, CLI_NOME TEXT,
-    DATA_ENTREGA_ESPERADA TEXT, PRG_FINALIZADO INT, DATA_INICIO_PRODUCAO TEXT, DATA_SAIDA TEXT,
+    DATA_ENTREGA_ESPERADA TEXT, PRG_FINALIZADO INT, DATA_INICIO_PRODUCAO TEXT,
     DATA_PREVIA_PRODUCAO TEXT)");
 $db->exec("CREATE TABLE PCP_AGENDA (AGD_CODIGO INT, PRG_CODIGO INT, PROD_CODIGO INT, AGD_TIPO TEXT,
     AGD_DATA TEXT, AGD_QTD REAL, AGD_USUARIO TEXT, AGD_REALIZADO REAL, AGD_REALIZADO_POR TEXT)");
-$db->exec("INSERT INTO PCP_PROGRAMACAO VALUES (1, 3187, '3829', 'Cliente', NULL, 0, NULL, NULL, NULL)");
+$db->exec("INSERT INTO PCP_PROGRAMACAO VALUES (1, 3187, '3829', 'Cliente', NULL, 0, NULL, NULL)");
 $ins = $db->prepare("INSERT INTO PCP_AGENDA VALUES (?, 1, 3187, 'BAG', ?, ?, 'x', NULL, NULL)");
 $ins->execute([1, $ontem, 300]);
 $ins->execute([2, $hoje, 300]);
@@ -129,7 +129,7 @@ $p = ['proximo' => '2026-12-03', 'concluido' => false, 'tipos' => [
     'BAG'     => ['produzido' => 550.0, 'saldo' => 350.0, 'total' => 1000.0],
     'SACARIA' => ['produzido' => 2000.0, 'saldo' => 0.0, 'total' => 2000.0],
 ]];
-confere('linhas por tipo', agProgressoLinhas($p), ['550 de 1.000 bags, 350 a agendar', '2.000 de 2.000 sac.']);
+confere('linhas por tipo', agProgressoLinhas($p), ['550 de 1.000 bags, 350 a agendar', '2.000 de 2.000 sacarias']);
 confere('sem andamento não gera linha', agProgressoLinhas(null), []);
 confere('link no mês do próximo dia', agLinkCalendario(3187, $p), '/pcp/agendamento?mes=2026-12&busca=3187');
 confere('link sem agenda fica no mês atual', agLinkCalendario(3187, null), '/pcp/agendamento?mes=' . date('Y-m') . '&busca=3187');
@@ -137,11 +137,11 @@ confere('sem ERP não há andamento', agProgresso($db, null, [1 => 3187]), []);
 
 // ── Entrega: a mesma função grava as três datas ──────────────────────────
 $entrega = static fn () => $db->query('SELECT DATA_ENTREGA_ESPERADA FROM PCP_PROGRAMACAO')->fetchColumn();
-agMarcarDatas($db, 1, '', '', '2026-12-20');
+agMarcarDatas($db, 1, '', '2026-12-20');
 confere('grava a entrega', $entrega(), '2026-12-20');
-agMarcarDatas($db, 1, '', '');
+agMarcarDatas($db, 1, '');
 confere('sem entrega mantém a data', $entrega(), '2026-12-20');
-confere('entrega vazia recusa', recusa(fn () => agMarcarDatas($db, 1, '', '', '')), 'Informe a data de entrega esperada.');
+confere('entrega vazia recusa', recusa(fn () => agMarcarDatas($db, 1, '', '')), 'Informe a data de entrega esperada.');
 
 echo $falhas ? "\n{$falhas} falha(s)\n" : "\nTudo certo\n";
 exit($falhas ? 1 : 0);

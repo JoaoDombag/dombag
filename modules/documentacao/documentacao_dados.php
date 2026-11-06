@@ -42,8 +42,8 @@ const DOC_TELAS = [
     '/yzidro/consulta'   => ['vendas', 'Pedidos aprovados no ERP que ainda não foram finalizados.'],
     '/vendas/simulacao'  => ['vendas', 'Mostra a ocupação de cada máquina e a capacidade livre para novos pedidos.'],
 
-    '/pcp/reuniao'       => ['planejar', 'Programação dos pedidos. Na linha de cada um você altera entrega esperada, início da produção, saída e etapa, e vê o andamento com o link para o calendário.'],
-    '/pcp/agendamento'   => ['planejar', 'Calendário do mês com os pedidos planejados. Arraste de "A agendar" para definir o dia, divida a quantidade em vários dias e marque o realizado. Pedido sem dia na agenda fica só em "A agendar".'],
+    '/pcp/reuniao'       => ['planejar', 'Programação dos pedidos. Na linha de cada um você altera entrega esperada, início da produção e etapa, e vê o andamento com o link para o calendário.'],
+    '/pcp/agendamento'   => ['planejar', 'Calendário do mês com os pedidos planejados. Arraste de "A agendar" para definir o dia, divida a quantidade em vários dias e marque o realizado. Pedido sem dia na agenda fica só em "A agendar". Big Bag aparece em verde e Sacaria em roxo.'],
     '/pcp/tv'            => ['planejar', 'O calendário do Agendamento para a TV da fábrica, somente leitura. No dia de hoje mostra também o que está em produção sem agendamento.', '/pcp/agendamento'],
     '/pcp/kanban'        => ['planejar', 'Quadro com os pedidos por etapa. Arraste um card para mudar a etapa. Cada card mostra o andamento e o link para o calendário.'],
     '/pcp/planejamento'  => ['planejar', 'Pedidos em produção, marcados no kanban antes da reunião.'],
@@ -111,11 +111,11 @@ const DOC_GUIAS = [
         'Se o dia de destino já tem esse pedido, as quantidades são somadas.',
         'Se o saldo que faltou já foi agendado por "A agendar", não arraste o card antigo: a previsão passaria do total do pedido.',
     ]],
-    ['Marcar início da produção, saída e entrega esperada', [
+    ['Marcar início da produção e entrega esperada', [
         'Na Reunião de Planejamento, altere as datas na linha do pedido. Cada data salva ao ser alterada.',
         'No Agendamento, clique no pedido, altere as datas e clique em Salvar datas.',
-        'Início, saída e entrega aparecem no calendário. Início e saída aparecem também na TV, com as cores da legenda.',
-        'Início e saída podem ficar vazios. A entrega esperada é obrigatória.',
+        'As duas datas aparecem no calendário. O início aparece também na TV, com a cor da legenda.',
+        'O início pode ficar vazio. A entrega esperada é obrigatória.',
     ]],
     ['Encontrar um bag, uma OP, um pedido ou um lote', [
         'Abra a Rastreabilidade.',
@@ -155,7 +155,7 @@ const DOC_NUMEROS = [
     ['Qual é a diferença entre Entrega e Entrega Esperada na Reunião?',
      'Entrega vem da OP no ERP e não pode ser alterada aqui. Entrega Esperada é definida na Reunião e é a data usada no calendário.'],
     ['O que é a Saída/Faturamento dos pedidos?',
-     'É a data informada na venda atacado do ERP. Ela pode estar no futuro enquanto o pedido aguarda produção, então não significa que o pedido já saiu. Não é a mesma Saída marcada na Reunião e no Agendamento.'],
+     'É a data informada na venda atacado do ERP. Ela pode estar no futuro enquanto o pedido aguarda produção, então não significa que o pedido já saiu.'],
     ['O que muda no ERP quando uso o sistema?',
      'Nada. As consultas ao ERP Yzidro são somente leitura. Reunião, agenda, etapas e datas ficam no sistema DOMBAG.'],
     ['O que o Assistente IA responde?',

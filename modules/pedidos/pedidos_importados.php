@@ -108,7 +108,8 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'itens') {
             ORDER BY p.PRO_DESCRICAO
         ');
         $stmt->execute([':id' => $venCod]);
-        $itens = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // dbPDO devolve as colunas em maiúsculas; a tela e o JS usam minúsculas
+        $itens = array_map(static fn ($i) => array_change_key_case($i, CASE_LOWER), $stmt->fetchAll(PDO::FETCH_ASSOC));
 
         echo json_encode([
             'ok' => true,
@@ -231,7 +232,8 @@ $stmt = $pdo->prepare("
     ORDER BY v.VEN_ENTREGA ASC, v.VEN_CODIGO_YZIDRO DESC
 ");
 $stmt->execute($params);
-$vendas = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// dbPDO devolve as colunas em maiúsculas; a tela usa minúsculas
+$vendas = array_map(static fn ($v) => array_change_key_case($v, CASE_LOWER), $stmt->fetchAll(PDO::FETCH_ASSOC));
 
 $saidasErp = piSaidasErp(dbPG(), array_column($vendas, 'pedido'));
 foreach ($vendas as &$venda) {

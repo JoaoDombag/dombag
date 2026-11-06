@@ -34,7 +34,7 @@ confere('futuro mostra previsto', agTvCard(card(['dia' => '2026-11-05']), $hoje)
 confere('hoje sem produção mostra previsto', agTvCard(card([]), $hoje)['qtd'], '100 bags prev.');
 confere('hoje com produção mostra real de previsto', agTvCard(card(['real' => 40.0]), $hoje)['qtd'], '40 bags de 100');
 confere('passado sem produção mostra zero real', agTvCard(card(['dia' => '2026-11-03']), $hoje)['qtd'], '0 bags de 100');
-confere('sacaria usa a unidade certa e milhar', agTvCard(card(['tipo' => 'SACARIA', 'plan' => 16000.0]), $hoje)['qtd'], '16.000 sac. prev.');
+confere('sacaria usa a unidade certa e milhar', agTvCard(card(['tipo' => 'SACARIA', 'plan' => 16000.0]), $hoje)['qtd'], '16.000 sacarias prev.');
 confere('barra limitada a 100%', agTvCard(card(['real' => 300.0]), $hoje)['pct'], 100);
 confere('sem pedido usa a OP', agTvCard(card(['pedido' => '']), $hoje)['pedido'], 'OP 3187');
 confere('avisos', agTvCard(card(['aberto' => 5.0, 'tarde' => true]), $hoje)['avisos'], ['5 em aberto no ERP', 'Depois da entrega']);
@@ -44,9 +44,9 @@ $livre = ['plan' => 0.0, 'status' => 'produzido'];
 confere('com leitura mostra a quantidade', agTvCard(card($livre + ['real' => 50.0]), $hoje)['qtd'], '50 bags s/ agenda');
 confere('parada hoje fica cheia', agTvCard(card($livre + ['real' => 50.0]), $hoje)['pct'], 100);
 confere('ativa não fica cheia', agTvCard(card($livre + ['real' => 50.0, 'agora' => true]), $hoje)['pct'], 0);
-confere('sacaria em aberto', agTvCard(card($livre + ['tipo' => 'SACARIA', 'aberto' => 5000.0]), $hoje)['qtd'], '5.000 sac. em aberto');
+confere('sacaria em aberto', agTvCard(card($livre + ['tipo' => 'SACARIA', 'aberto' => 5000.0]), $hoje)['qtd'], '5.000 sacarias em aberto');
 confere('em aberto não repete no aviso', agTvCard(card($livre + ['tipo' => 'SACARIA', 'aberto' => 5000.0]), $hoje)['avisos'], []);
-confere('ativa sem leitura', agTvCard(card($livre + ['agora' => true]), $hoje)['qtd'], 'Sem agenda');
+confere('ativa sem leitura mostra o tipo', agTvCard(card($livre + ['agora' => true]), $hoje)['qtd'], 'Big Bag sem agenda');
 confere('card comum não está ativo', agTvCard(card([]), $hoje)['agora'], false);
 
 // OPs com apontamento aberto
@@ -76,7 +76,7 @@ confere('título do mês', $p['mes_titulo'], 'Novembro de 2026');
 $diaHoje = $p['semanas'][1][2];
 confere('hoje está na quarta da 2a semana', [$diaHoje['num'], $diaHoje['hoje']], [4, true]);
 confere('produção sem agendamento aparece hoje', count($diaHoje['cards']), 4);
-confere('bag antes de sacaria, maior primeiro', array_column($diaHoje['cards'], 'qtd'), ['300 bags prev.', '100 bags prev.', '50 bags s/ agenda', '2.000 sac. prev.']);
+confere('bag antes de sacaria, maior primeiro', array_column($diaHoje['cards'], 'qtd'), ['300 bags prev.', '100 bags prev.', '50 bags s/ agenda', '2.000 sacarias prev.']);
 confere('soma do dia usa o agendado (bag)', $diaHoje['soma_bag'], '400');
 confere('soma do dia usa o agendado (sacaria)', $diaHoje['soma_sac'], '2.000');
 confere('dia de outro mês', $p['semanas'][0][0]['outro_mes'], true);
@@ -88,53 +88,55 @@ confere('só produção não conta como agendado', $soProducao['tem_agenda'], fa
 $ontem = agTvPainel($base + ['cards' => [card(['dia' => '2026-11-03', 'plan' => 0.0, 'real' => 9.0])]]);
 confere('produção sem agendamento de outro dia fica fora', $ontem['semanas'][1][1]['cards'], []);
 
-// Início da produção e saída
+// Início da produção
 $comMarco = agTvPainel($base + ['cards' => [], 'marcos' => ['2026-11-04' => [
     ['marco' => 'inicio', 'pedido' => '3829', 'cliente' => 'Cliente', 'op' => 3187],
-    ['marco' => 'saida', 'pedido' => '', 'cliente' => 'Cliente', 'op' => 3187],
+    ['marco' => 'inicio', 'pedido' => '', 'cliente' => 'Cliente', 'op' => 3187],
 ]]]);
-confere('marcos no dia', array_column($comMarco['semanas'][1][2]['marcos'], 'texto'), ['Início 3829 Cliente', 'Saída OP 3187 Cliente']);
+confere('marcos no dia', array_column($comMarco['semanas'][1][2]['marcos'], 'texto'), ['Início 3829 Cliente', 'Início OP 3187 Cliente']);
 confere('dia sem marco', $comMarco['semanas'][1][3]['marcos'], []);
 confere('marco não conta como agendado', $comMarco['tem_agenda'], false);
 
 $db = new PDO('sqlite::memory:');
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-$db->exec('CREATE TABLE PCP_PROGRAMACAO (PRG_CODIGO INT, DATA_INICIO_PRODUCAO TEXT, DATA_SAIDA TEXT)');
+$db->exec('CREATE TABLE PCP_PROGRAMACAO (PRG_CODIGO INT, DATA_INICIO_PRODUCAO TEXT)');
 $db->exec('INSERT INTO PCP_PROGRAMACAO (PRG_CODIGO) VALUES (1)');
-$datas = static fn () => $db->query('SELECT DATA_INICIO_PRODUCAO, DATA_SAIDA FROM PCP_PROGRAMACAO')->fetch(PDO::FETCH_NUM);
-$recusa = static function (int $prg, string $ini, string $sai) use ($db): string {
+$datas = static fn () => $db->query('SELECT DATA_INICIO_PRODUCAO FROM PCP_PROGRAMACAO')->fetchColumn();
+$recusa = static function (int $prg, string $ini) use ($db): string {
     try {
-        agMarcarDatas($db, $prg, $ini, $sai);
+        agMarcarDatas($db, $prg, $ini);
         return 'aceitou';
     } catch (RuntimeException $e) {
         return $e->getMessage();
     }
 };
-agMarcarDatas($db, 1, '2026-11-02', '2026-11-20');
-confere('grava as duas datas', $datas(), ['2026-11-02', '2026-11-20']);
-agMarcarDatas($db, 1, '2026-11-02', '');
-confere('campo vazio apaga a data', $datas(), ['2026-11-02', null]);
-confere('saída antes do início', $recusa(1, '2026-11-20', '2026-11-02'), 'A saída não pode ser antes do início da produção.');
-confere('data inválida', $recusa(1, '2026-13-01', ''), 'Início da produção: data inválida.');
-confere('pedido inexistente', $recusa(2, '', ''), 'Pedido não encontrado na Reunião de Planejamento.');
+agMarcarDatas($db, 1, '2026-11-02');
+confere('grava o início', $datas(), '2026-11-02');
+agMarcarDatas($db, 1, '');
+confere('campo vazio apaga a data', $datas(), null);
+confere('data inválida', $recusa(1, '2026-13-01'), 'Início da produção: data inválida.');
+confere('pedido inexistente', $recusa(2, ''), 'Pedido não encontrado na Reunião de Planejamento.');
 
 // agMontar sem ERP: o pedido encerrado some dos dias à frente, mas mantém os passados
 $db->exec("DROP TABLE PCP_PROGRAMACAO");
 $db->exec("CREATE TABLE PCP_PROGRAMACAO (PRG_CODIGO INT, PROD_CODIGO INT, VENDA_REF TEXT, CLI_NOME TEXT,
-    DATA_ENTREGA_ESPERADA TEXT, PRG_FINALIZADO INT, DATA_INICIO_PRODUCAO TEXT, DATA_SAIDA TEXT)");
+    DATA_ENTREGA_ESPERADA TEXT, PRG_FINALIZADO INT, DATA_INICIO_PRODUCAO TEXT)");
 $db->exec("CREATE TABLE PCP_AGENDA (AGD_CODIGO INT, PRG_CODIGO INT, PROD_CODIGO INT, AGD_TIPO TEXT,
     AGD_DATA TEXT, AGD_QTD REAL, AGD_USUARIO TEXT, AGD_REALIZADO REAL, AGD_REALIZADO_POR TEXT)");
 $mesTeste  = date('Y-m');
 $diaAntes  = date('Y-m-d', strtotime('-1 day'));
 $diaDepois = date('Y-m-d', strtotime('+1 day'));
-$ins = $db->prepare('INSERT INTO PCP_PROGRAMACAO VALUES (?, ?, ?, ?, NULL, ?, ?, ?)');
-$ins->execute([1, 3187, '3829', 'Ativo', 0, $diaAntes, $diaDepois]);
-$ins->execute([2, 3188, '3830', 'Encerrado', 1, $diaAntes, $diaDepois]);
+$ins = $db->prepare('INSERT INTO PCP_PROGRAMACAO VALUES (?, ?, ?, ?, NULL, ?, ?)');
+$ins->execute([1, 3187, '3829', 'Ativo', 0, $diaAntes]);
+$ins->execute([2, 3188, '3830', 'Encerrado', 1, $diaAntes]);
+$ins->execute([3, 3189, '3831', 'Ativo futuro', 0, $diaDepois]);
+$ins->execute([4, 3190, '3832', 'Encerrado futuro', 1, $diaDepois]);
 $db->exec("INSERT INTO PCP_AGENDA VALUES (1, 1, 3187, 'BAG', '{$diaDepois}', 10, 'x', NULL, NULL)");
 $m = agMontar($db, null, $mesTeste);
 confere('início dos dois pedidos', array_column($m['marcos'][$diaAntes], 'pedido'), ['3829', '3830']);
-confere('saída futura só do ativo', array_column($m['marcos'][$diaDepois], 'pedido'), ['3829']);
-confere('card leva as datas do pedido', [$m['cards'][0]['inicio'], $m['cards'][0]['saida']], [$diaAntes, $diaDepois]);
+confere('início futuro só do ativo', array_column($m['marcos'][$diaDepois], 'pedido'), ['3831']);
+confere('card leva o início do pedido', $m['cards'][0]['inicio'], $diaAntes);
+confere('card não traz saída', isset($m['cards'][0]['saida']), false);
 
 // Demonstração: precisa se identificar e cobrir os estados do calendário
 $demo = agTvDemo(date('Y-m'));

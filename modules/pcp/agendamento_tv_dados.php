@@ -10,8 +10,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/agendamento_dados.php';
 //  repetir regra de negócio em JavaScript.
 // ══════════════════════════════════════════════════════════════
 
-const AGTV_UNIDADE = [PROD_TIPO_BAG => 'bags', PROD_TIPO_SACARIA => 'sac.'];
-const AGTV_MARCOS = ['inicio' => 'Início', 'saida' => 'Saída'];
+const AGTV_UNIDADE = [PROD_TIPO_BAG => 'bags', PROD_TIPO_SACARIA => 'sacarias'];
+const AGTV_TIPO = [PROD_TIPO_BAG => 'Big Bag', PROD_TIPO_SACARIA => 'Sacaria'];
+const AGTV_MARCOS = ['inicio' => 'Início'];
 const AGTV_MESES   = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho',
                       'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -53,7 +54,7 @@ function agTvQtd(array $c, string $hoje): string
     return match (true) {
         $c['real'] > 0   => agTvNum($c['real']) . " {$un} s/ agenda",
         $c['aberto'] > 0 => agTvNum($c['aberto']) . " {$un} em aberto",
-        default          => 'Sem agenda',
+        default          => AGTV_TIPO[$c['tipo']] . ' sem agenda',
     };
 }
 
@@ -230,7 +231,6 @@ function agTvDemo(string $mes): array
 
     $marcos = [
         $hoje => [['marco' => 'inicio', 'pedido' => '7999', 'cliente' => $clientes[0], 'op' => 8999]],
-        date('Y-m-d', strtotime('+2 days')) => [['marco' => 'saida', 'pedido' => '7999', 'cliente' => $clientes[0], 'op' => 8999]],
     ];
 
     return ['demo' => true] + agTvPainel(['mes' => $mes, 'hoje' => $hoje, 'ini' => $ini, 'fim' => $fim, 'cards' => $cards, 'marcos' => $marcos]);

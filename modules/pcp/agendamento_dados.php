@@ -21,7 +21,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/producao_tipo.php';
 // ══════════════════════════════════════════════════════════════════════
 
 const AG_GRP_BAG = 6; // GRUPOS.GRP_CODIGO no ERP
-const AG_MARCOS  = ['inicio' => 'DATA_INICIO_PRODUCAO', 'saida' => 'DATA_SAIDA'];
+const AG_MARCOS  = ['inicio' => 'DATA_INICIO_PRODUCAO'];
 
 function agPgAll($pg, string $sql, array $params = []): array
 {
@@ -198,7 +198,7 @@ function agProgresso(PDO $db, $pg, array $pedidos): array
 // Uma linha por tipo: "550 de 1.000 bags, 350 a agendar"
 function agProgressoLinhas(?array $p): array
 {
-    $un = [PROD_TIPO_BAG => 'bags', PROD_TIPO_SACARIA => 'sac.'];
+    $un = [PROD_TIPO_BAG => 'bags', PROD_TIPO_SACARIA => 'sacarias'];
     $fmt = static fn (float $n): string => number_format($n, 0, ',', '.');
     $linhas = [];
     foreach ($p['tipos'] ?? [] as $tipo => $t) {
@@ -254,7 +254,7 @@ function agMontar(PDO $db, $pg, string $mes): array
 
     $programados = $db->query('
         SELECT PRG_CODIGO, PROD_CODIGO, VENDA_REF, CLI_NOME, DATA_ENTREGA_ESPERADA, PRG_FINALIZADO,
-               DATA_INICIO_PRODUCAO, DATA_SAIDA
+               DATA_INICIO_PRODUCAO
           FROM PCP_PROGRAMACAO
     ')->fetchAll(PDO::FETCH_ASSOC);
 
@@ -321,7 +321,6 @@ function agMontar(PDO $db, $pg, string $mes): array
             'programado' => $prg !== null,
             'entrega' => $prg['DATA_ENTREGA_ESPERADA'] ?? null,
             'inicio'  => $prg['DATA_INICIO_PRODUCAO'] ?? null,
-            'saida'   => $prg['DATA_SAIDA'] ?? null,
             'agd' => 0, 'usuario' => '', 'plan' => 0.0, 'real' => 0.0, 'aberto' => 0.0,
             'feito' => null, 'feito_por' => '',
         ];
@@ -341,7 +340,6 @@ function agMontar(PDO $db, $pg, string $mes): array
         $cards[$k]['feito_por'] = (string) $s['AGD_REALIZADO_POR'];
         $cards[$k]['entrega'] = $prgPorCodigo[$s['PRG_CODIGO']]['DATA_ENTREGA_ESPERADA'] ?? null;
         $cards[$k]['inicio']  = $prgPorCodigo[$s['PRG_CODIGO']]['DATA_INICIO_PRODUCAO'] ?? null;
-        $cards[$k]['saida']   = $prgPorCodigo[$s['PRG_CODIGO']]['DATA_SAIDA'] ?? null;
     }
     foreach ($producaoGrade as $r) {
         $op = (int) $r['op'];
@@ -401,7 +399,6 @@ function agMontar(PDO $db, $pg, string $mes): array
                 'saldo'      => $apurado['saldo'],
                 'entrega'    => $p['DATA_ENTREGA_ESPERADA'],
                 'inicio'     => $p['DATA_INICIO_PRODUCAO'],
-                'saida'      => $p['DATA_SAIDA'],
                 'atrasado'   => $apurado['atrasado'],
                 'erp_finalizada' => $info[$op]['finalizado'],
             ];
@@ -458,7 +455,7 @@ function agMontar(PDO $db, $pg, string $mes): array
         }
     }
 
-    // Início da produção e saída marcados no pedido. Como nos agendamentos, o
+    // Início da produção marcado no pedido. Como nos agendamentos, o
     // pedido encerrado na Reunião some dos dias à frente.
     $marcos = [];
     foreach ($programados as $p) {
@@ -497,21 +494,14 @@ function agMontar(PDO $db, $pg, string $mes): array
 
 // Campo vazio apaga a data. Valem dias passados: o início real pode ser anotado depois.
 // A entrega esperada é obrigatória no pedido; null a deixa como está.
-function agMarcarDatas(PDO $db, int $prg, string $inicio, string $saida, ?string $entrega = null): void
+function agMarcarDatas(PDO $db, int $prg, string $inicio, ?string $entrega = null): void
 {
     if ($entrega !== null && agData($entrega) === null) {
         throw new RuntimeException('Informe a data de entrega esperada.');
     }
-    $datas = [];
-    foreach (['Início da produção' => $inicio, 'Saída' => $saida] as $nome => $valor) {
-        $dia = agData($valor);
-        if ($valor !== '' && $dia === null) {
-            throw new RuntimeException("{$nome}: data inválida.");
-        }
-        $datas[] = $dia;
-    }
-    if ($datas[0] !== null && $datas[1] !== null && $datas[1] < $datas[0]) {
-        throw new RuntimeException('A saída não pode ser antes do início da produção.');
+    $dia = agData($inicio);
+    if ($inicio !== '' && $dia === null) {
+        throw new RuntimeException('Início da produção: data inválida.');
     }
 
     $stmt = $db->prepare('SELECT COUNT(*) FROM PCP_PROGRAMACAO WHERE PRG_CODIGO = ?');
@@ -520,8 +510,8 @@ function agMarcarDatas(PDO $db, int $prg, string $inicio, string $saida, ?string
         throw new RuntimeException('Pedido não encontrado na Reunião de Planejamento.');
     }
 
-    $db->prepare('UPDATE PCP_PROGRAMACAO SET DATA_INICIO_PRODUCAO = ?, DATA_SAIDA = ? WHERE PRG_CODIGO = ?')
-       ->execute([$datas[0], $datas[1], $prg]);
+    $db->prepare('UPDATE PCP_PROGRAMACAO SET DATA_INICIO_PRODUCAO = ? WHERE PRG_CODIGO = ?')
+       ->execute([$dia, $prg]);
     if ($entrega !== null) {
         $db->prepare('UPDATE PCP_PROGRAMACAO SET DATA_ENTREGA_ESPERADA = ? WHERE PRG_CODIGO = ?')
            ->execute([$entrega, $prg]);

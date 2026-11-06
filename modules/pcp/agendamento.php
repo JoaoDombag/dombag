@@ -47,7 +47,7 @@ if ($acao !== '') {
                 'editar'  => agEditar($pdo, $pg, $agd, $qtd, $dia),
                 'remover' => agRemover($pdo, $agd),
                 'realizado' => agMarcarRealizado($pdo, $agd, (string) ($_POST['realizado'] ?? '')),
-                'datas'   => agMarcarDatas($pdo, (int) ($_POST['prg'] ?? 0), (string) ($_POST['inicio'] ?? ''), (string) ($_POST['saida'] ?? ''), (string) ($_POST['entrega'] ?? '')),
+                'datas'   => agMarcarDatas($pdo, (int) ($_POST['prg'] ?? 0), (string) ($_POST['inicio'] ?? ''), (string) ($_POST['entrega'] ?? '')),
                 default   => throw new RuntimeException('Ação desconhecida.'),
             };
         }
@@ -70,10 +70,10 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
 <link rel="stylesheet" href="/public/css/unified_admin.css">
 <link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
-  .tipo-BAG     { --tipo: 45,106,255;  --tipo-txt: #7db3ff; }
-  .tipo-SACARIA { --tipo: 245,158,11;  --tipo-txt: var(--amber); }
-  :root[data-theme="claro"] .tipo-BAG     { --tipo-txt: #1e4fc9; }
-  :root[data-theme="claro"] .tipo-SACARIA { --tipo-txt: #a16207; }
+  .tipo-BAG     { --tipo: 34,197,94;   --tipo-txt: #4ade80; }
+  .tipo-SACARIA { --tipo: 168,85,247;  --tipo-txt: #c084fc; }
+  :root[data-theme="claro"] .tipo-BAG     { --tipo-txt: #15803d; }
+  :root[data-theme="claro"] .tipo-SACARIA { --tipo-txt: #7e22ce; }
 
   .content.ag-content { display: block; overflow: auto; padding: 18px 24px 28px; }
 
@@ -93,8 +93,6 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
 
   /* ── Legenda: Big Bag e Sacaria também filtram ────────── */
   .ag-legenda { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 12px; font-size: 12px; color: var(--text-muted); }
-  .ag-tipo-btn.tipo-BAG     { --tipo: 34,197,94; }
-  .ag-tipo-btn.tipo-SACARIA { --tipo: 168,85,247; }
   .ag-tipo-btn {
     display: inline-flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px; border-radius: 8px; cursor: pointer;
     border: 1px solid rgba(var(--tipo), .45); background: rgba(var(--tipo), .16);
@@ -110,7 +108,6 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
   .ag-amostra .s-produzido { background: var(--text-muted); }
   .ag-amostra .s-abaixo { border: 1px solid var(--red); }
   .ag-amostra .s-inicio { background: #a3e635; }
-  .ag-amostra .s-saida  { background: #f472b6; }
 
   /* ── Totais do mês, um por tipo: as unidades não se somam ─ */
   .ag-totais { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
@@ -181,7 +178,6 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .ag-marco.inicio { background: rgba(163,230,53,.16); border-left: 3px solid #a3e635; }
-  .ag-marco.saida  { background: rgba(244,114,182,.16); border-left: 3px solid #f472b6; }
 
   /* O card é um medidor: a cor enche conforme o produzido alcança o previsto */
   .ag-card {
@@ -343,7 +339,6 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
         <span class="ag-amostra"><i class="s-produzido"></i> Produzido</span>
         <span class="ag-amostra"><i class="s-abaixo"></i> Abaixo do previsto</span>
         <span class="ag-amostra"><i class="s-inicio"></i> Início da produção</span>
-        <span class="ag-amostra"><i class="s-saida"></i> Saída</span>
       </div>
 
       <p class="ag-sem-agenda" id="agSemAgenda" hidden>Nenhum pedido agendado neste mês.</p>
@@ -400,7 +395,6 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
       </div>
       <div class="ag-form" id="agModalMarcos">
         <label>Início da produção <input type="date" id="agCampoInicio"></label>
-        <label>Saída <input type="date" id="agCampoSaida"></label>
         <label>Entrega esperada <input type="date" id="agCampoEntrega"></label>
         <button type="button" class="btn-secondary ag-marcos-acao" id="agBtnDatas">Salvar datas</button>
       </div>
@@ -423,7 +417,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const dataBr = d => d ? d.split('-').reverse().join('/') : '—';
   const tipoNome = { BAG: 'Big Bag', SACARIA: 'Sacaria' };
-  const unidade = { BAG: 'bags', SACARIA: 'sac.' };
+  const unidade = { BAG: 'bags', SACARIA: 'sacarias' };
 
   let dados = null;
   let mes = <?= json_encode($mesInicial) ?>;
@@ -563,7 +557,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     </div>`;
   }
 
-  const marcoNome = { inicio: 'Início', saida: 'Saída' };
+  const marcoNome = { inicio: 'Início' };
 
   function renderGrade() {
     const porDia = {};
@@ -742,7 +736,6 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     $('agCampoReal').value = marcaReal && item.feito !== null ? Math.round(item.feito) : '';
     $('agModalMarcos').hidden = !item.prg;
     $('agCampoInicio').value = item.inicio || '';
-    $('agCampoSaida').value = item.saida || '';
     $('agCampoEntrega').value = item.entrega || '';
     $('agCampoDia').required = editavel;
     $('agCampoQtd').required = editavel;
@@ -796,7 +789,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
   });
   $('agBtnDatas').addEventListener('click', async () => {
     const ok = await enviar('datas', {
-      prg: selecionado.item.prg, inicio: $('agCampoInicio').value, saida: $('agCampoSaida').value, entrega: $('agCampoEntrega').value,
+      prg: selecionado.item.prg, inicio: $('agCampoInicio').value, entrega: $('agCampoEntrega').value,
     }, 'Datas do pedido salvas.');
     if (ok) fecharModal();
   });
