@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/agendamento_dados.php';
 
 // ══════════════════════════════════════════════════════════════
 //  DOMBAG — Reunião de Planejamento (Programação de Pedidos)
@@ -71,7 +72,7 @@ function p2EnsureTabela(PDO $db): void
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
 
-    foreach (['DATA_ENTREGA_VENDEDOR', 'DATA_ENTREGA_ESPERADA'] as $coluna) {
+    foreach (['DATA_ENTREGA_VENDEDOR', 'DATA_ENTREGA_ESPERADA', 'DATA_INICIO_PRODUCAO', 'DATA_SAIDA'] as $coluna) {
         $chk = $db->prepare(
             'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
@@ -202,8 +203,8 @@ function p2FetchProgramacao(PDO $db, $pg): array
 {
     $stmt = $db->query('
         SELECT p.PRG_CODIGO, p.PROD_CODIGO, p.VENDA_REF, p.VEN_COD_PEDIDO, p.CLI_CODIGO, p.CLI_NOME,
-               p.PROD_DATA, p.DATA_ENTREGA, p.DATA_ENTREGA_VENDEDOR, p.DATA_ENTREGA_ESPERADA,
-               p.PROD_TOTAL, p.TIPO_PRODUCAO,
+               p.PROD_DATA, p.DATA_ENTREGA, p.DATA_ENTREGA_ESPERADA,
+               p.DATA_INICIO_PRODUCAO, p.DATA_SAIDA, p.PROD_TOTAL, p.TIPO_PRODUCAO,
                p.PRG_ADICIONADO_EM, p.PRG_ADICIONADO_POR,
                p.ETP_CODIGO, e.ETP_DESCRICAO
         FROM PCP_PROGRAMACAO p
@@ -295,10 +296,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') ==
         echo json_encode(['error' => 'OP inválida.']);
         exit;
     }
-    $dataEntregaVendedor = p2SanitizeDate($_POST['data_entrega_vendedor'] ?? '');
     $dataEntregaEsperada = p2SanitizeDate($_POST['data_entrega_esperada'] ?? '');
-    if ($dataEntregaVendedor === '' || $dataEntregaEsperada === '') {
-        echo json_encode(['error' => 'Informe a Data de entrega do vendedor e a Data de entrega esperada.']);
+    $dataInicio = p2SanitizeDate($_POST['data_inicio_producao'] ?? '');
+    if ($dataEntregaEsperada === '') {
+        echo json_encode(['error' => 'Informe a Data de entrega esperada.']);
         exit;
     }
     if (!$pg) {
@@ -326,7 +327,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') ==
         $ins = $pdo->prepare('
             INSERT INTO PCP_PROGRAMACAO
                 (PROD_CODIGO, VENDA_REF, VEN_COD_PEDIDO, CLI_CODIGO, CLI_NOME, PROD_DATA, DATA_ENTREGA,
-                 DATA_ENTREGA_VENDEDOR, DATA_ENTREGA_ESPERADA, PROD_TOTAL, TIPO_PRODUCAO, ETP_CODIGO, PRG_ADICIONADO_POR)
+                 DATA_ENTREGA_ESPERADA, DATA_INICIO_PRODUCAO, PROD_TOTAL, TIPO_PRODUCAO, ETP_CODIGO, PRG_ADICIONADO_POR)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ');
         $ins->execute([
@@ -337,14 +338,37 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') ==
             $op['cli_nome'],
             $op['prod_data'] ? substr((string) $op['prod_data'], 0, 10) : null,
             $op['data_entrega'] ? substr((string) $op['data_entrega'], 0, 10) : null,
-            $dataEntregaVendedor,
             $dataEntregaEsperada,
+            $dataInicio ?: null,
             null,
             $op['tipo_producao'],
             p2EtapaPadraoCodigo($pdo),
             usuNome(),
         ]);
 
+        echo json_encode(['ok' => true]);
+    } catch (Throwable $e) {
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
+
+// ── AJAX: trocar a OP de um pedido programado ───────────────────────────────
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'alterar_op') {
+    header('Content-Type: application/json; charset=utf-8');
+    $prgCodigo = (int) ($_POST['prg_codigo'] ?? 0);
+    $prodCodigo = (int) ($_POST['prod_codigo'] ?? 0);
+    if (!$pg) {
+        echo json_encode(['error' => 'Não foi possível conectar ao banco de dados do ERP (PostgreSQL).']);
+        exit;
+    }
+    try {
+        $op = p2FetchOPUnica($pg, $prodCodigo);
+        if (!$op) {
+            throw new RuntimeException('OP não encontrada no ERP.');
+        }
+        $tipos = array_keys(agOpsInfo($pg, [$prodCodigo])[$prodCodigo]['tipos'] ?? []);
+        agAlterarOp($pdo, $prgCodigo, $op, $tipos);
         echo json_encode(['ok' => true]);
     } catch (Throwable $e) {
         echo json_encode(['error' => $e->getMessage()]);
@@ -393,6 +417,28 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') ==
     exit;
 }
 
+// ── AJAX: datas do pedido, as mesmas do Agendamento ─────────────────────────
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'atualizar_data') {
+    header('Content-Type: application/json; charset=utf-8');
+    $prgCodigo = (int) ($_POST['prg_codigo'] ?? 0);
+    try {
+        $stmt = $pdo->prepare('SELECT DATA_INICIO_PRODUCAO, DATA_SAIDA, DATA_ENTREGA_ESPERADA FROM PCP_PROGRAMACAO WHERE PRG_CODIGO = ?');
+        $stmt->execute([$prgCodigo]);
+        [$inicio, $saida, $entrega] = array_map('strval', $stmt->fetch(PDO::FETCH_NUM) ?: ['', '', '']);
+        $valor = (string) ($_POST['valor'] ?? '');
+        match ((string) ($_POST['campo'] ?? '')) {
+            'inicio'  => agMarcarDatas($pdo, $prgCodigo, $valor, $saida),
+            'saida'   => agMarcarDatas($pdo, $prgCodigo, $inicio, $valor),
+            'entrega' => agMarcarDatas($pdo, $prgCodigo, $inicio, $saida, $valor),
+            default   => throw new RuntimeException('Data desconhecida.'),
+        };
+        echo json_encode(['ok' => true]);
+    } catch (Throwable $e) {
+        echo json_encode(['error' => $e->getMessage()]);
+    }
+    exit;
+}
+
 // ── Lista de etapas de produção (para o seletor da grid) ─────────────────────
 try {
     $etapasProducao = $pdo->query('SELECT ETP_CODIGO, ETP_DESCRICAO FROM ETAPA_PRODUCAO ORDER BY ETP_CODIGO')
@@ -404,8 +450,10 @@ try {
 // ── Carga inicial da página ────────────────────────────────────────────────────
 $error = '';
 $programacao = [];
+$progresso = [];
 try {
     $programacao = p2FetchProgramacao($pdo, $pg);
+    $progresso = agProgresso($pdo, $pg, array_column($programacao, 'prod_codigo', 'prg_codigo'));
 } catch (Throwable $e) {
     $error = $e->getMessage();
 }
@@ -439,12 +487,16 @@ if (!$pg && $error === '') {
   .p2-filter-field label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted); }
   .p2-filter-field input { height: 36px; padding: 0 10px; font-size: 12.5px; font-family: 'Segoe UI', sans-serif; width: 170px; }
   #p2ResultsBody td:nth-child(2) { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #p2ResultsBody input[type="date"] { width: 130px; height: 30px; padding: 0 6px; font-size: 11.5px; }
+  .p2-progresso { min-width: 190px; font-size: 12px; line-height: 1.5; }
+  .p2-progresso a { font-weight: 600; white-space: nowrap; }
+  #p2ResultsBody input[type="date"], #p2Tbody input[type="date"] { width: 130px; height: 30px; padding: 0 6px; font-size: 11.5px; }
   .p2-add-btn { padding: 5px 12px; height: 28px; border-radius: 7px; border: none; background: var(--blue-accent, #1e4fc9); color: #fff; font-family: 'Segoe UI', sans-serif; font-size: 11.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
   .p2-add-btn:hover { background: var(--blue-light); }
   .p2-add-btn:disabled { opacity: .5; cursor: default; }
   .p2-finalizar-btn { padding: 5px 12px; height: 28px; border-radius: 7px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-family: 'Segoe UI', sans-serif; font-size: 11.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
   .p2-finalizar-btn:hover { background: rgba(0,201,167,.12); color: var(--teal); border-color: rgba(0,201,167,.3); }
+  .p2-acoes { display: flex; gap: 6px; justify-content: flex-end; }
+  .p2-troca th:nth-child(6), .p2-troca th:nth-child(7), .p2-troca td:nth-child(6), .p2-troca td:nth-child(7) { display: none; }
 </style>
 </head>
 <body>
@@ -460,6 +512,10 @@ if (!$pg && $error === '') {
         </div>
       </div>
       <div class="topbar-actions">
+        <a href="/pcp/agendamento" class="btn-secondary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:5px;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          Agendamento de Produção
+        </a>
         <a href="/pcp/etapas" class="btn-secondary">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:5px;"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           Etapas de Produção
@@ -494,8 +550,10 @@ if (!$pg && $error === '') {
                 <th>Pedido / Venda Ref.</th>
                 <th>Emissão</th>
                 <th>Entrega</th>
-                <th>Entrega Vendedor</th>
                 <th>Entrega Esperada</th>
+                <th>Início da Produção</th>
+                <th>Saída</th>
+                <th>Andamento</th>
                 <th>Etapa de Produção</th>
                 <th>Adicionado em</th>
                 <th>Adicionado por</th>
@@ -504,7 +562,7 @@ if (!$pg && $error === '') {
             </thead>
             <tbody id="p2Tbody">
               <?php if (!$programacao): ?>
-                <tr class="p2-empty-row"><td colspan="11">Nenhum pedido na programação. Clique em "Adicionar Pedido à Programação" para começar.</td></tr>
+                <tr class="p2-empty-row"><td colspan="13">Nenhum pedido na programação. Clique em "Adicionar Pedido à Programação" para começar.</td></tr>
               <?php else: ?>
                 <?php foreach ($programacao as $row): ?>
                   <tr id="p2-row-<?= (int) $row['prg_codigo'] ?>">
@@ -513,8 +571,32 @@ if (!$pg && $error === '') {
                     <td><?= p2Escape($row['venda_ref'] ?: ($row['ven_cod_pedido'] ?: '—')) ?></td>
                     <td><?= p2Escape(p2FmtDate($row['prod_data'] ?? '')) ?></td>
                     <td><?= p2Escape(p2FmtDate($row['data_entrega'] ?? '')) ?></td>
-                    <td><?= p2Escape(p2FmtDate($row['data_entrega_vendedor'] ?? '')) ?></td>
-                    <td><?= p2Escape(p2FmtDate($row['data_entrega_esperada'] ?? '')) ?></td>
+                    <td>
+                      <input type="date" aria-label="Entrega esperada" required
+                        value="<?= p2Escape($row['data_entrega_esperada'] ?? '') ?>"
+                        data-prg="<?= (int) $row['prg_codigo'] ?>"
+                        data-prev="<?= p2Escape($row['data_entrega_esperada'] ?? '') ?>"
+                        onchange="p2AtualizarData(this, 'entrega')">
+                    </td>
+                    <td>
+                      <input type="date" aria-label="Início da produção"
+                        value="<?= p2Escape($row['data_inicio_producao'] ?? '') ?>"
+                        data-prg="<?= (int) $row['prg_codigo'] ?>"
+                        data-prev="<?= p2Escape($row['data_inicio_producao'] ?? '') ?>"
+                        onchange="p2AtualizarData(this, 'inicio')">
+                    </td>
+                    <td>
+                      <input type="date" aria-label="Saída"
+                        value="<?= p2Escape($row['data_saida'] ?? '') ?>"
+                        data-prg="<?= (int) $row['prg_codigo'] ?>"
+                        data-prev="<?= p2Escape($row['data_saida'] ?? '') ?>"
+                        onchange="p2AtualizarData(this, 'saida')">
+                    </td>
+                    <td class="p2-progresso">
+                      <?php $prog = $progresso[(int) $row['prg_codigo']] ?? null; ?>
+                      <?php foreach (agProgressoLinhas($prog) as $linha): ?><div><?= p2Escape($linha) ?></div><?php endforeach; ?>
+                      <a href="<?= p2Escape(agLinkCalendario((int) $row['prod_codigo'], $prog)) ?>">Ver no calendário</a>
+                    </td>
                     <td>
                       <select class="status-sel"
                         data-prg="<?= (int) $row['prg_codigo'] ?>"
@@ -531,7 +613,10 @@ if (!$pg && $error === '') {
                     <td class="td-nowrap"><?= p2Escape(p2FmtDateTime($row['prg_adicionado_em'] ?? '')) ?></td>
                     <td class="td-muted"><?= p2Escape($row['prg_adicionado_por'] ?? '—') ?></td>
                     <td class="td-right">
-                      <button type="button" class="p2-finalizar-btn" onclick="p2Finalizar(<?= (int) $row['prg_codigo'] ?>)">Marcar como Finalizado</button>
+                      <div class="p2-acoes">
+                        <button type="button" class="p2-finalizar-btn" data-cliente="<?= p2Escape($row['cli_nome'] ?? '') ?>" onclick="p2AbrirTroca(this, <?= (int) $row['prg_codigo'] ?>, <?= (int) $row['prod_codigo'] ?>)">Alterar OP</button>
+                        <button type="button" class="p2-finalizar-btn" onclick="p2Finalizar(<?= (int) $row['prg_codigo'] ?>)">Marcar como Finalizado</button>
+                      </div>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -548,7 +633,7 @@ if (!$pg && $error === '') {
 <!-- Modal: buscar/adicionar pedidos -->
 <div class="modal-overlay" id="p2ModalOverlay">
   <div class="modal-box p2-modal-box">
-    <h3>Adicionar Pedido à Programação</h3>
+    <h3 id="p2ModalTitulo">Adicionar Pedido à Programação</h3>
     <p>Somente OPs ainda não finalizadas no ERP (Finalizado = N) são exibidas.</p>
     <div class="p2-modal-body">
       <div class="p2-filter-row">
@@ -567,7 +652,7 @@ if (!$pg && $error === '') {
         <button type="button" class="btn-refresh" id="p2BtnBuscar">Buscar</button>
       </div>
       <div class="table-wrap" style="max-height:44vh;">
-        <table>
+        <table id="p2ResultsTable">
           <thead>
             <tr>
               <th>Cód. OP</th>
@@ -575,8 +660,8 @@ if (!$pg && $error === '') {
               <th>Pedido / Venda Ref.</th>
               <th>Emissão</th>
               <th>Entrega</th>
-              <th>Entrega Vendedor</th>
               <th>Entrega Esperada</th>
+              <th>Início da Produção</th>
               <th></th>
             </tr>
           </thead>
@@ -604,9 +689,18 @@ function p2FmtDate(v) {
 }
 
 // ── Modal de busca ────────────────────────────────────────────────────────────
-function p2AbrirModal() {
+let p2Troca = null; // pedido cuja OP está sendo alterada; null ao adicionar
+
+function p2MostrarModal() {
+  document.getElementById('p2ModalTitulo').textContent = p2Troca ? `Alterar a OP ${p2Troca.op}` : 'Adicionar Pedido à Programação';
+  document.getElementById('p2ResultsTable').classList.toggle('p2-troca', !!p2Troca);
   document.getElementById('p2ModalOverlay').classList.add('open');
   p2Buscar();
+}
+function p2AbrirModal() {
+  if (p2Troca) document.getElementById('p2Cliente').value = '';
+  p2Troca = null;
+  p2MostrarModal();
 }
 function p2FecharModal() {
   document.getElementById('p2ModalOverlay').classList.remove('open');
@@ -645,9 +739,9 @@ function p2Buscar() {
           <td>${p2Esc(op.venda_ref || op.ven_cod_pedido || '—')}</td>
           <td>${p2FmtDate(op.prod_data)}</td>
           <td>${p2FmtDate(op.data_entrega)}</td>
-          <td><input type="date" class="p2-data-vendedor"></td>
           <td><input type="date" class="p2-data-esperada"></td>
-          <td class="td-right"><button type="button" class="p2-add-btn" onclick="p2Adicionar(${op.prod_codigo}, this)">Adicionar</button></td>
+          <td><input type="date" class="p2-data-inicio" aria-label="Início da produção (opcional)"></td>
+          <td class="td-right"><button type="button" class="p2-add-btn" onclick="${p2Troca ? 'p2Alterar' : 'p2Adicionar'}(${op.prod_codigo}, this)">${p2Troca ? 'Usar esta OP' : 'Adicionar'}</button></td>
         </tr>
       `).join('');
     })
@@ -662,10 +756,10 @@ document.getElementById('p2BtnBuscar').addEventListener('click', p2Buscar);
 
 function p2Adicionar(prodCodigo, btn) {
   const row = btn.closest('tr');
-  const dataVendedor = row.querySelector('.p2-data-vendedor').value;
   const dataEsperada = row.querySelector('.p2-data-esperada').value;
-  if (!dataVendedor || !dataEsperada) {
-    alert('Informe a Data de entrega do vendedor e a Data de entrega esperada antes de adicionar.');
+  const dataInicio = row.querySelector('.p2-data-inicio').value;
+  if (!dataEsperada) {
+    alert('Informe a Data de entrega esperada antes de adicionar.');
     return;
   }
   btn.disabled = true;
@@ -673,8 +767,8 @@ function p2Adicionar(prodCodigo, btn) {
   const body = new URLSearchParams({
     action: 'adicionar',
     prod_codigo: prodCodigo,
-    data_entrega_vendedor: dataVendedor,
     data_entrega_esperada: dataEsperada,
+    data_inicio_producao: dataInicio,
   });
   fetch('?action=adicionar', {
     method: 'POST',
@@ -698,6 +792,42 @@ function p2Adicionar(prodCodigo, btn) {
     });
 }
 
+// ── Alterar a OP de um pedido programado, pelo mesmo modal de busca ──────────
+function p2AbrirTroca(btn, prgCodigo, opAtual) {
+  p2Troca = { prg: prgCodigo, op: opAtual };
+  document.getElementById('p2CodOp').value = '';
+  document.getElementById('p2CodVenda').value = '';
+  document.getElementById('p2Cliente').value = btn.dataset.cliente;
+  p2MostrarModal();
+}
+
+function p2Alterar(prodCodigo, btn) {
+  const cliente = btn.closest('tr').cells[1].textContent;
+  if (!confirm(`Trocar a OP ${p2Troca.op} pela OP ${prodCodigo} (${cliente})?\n\nDatas e etapa continuam no pedido. Os dias agendados de hoje em diante passam para a OP ${prodCodigo}; os dias passados ficam na OP ${p2Troca.op}.`)) return;
+  btn.disabled = true;
+  btn.textContent = 'Alterando...';
+  fetch('?action=alterar_op', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+    body: new URLSearchParams({ action: 'alterar_op', prg_codigo: p2Troca.prg, prod_codigo: prodCodigo }).toString(),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error || !data.ok) {
+        alert(data.error || 'Não foi possível alterar a OP.');
+        btn.disabled = false;
+        btn.textContent = 'Usar esta OP';
+        return;
+      }
+      window.location.reload();
+    })
+    .catch(() => {
+      alert('Erro ao alterar a OP.');
+      btn.disabled = false;
+      btn.textContent = 'Usar esta OP';
+    });
+}
+
 // ── Marcar como finalizado (grid principal) ───────────────────────────────────
 function p2Finalizar(prgCodigo) {
   if (!confirm('Marcar este pedido como finalizado e removê-lo da programação?')) return;
@@ -718,10 +848,35 @@ function p2Finalizar(prgCodigo) {
       if (badge) badge.textContent = Math.max(0, (parseInt(badge.textContent, 10) || 1) - 1);
       const tbody = document.getElementById('p2Tbody');
       if (tbody && !tbody.querySelector('tr:not(.p2-empty-row)')) {
-        tbody.innerHTML = '<tr class="p2-empty-row"><td colspan="11">Nenhum pedido na programação. Clique em "Adicionar Pedido à Programação" para começar.</td></tr>';
+        tbody.innerHTML = '<tr class="p2-empty-row"><td colspan="13">Nenhum pedido na programação. Clique em "Adicionar Pedido à Programação" para começar.</td></tr>';
       }
     })
     .catch(() => alert('Erro ao finalizar o pedido.'));
+}
+
+// ── Início da produção e entrega esperada de um pedido programado ────────────
+function p2AtualizarData(input, campo) {
+  const anterior = input.dataset.prev;
+  input.disabled = true;
+  fetch('?action=atualizar_data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
+    body: new URLSearchParams({ action: 'atualizar_data', prg_codigo: input.dataset.prg, campo, valor: input.value }).toString(),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error || !data.ok) {
+        alert(data.error || 'Não foi possível salvar a data.');
+        input.value = anterior;
+        return;
+      }
+      input.dataset.prev = input.value;
+    })
+    .catch(() => {
+      alert('Erro ao salvar a data.');
+      input.value = anterior;
+    })
+    .finally(() => { input.disabled = false; });
 }
 
 // ── Atualizar etapa de produção de um pedido programado ───────────────────────

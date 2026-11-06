@@ -18,13 +18,13 @@ header('Cache-Control: no-store');
 
 // Mesma garantia da página de Agendamento: a sessão da TV pode ser anterior à
 // publicação da tabela PCP_AGENDA.
-if (empty($_SESSION['agenda_mig_ok'])) {
+if (empty($_SESSION['agenda_mig_v2_ok'])) {
     require_once $_SERVER['DOCUMENT_ROOT'] . '/config/migrations.php';
     ob_start();
     unset($_SESSION['mig_ok']);
     rodarMigrations();
     ob_end_clean();
-    $_SESSION['agenda_mig_ok'] = 1;
+    $_SESSION['agenda_mig_v2_ok'] = 1;
 }
 
 $mesFixo = agTvMesFixo($_GET['mes'] ?? null);
@@ -94,17 +94,20 @@ session_write_close();
   #btnTela { display: none; margin-left: 1.2rem; font: inherit; font-size: 1rem; font-weight: 700; color: #eef2f7; background: #10161d; border: 2px solid #2b3540; border-radius: .5rem; padding: .25rem .8rem; }
   #btnTela:focus { outline: none; border-color: #58d6c9; }
 
-  /* ── Legenda ── */
-  #legenda { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-flex: 0 0 auto; flex: 0 0 auto; margin-bottom: .4rem; font-size: .95rem; font-weight: 600; color: #a9b7c6; }
-  .leg { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-right: 1.4rem; white-space: nowrap; }
-  .leg i { display: block; width: 1.6rem; height: .85rem; margin-right: .45rem; border-radius: .2rem; border: 1px solid #8fa0b3; }
+  /* ── Legenda: discreta, no canto inferior esquerdo ── */
+  #legenda { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; -webkit-flex: 0 0 auto; flex: 0 0 auto; margin-top: .25rem; font-size: .65rem; font-weight: 600; color: #66727f; }
+  .leg { display: -webkit-flex; display: flex; -webkit-align-items: center; align-items: center; margin-right: .9rem; white-space: nowrap; }
+  .leg i { display: block; width: 1rem; height: .5rem; margin-right: .3rem; border-radius: .12rem; border: 1px solid #66727f; opacity: .8; }
   .leg .bag { background: #22c55e; border-color: #22c55e; }
   .leg .sac { background: #a855f7; border-color: #a855f7; }
   .leg .agendado { border-style: dashed; }
-  .leg .parcial { background: #8fa0b3; background: linear-gradient(90deg, #8fa0b3 55%, transparent 55%); }
-  .leg .cumprido { background: #8fa0b3; }
+  .leg .parcial { background: #66727f; background: linear-gradient(90deg, #66727f 55%, transparent 55%); }
+  .leg .cumprido { background: #66727f; }
   .leg .abaixo { border-color: #ef4444; }
-  #vazio { display: none; margin-left: auto; font-size: 1.1rem; font-weight: 700; color: #eef2f7; }
+  .leg .agora { border-color: #58d6c9; }
+  .leg .inicio { background: #a3e635; border-color: #a3e635; }
+  .leg .saida { background: #f472b6; border-color: #f472b6; }
+  #vazio { display: none; margin-left: auto; font-size: .8rem; color: #8fa0b3; }
 
   /* ── Aviso de dados desatualizados / erro ── */
   #aviso { display: none; -webkit-flex: 0 0 auto; flex: 0 0 auto; margin-bottom: .4rem; padding: .45rem 1rem; border-radius: .6rem; font-size: 1.1rem; font-weight: 700; }
@@ -134,9 +137,16 @@ session_write_close();
   .somaBag { color: #7db3ff; font-weight: 800; margin-left: .5em; }
   .somaSac { color: #f59e0b; font-weight: 800; margin-left: .5em; }
 
+  .marco { margin-top: .15em; padding: 0 .3em; border-radius: .2em; font-size: .8em; font-weight: 700; line-height: 1.25; color: #eef2f7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .marco.inicio { background: rgba(163,230,53,.18); border-left: .25em solid #a3e635; }
+  .marco.saida { background: rgba(244,114,182,.18); border-left: .25em solid #f472b6; }
+  .dia.outro .marco { opacity: .55; }
+
   .cartao { position: relative; overflow: hidden; margin-top: .2em; padding: .1em .35em .1em .5em; border-radius: .25em; border: 1px solid #36404c; background: #161d26; line-height: 1.2; }
   .cartao.agendado { border-style: dashed; }
   .cartao.abaixo { border-color: #ef4444; }
+  .cartao.agora { border: 1px solid #58d6c9; }
+  .agora .cliCard:before { content: '\25CF\00A0'; color: #58d6c9; }
   .cartao .faixa { position: absolute; left: 0; top: 0; bottom: 0; width: .2em; }
   .cartao.BAG .faixa { background: #2d6aff; }
   .cartao.SACARIA .faixa { background: #f59e0b; }
@@ -197,21 +207,24 @@ setTimeout(function () {
   <div id="aviso" role="status"></div>
   <noscript><div style="font-size:1.5rem;color:#ffc4c4;padding:1rem">Este painel precisa de JavaScript habilitado.</div></noscript>
 
-  <div id="legenda">
-    <span class="leg"><i class="bag"></i>Big Bag</span>
-    <span class="leg"><i class="sac"></i>Sacaria</span>
-    <span class="leg"><i class="agendado"></i>Agendado</span>
-    <span class="leg"><i class="parcial"></i>Em produção</span>
-    <span class="leg"><i class="cumprido"></i>Produzido</span>
-    <span class="leg"><i class="abaixo"></i>Abaixo do previsto</span>
-    <span id="vazio">Nenhum pedido agendado neste mês.</span>
-  </div>
-
   <div id="calendario">
     <div class="semana" id="cabecalho">
       <div class="col">Segunda</div><div class="col">Terça</div><div class="col">Quarta</div><div class="col">Quinta</div><div class="col">Sexta</div><div class="col fds">Sábado</div><div class="col fds">Domingo</div>
     </div>
     <div id="grade"><div id="estado">Carregando dados…</div></div>
+  </div>
+
+  <div id="legenda">
+    <span class="leg"><i class="bag"></i>Big Bag</span>
+    <span class="leg"><i class="sac"></i>Sacaria</span>
+    <span class="leg"><i class="agendado"></i>Agendado</span>
+    <span class="leg"><i class="parcial"></i>Em andamento</span>
+    <span class="leg"><i class="cumprido"></i>Produzido</span>
+    <span class="leg"><i class="abaixo"></i>Abaixo do previsto</span>
+    <span class="leg"><i class="agora"></i>Produzindo agora</span>
+    <span class="leg"><i class="inicio"></i>Início da produção</span>
+    <span class="leg"><i class="saida"></i>Saída</span>
+    <span id="vazio">Nenhum pedido agendado neste mês.</span>
   </div>
 </div>
 <pre id="diag"></pre>
@@ -231,6 +244,7 @@ setTimeout(function () {
   var ALT_CARD = 2.45;
   var ALT_COMPACTO = 1.5;
   var ALT_AVISO = 1.05;
+  var ALT_MARCO = 1.15;
   var ALT_SEMANA_MIN = 3.2;
   var FONTE_MIN_REM = 0.7;     // abaixo disso os cards passam a ter uma linha só
   var FONTE_MAX_REM = 1.25;
@@ -280,7 +294,7 @@ setTimeout(function () {
   }
 
   function altDia(d, compacto) {
-    var alt = ALT_TOPO;
+    var alt = ALT_TOPO + d.marcos.length * ALT_MARCO;
     for (var i = 0; i < d.cards.length; i++) { alt += altCard(d.cards[i], compacto); }
     return alt;
   }
@@ -300,7 +314,7 @@ setTimeout(function () {
   // ── Calendário ─────────────────────────────────────────────────────────────
   // O cliente é a informação principal; quantidade e pedido são detalhe.
   function criaCartao(c, compacto) {
-    var el = criar('div', 'cartao ' + c.tipo + ' ' + c.status + (compacto ? ' compacto' : ''));
+    var el = criar('div', 'cartao ' + c.tipo + ' ' + c.status + (compacto ? ' compacto' : '') + (c.agora ? ' agora' : ''));
     var enche = criar('div', 'enche');
     enche.style.width = c.pct + '%';
     el.appendChild(enche);
@@ -324,6 +338,9 @@ setTimeout(function () {
     topo.appendChild(somas);
     el.appendChild(topo);
 
+    for (var m = 0; m < d.marcos.length; m++) {
+      el.appendChild(criar('div', 'marco ' + d.marcos[m].marco, d.marcos[m].texto));
+    }
     for (var i = 0; i < d.cards.length; i++) { el.appendChild(criaCartao(d.cards[i], compacto)); }
     return el;
   }

@@ -4,13 +4,14 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/agendamento_dados.php';
 
 // ══════════════════════════════════════════════════════════════
 //  DOMBAG — Dados do Agendamento na TV (/pcp/tv)
-//  Reaproveita agMontar e aplica o critério do modo Tela cheia da página
-//  de Agendamento: só os pedidos agendados, sem totais nem fila. Quantidades
+//  Reaproveita agMontar: mostra os pedidos agendados e, no dia de hoje, o que
+//  está em produção mesmo sem agendamento. Sem totais nem fila. Quantidades
 //  e textos saem prontos daqui, porque a TV não tem Intl confiável nem deve
 //  repetir regra de negócio em JavaScript.
 // ══════════════════════════════════════════════════════════════
 
 const AGTV_UNIDADE = [PROD_TIPO_BAG => 'bags', PROD_TIPO_SACARIA => 'sac.'];
+const AGTV_MARCOS = ['inicio' => 'Início', 'saida' => 'Saída'];
 const AGTV_MESES   = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho',
                       'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -40,17 +41,31 @@ function agTvMesTitulo(string $mes): string
     return AGTV_MESES[(int) $m - 1] . ' de ' . $ano;
 }
 
-// Mesmas regras de htmlCard em agendamento.php, para um card com previsto.
+// Texto da quantidade: com previsto, mesmas regras de htmlCard em agendamento.php.
+function agTvQtd(array $c, string $hoje): string
+{
+    $un = AGTV_UNIDADE[$c['tipo']];
+    if ($c['plan'] > 0) {
+        return ($c['real'] > 0 || $c['dia'] < $hoje)
+            ? agTvNum($c['real']) . " {$un} de " . agTvNum($c['plan'])
+            : agTvNum($c['plan']) . " {$un} prev.";
+    }
+    return match (true) {
+        $c['real'] > 0   => agTvNum($c['real']) . " {$un} s/ agenda",
+        $c['aberto'] > 0 => agTvNum($c['aberto']) . " {$un} em aberto",
+        default          => 'Sem agenda',
+    };
+}
+
 function agTvCard(array $c, string $hoje): array
 {
-    $un      = AGTV_UNIDADE[$c['tipo']];
-    $passado = $c['dia'] < $hoje;
-    $qtd = ($c['real'] > 0 || $passado)
-        ? agTvNum($c['real']) . " {$un} de " . agTvNum($c['plan'])
-        : agTvNum($c['plan']) . " {$un} prev.";
+    $agora = !empty($c['agora']);
+    $pct   = $c['plan'] > 0
+        ? min(100, $c['real'] / $c['plan'] * 100)
+        : ($c['real'] > 0 && !$agora ? 100 : 0);
 
     $avisos = [];
-    if ($c['aberto'] > 0) {
+    if ($c['aberto'] > 0 && ($c['plan'] > 0 || $c['real'] > 0)) {
         $avisos[] = agTvNum($c['aberto']) . ' em aberto no ERP';
     }
     if ($c['tarde']) {
@@ -60,21 +75,80 @@ function agTvCard(array $c, string $hoje): array
     return [
         'tipo'    => $c['tipo'],
         'status'  => $c['status'],
-        'pct'     => min(100, $c['real'] / $c['plan'] * 100),
-        'qtd'     => $qtd,
+        'agora'   => $agora,
+        'pct'     => $pct,
+        'qtd'     => agTvQtd($c, $hoje),
         'pedido'  => $c['pedido'] !== '' ? $c['pedido'] : 'OP ' . $c['op'],
         'cliente' => $c['cliente'],
         'avisos'  => $avisos,
     ];
 }
 
+// OPs de bag com apontamento aberto agora. Sacaria não tem apontamento.
+function agTvOpsAtivas($pg): array
+{
+    return array_map('intval', array_column(agPgAll($pg, "
+        SELECT DISTINCT A.PROD_CODIGO AS op
+          FROM OP_ITENS_ATIVIDADES_APONTADAS A
+          JOIN PRODUTO P ON P.PRO_CODIGO = A.PRO_CODIGO
+         WHERE NOT A.OIAP_EXCLUIDO
+           AND TRIM(A.OIAP_STATUS) <> 'C'
+           AND A.OIAP_DATA_HORA_FIM IS NULL
+           AND P.GRP_CODIGO = " . AG_GRP_BAG . "
+    "), 'op'));
+}
+
+// Marca os cards de hoje das OPs ativas e cria card para a OP ativa que ainda
+// não tem card hoje, como a iniciada ontem ou sem leitura. OP fora de $info é
+// de outra empresa.
+function agTvComAtivas(array $cards, array $ativas, array $info, string $hoje): array
+{
+    $semCard = array_fill_keys($ativas, true);
+    foreach ($cards as &$c) {
+        if ($c['dia'] === $hoje && $c['tipo'] === PROD_TIPO_BAG && isset($semCard[$c['op']])) {
+            $c['agora'] = true;
+            unset($semCard[$c['op']]);
+        }
+    }
+    unset($c);
+
+    foreach (array_keys($semCard) as $op) {
+        if (!isset($info[$op])) {
+            continue;
+        }
+        $cards[] = [
+            'dia' => $hoje, 'op' => $op, 'tipo' => PROD_TIPO_BAG,
+            'pedido' => $info[$op]['pedido'], 'cliente' => $info[$op]['cliente'],
+            'plan' => 0.0, 'real' => 0.0, 'aberto' => 0.0,
+            'status' => 'produzido', 'tarde' => false, 'agora' => true,
+        ];
+    }
+    return $cards;
+}
+
+function agTvMarco(array $m): array
+{
+    $pedido = $m['pedido'] !== '' ? $m['pedido'] : 'OP ' . $m['op'];
+    return ['marco' => $m['marco'], 'texto' => trim(AGTV_MARCOS[$m['marco']] . " {$pedido} {$m['cliente']}")];
+}
+
+// Dias passados seguem só com o agendado: produção fora da agenda aparece no
+// dia de hoje, para o calendário não lotar com o histórico do mês.
+function agTvMostra(array $c, string $hoje): bool
+{
+    return $c['plan'] > 0
+        || ($c['dia'] === $hoje && (!empty($c['agora']) || $c['real'] > 0 || $c['aberto'] > 0));
+}
+
 // Grade do mês em semanas de 7 dias, pronta para desenhar.
 function agTvPainel(array $d): array
 {
     $porDia = [];
+    $temAgenda = false;
     foreach ($d['cards'] as $c) {
-        if ($c['plan'] > 0) {
+        if (agTvMostra($c, $d['hoje'])) {
             $porDia[$c['dia']][] = $c;
+            $temAgenda = $temAgenda || $c['plan'] > 0;
         }
     }
 
@@ -101,6 +175,7 @@ function agTvPainel(array $d): array
             'outro_mes' => !str_starts_with($dia, $d['mes']),
             'soma_bag'  => $soma[PROD_TIPO_BAG] > 0 ? agTvNum($soma[PROD_TIPO_BAG]) : '',
             'soma_sac'  => $soma[PROD_TIPO_SACARIA] > 0 ? agTvNum($soma[PROD_TIPO_SACARIA]) : '',
+            'marcos'    => array_map('agTvMarco', $d['marcos'][$dia] ?? []),
             'cards'     => array_map(static fn ($c) => agTvCard($c, $d['hoje']), $cards),
         ];
     }
@@ -109,7 +184,7 @@ function agTvPainel(array $d): array
         'mes'        => $d['mes'],
         'mes_titulo' => agTvMesTitulo($d['mes']),
         'hoje'       => $d['hoje'],
-        'tem_agenda' => (bool) $porDia,
+        'tem_agenda' => $temAgenda,
         'semanas'    => $semanas,
     ];
 }
@@ -144,11 +219,21 @@ function agTvDemo(string $mes): array
                 'cliente' => $clientes[$n % count($clientes)], 'plan' => $plan, 'real' => $real, 'aberto' => 0.0,
                 'status' => $real >= $plan ? 'cumprido' : ($dia < $hoje ? 'abaixo' : 'agendado'),
                 'tarde'  => $dia > $hoje && $n % 17 === 0,
+                'agora'  => $dia === $hoje && $k === 0,
             ];
         }
     }
+    $cards[] = [
+        'dia' => $hoje, 'op' => 8999, 'tipo' => PROD_TIPO_BAG, 'pedido' => '7999', 'cliente' => $clientes[0],
+        'plan' => 0.0, 'real' => 35.0, 'aberto' => 0.0, 'status' => 'produzido', 'tarde' => false, 'agora' => true,
+    ];
 
-    return ['demo' => true] + agTvPainel(['mes' => $mes, 'hoje' => $hoje, 'ini' => $ini, 'fim' => $fim, 'cards' => $cards]);
+    $marcos = [
+        $hoje => [['marco' => 'inicio', 'pedido' => '7999', 'cliente' => $clientes[0], 'op' => 8999]],
+        date('Y-m-d', strtotime('+2 days')) => [['marco' => 'saida', 'pedido' => '7999', 'cliente' => $clientes[0], 'op' => 8999]],
+    ];
+
+    return ['demo' => true] + agTvPainel(['mes' => $mes, 'hoje' => $hoje, 'ini' => $ini, 'fim' => $fim, 'cards' => $cards, 'marcos' => $marcos]);
 }
 
 // Sem conexão com o ERP agMontar segue com a produção zerada; na TV isso
@@ -158,5 +243,8 @@ function agTvBuscar(PDO $pdo, $pg, string $mes): array
     if (!$pg) {
         throw new AgTvErro('erp_indisponivel', 'Sem conexão com o ERP.');
     }
-    return agTvPainel(agMontar($pdo, $pg, $mes));
+    $d      = agMontar($pdo, $pg, $mes);
+    $ativas = agTvOpsAtivas($pg);
+    $d['cards'] = agTvComAtivas($d['cards'], $ativas, agOpsInfo($pg, $ativas), $d['hoje']);
+    return agTvPainel($d);
 }

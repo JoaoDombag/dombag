@@ -8,19 +8,20 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/agendamento_dados.php';
 //  DOMBAG — Agendamento de Produção
 //  Calendário do mês com os pedidos da Reunião de Planejamento.
 //  Relatório: produzido por dia, vindo do ERP. Operacional: arrastar
-//  um pedido para um dia grava o previsto em PCP_AGENDA. Regras e
+//  um pedido para um dia grava o previsto em PCP_AGENDA, e o card
+//  recebe o realizado do dia. Regras e
 //  consultas: agendamento_dados.php
 // ══════════════════════════════════════════════════════════════
 
 // Migrations normalmente rodam no login; garante a tabela para quem já estava
 // logado quando esta página foi publicada.
-if (empty($_SESSION['agenda_mig_ok'])) {
+if (empty($_SESSION['agenda_mig_v3_ok'])) {
     require_once $_SERVER['DOCUMENT_ROOT'] . '/config/migrations.php';
     ob_start();
     unset($_SESSION['mig_ok']);
     rodarMigrations();
     ob_end_clean();
-    $_SESSION['agenda_mig_ok'] = 1;
+    $_SESSION['agenda_mig_v3_ok'] = 1;
 }
 
 $acao = (string) ($_POST['action'] ?? $_GET['action'] ?? '');
@@ -37,7 +38,7 @@ if ($acao !== '') {
             $agd = (int) ($_POST['agd'] ?? 0);
             $qtd = (float) ($_POST['qtd'] ?? 0);
             $dia = agData((string) ($_POST['dia'] ?? ''));
-            if ($acao !== 'remover' && $dia === null) {
+            if (!in_array($acao, ['remover', 'datas', 'realizado'], true) && $dia === null) {
                 throw new RuntimeException('Data inválida.');
             }
             match ($acao) {
@@ -45,6 +46,8 @@ if ($acao !== '') {
                 'mover'   => agMover($pdo, $pg, agSlotAberto($pdo, $agd), $dia),
                 'editar'  => agEditar($pdo, $pg, $agd, $qtd, $dia),
                 'remover' => agRemover($pdo, $agd),
+                'realizado' => agMarcarRealizado($pdo, $agd, (string) ($_POST['realizado'] ?? '')),
+                'datas'   => agMarcarDatas($pdo, (int) ($_POST['prg'] ?? 0), (string) ($_POST['inicio'] ?? ''), (string) ($_POST['saida'] ?? ''), (string) ($_POST['entrega'] ?? '')),
                 default   => throw new RuntimeException('Ação desconhecida.'),
             };
         }
@@ -106,6 +109,8 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
   .ag-amostra .s-parcial  { border: 1px solid var(--text-muted); background: linear-gradient(90deg, var(--text-muted) 55%, transparent 55%); }
   .ag-amostra .s-produzido { background: var(--text-muted); }
   .ag-amostra .s-abaixo { border: 1px solid var(--red); }
+  .ag-amostra .s-inicio { background: #a3e635; }
+  .ag-amostra .s-saida  { background: #f472b6; }
 
   /* ── Totais do mês, um por tipo: as unidades não se somam ─ */
   .ag-totais { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
@@ -171,6 +176,13 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     background: var(--card-hover); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
 
+  .ag-marco {
+    font-size: 10.5px; font-weight: 600; padding: 1px 5px; border-radius: 4px; color: var(--text-primary);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ag-marco.inicio { background: rgba(163,230,53,.16); border-left: 3px solid #a3e635; }
+  .ag-marco.saida  { background: rgba(244,114,182,.16); border-left: 3px solid #f472b6; }
+
   /* O card é um medidor: a cor enche conforme o produzido alcança o previsto */
   .ag-card {
     position: relative; overflow: hidden; display: block; width: 100%; padding: 4px 6px 4px 8px;
@@ -207,8 +219,10 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
   .ag-det { margin: 12px 0 2px; display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; font-size: 12.5px; }
   .ag-det dt { color: var(--text-muted); }
   .ag-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  #agModal [hidden] { display: none; }
   .ag-form label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--text-muted); }
   .ag-form input { height: 36px; padding: 0 10px; font-size: 13px; }
+  .ag-marcos-acao { grid-column: 1 / -1; justify-self: start; }
   .ag-nota { margin-top: 10px; }
   .ag-remover { margin-right: auto; color: var(--red) !important; }
 
@@ -329,6 +343,8 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
         <span class="ag-amostra"><i class="s-parcial"></i> Em produção</span>
         <span class="ag-amostra"><i class="s-produzido"></i> Produzido</span>
         <span class="ag-amostra"><i class="s-abaixo"></i> Abaixo do previsto</span>
+        <span class="ag-amostra"><i class="s-inicio"></i> Início da produção</span>
+        <span class="ag-amostra"><i class="s-saida"></i> Saída</span>
       </div>
 
       <p class="ag-sem-agenda" id="agSemAgenda" hidden>Nenhum pedido agendado neste mês.</p>
@@ -359,7 +375,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
             <thead>
               <tr>
                 <th>Pedido</th><th>OP</th><th>Cliente</th><th>Tipo</th><th>Entrega esperada</th>
-                <th class="num">Agendado no mês</th><th class="num">Produzido no mês</th><th class="num">Quantidade da OP</th>
+                <th class="num">Agendado no mês</th><th class="num">Realizado marcado</th><th class="num">Produzido no ERP</th><th class="num">Quantidade da OP</th>
               </tr>
             </thead>
             <tbody id="agResumo"></tbody>
@@ -377,7 +393,17 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     <form id="agModalForm">
       <div class="ag-form" id="agModalCampos">
         <label>Dia <input type="date" id="agCampoDia" required></label>
-        <label>Quantidade <input type="number" id="agCampoQtd" min="1" step="1" required></label>
+        <label>Previsto no dia <input type="number" id="agCampoQtd" min="1" step="1" required></label>
+      </div>
+      <div class="ag-form" id="agModalReal">
+        <label>Realizado no dia <input type="number" id="agCampoReal" min="0" step="1" inputmode="numeric"></label>
+        <button type="button" class="btn-secondary ag-marcos-acao" id="agBtnReal">Salvar realizado</button>
+      </div>
+      <div class="ag-form" id="agModalMarcos">
+        <label>Início da produção <input type="date" id="agCampoInicio"></label>
+        <label>Saída <input type="date" id="agCampoSaida"></label>
+        <label>Entrega esperada <input type="date" id="agCampoEntrega"></label>
+        <button type="button" class="btn-secondary ag-marcos-acao" id="agBtnDatas">Salvar datas</button>
       </div>
       <p class="ag-nota" id="agModalNota"></p>
       <div class="modal-actions">
@@ -534,9 +560,12 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
       <span class="ag-qtd">${qtd}</span>
       <span class="ag-nome"><em>${esc(c.pedido || 'OP ' + c.op)}</em> ${esc(c.cliente)}</span>
       ${c.aberto > 0 && (c.real > 0 || c.plan > 0) ? `<span class="ag-aberto">${nf.format(c.aberto)} em aberto no ERP</span>` : ''}
+      ${c.feito !== null && c.erp > 0 && c.erp !== c.feito ? `<span class="ag-aberto">${nf.format(c.erp)} no ERP</span>` : ''}
       ${c.tarde ? '<span class="ag-aviso">Depois da entrega</span>' : ''}
     </div>`;
   }
+
+  const marcoNome = { inicio: 'Início', saida: 'Saída' };
 
   function renderGrade() {
     const porDia = {};
@@ -557,12 +586,13 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
       const dt = new Date(dia + 'T12:00:00');
       const itens = (porDia[dia] || []).sort(([a], [b]) => a.tipo.localeCompare(b.tipo) || (b.real + b.plan) - (a.real + a.plan));
       const entregas = (soAgendado ? [] : dados.entregas[dia] || []).filter(e => filtro.busca === '' || `${e.pedido} ${e.op} ${e.cliente}`.toLowerCase().includes(filtro.busca));
+      const marcos = (dados.marcos[dia] || []).filter(m => filtro.busca === '' || `${m.pedido} ${m.op} ${m.cliente}`.toLowerCase().includes(filtro.busca));
       const classes = ['ag-dia'];
       if (!dia.startsWith(dados.mes)) classes.push('outro-mes');
       if (dia < dados.hoje) classes.push('passado');
       if (dia === dados.hoje) classes.push('hoje');
       if (dt.getDay() === 0 || dt.getDay() === 6) classes.push('fds');
-      if (!itens.length && !entregas.length) classes.push('vazio');
+      if (!itens.length && !entregas.length && !marcos.length) classes.push('vazio');
 
       const soma = { BAG: 0, SACARIA: 0 };
       const somaAgendada = soAgendado || dia > dados.hoje;
@@ -576,6 +606,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
           <span class="ag-num">${dt.getDate()}<span class="ag-rotulo-dia"> ${esc(rotulo)}</span></span>
           <span class="ag-dia-soma">${somaHtml}</span>
         </div>
+        ${marcos.map(m => `<div class="ag-marco ${m.marco}" title="${marcoNome[m.marco]}: ${esc(m.cliente)}">${marcoNome[m.marco]} ${esc(m.pedido || 'OP ' + m.op)} ${esc(m.cliente)}</div>`).join('')}
         ${entregas.map(e => `<div class="ag-entrega" title="Entrega esperada: ${esc(e.cliente)}">Entrega ${esc(e.pedido || 'OP ' + e.op)} ${esc(e.cliente)}</div>`).join('')}
         ${itens.map(([c, i]) => htmlCard(c, i)).join('')}
       </div>`;
@@ -591,9 +622,10 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
       <td><span class="tipo-txt">${tipoNome[r.tipo]}</span></td>
       <td class="td-nowrap">${dataBr(r.entrega)}</td>
       <td class="num">${r.agendado > 0 ? nf.format(r.agendado) : '—'}</td>
+      <td class="num">${r.marcado > 0 ? nf.format(r.marcado) : '—'}</td>
       <td class="num">${nf.format(r.produzido)}${r.aberto > 0 ? `<small>${nf.format(r.aberto)} em aberto</small>` : ''}</td>
       <td class="num">${r.total > 0 ? nf.format(r.total) : '—'}</td>
-    </tr>`).join('') || '<tr><td colspan="8" class="td-muted" style="text-align:center;padding:24px;">Nenhum pedido neste mês com os filtros atuais.</td></tr>';
+    </tr>`).join('') || '<tr><td colspan="9" class="td-muted" style="text-align:center;padding:24px;">Nenhum pedido neste mês com os filtros atuais.</td></tr>';
   }
 
   // ── Arrastar e soltar ───────────────────────────────────────────────────
@@ -677,14 +709,14 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     const linhas = [
       ['Cliente', item.cliente], ['OP', item.op], ['Produto', item.produto || '—'],
       ['Quantidade da OP', item.total > 0 ? `${nf.format(item.total)} ${unidade[item.tipo]}` : '—'],
-      ['Entrega esperada', dataBr(item.entrega)],
     ];
     if (novo) {
       linhas.push(['Já produzido', nf.format(item.produzido)], ['A agendar', nf.format(item.saldo)]);
     } else {
       linhas.push(['Dia', dataBr(item.dia)]);
       if (item.plan > 0) linhas.push(['Agendado', nf.format(item.plan)]);
-      if (item.dia <= dados.hoje) linhas.push(['Produzido no dia', nf.format(item.real)]);
+      if (item.dia <= dados.hoje) linhas.push(['Produzido no ERP', nf.format(item.erp)]);
+      if (item.feito_por) linhas.push(['Realizado marcado por', item.feito_por]);
       if (item.aberto > 0) linhas.push(['Em aberto no ERP', nf.format(item.aberto)]);
       if (item.usuario) linhas.push(['Agendado por', item.usuario]);
     }
@@ -693,7 +725,8 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     let nota = '';
     if (!novo && !item.programado) nota = 'Este pedido não está na Reunião de Planejamento. Para agendá-lo, adicione-o lá primeiro.';
     else if (!novo && item.status === 'abaixo') nota = 'Dia encerrado. O que faltou voltou para A agendar.';
-    else if (!novo && !editavel && item.plan > 0) nota = 'Dia encerrado: este registro não muda mais.';
+    else if (!novo && !editavel && item.plan > 0) nota = 'Dia encerrado: dia e previsto não mudam mais.';
+    else if (!novo && editavel) nota = 'Para dividir em vários dias, reduza o previsto aqui: o restante volta para A agendar.';
     else if (novo) nota = 'Agende uma parte e o restante continua em A agendar.';
     $('agModalNota').textContent = nota;
 
@@ -704,11 +737,19 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     $('agCampoDia').min = dados.hoje;
     $('agCampoDia').value = novo ? '' : item.dia;
     $('agCampoQtd').value = Math.round(novo ? item.saldo : item.plan);
+    // Só o dia agendado que já chegou recebe realizado
+    const marcaReal = !novo && item.agd > 0 && item.dia <= dados.hoje;
+    $('agModalReal').hidden = !marcaReal;
+    $('agCampoReal').value = marcaReal && item.feito !== null ? Math.round(item.feito) : '';
+    $('agModalMarcos').hidden = !item.prg;
+    $('agCampoInicio').value = item.inicio || '';
+    $('agCampoSaida').value = item.saida || '';
+    $('agCampoEntrega').value = item.entrega || '';
     $('agCampoDia').required = editavel;
     $('agCampoQtd').required = editavel;
 
     $('agModal').classList.add('open');
-    (editavel ? $('agCampoDia') : $('agBtnFechar')).focus();
+    (marcaReal ? $('agCampoReal') : editavel ? $('agCampoDia') : $('agBtnFechar')).focus();
   }
   function fecharModal() {
     $('agModal').classList.remove('open');
@@ -741,6 +782,25 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
       : await enviar('editar', { agd: item.agd, dia, qtd }, 'Agendamento salvo.');
     if (ok) fecharModal();
   });
+  async function salvarRealizado() {
+    const realizado = $('agCampoReal').value;
+    const ok = await enviar('realizado', { agd: selecionado.item.agd, realizado },
+      realizado === '' ? 'Realizado apagado. O dia voltou a mostrar o ERP.' : 'Realizado salvo.');
+    if (ok) fecharModal();
+  }
+  $('agBtnReal').addEventListener('click', salvarRealizado);
+  $('agCampoReal').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      salvarRealizado();
+    }
+  });
+  $('agBtnDatas').addEventListener('click', async () => {
+    const ok = await enviar('datas', {
+      prg: selecionado.item.prg, inicio: $('agCampoInicio').value, saida: $('agCampoSaida').value, entrega: $('agCampoEntrega').value,
+    }, 'Datas do pedido salvas.');
+    if (ok) fecharModal();
+  });
   $('agBtnRemover').addEventListener('click', async () => {
     const ok = await enviar('remover', { agd: selecionado.item.agd }, 'Agendamento removido. O saldo voltou para A agendar.');
     if (ok) fecharModal();
@@ -770,6 +830,12 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
     render();
   }));
   $('agBusca').addEventListener('input', e => { filtro.busca = e.target.value.trim().toLowerCase(); render(); });
+  // Link vindo da Reunião, do Kanban ou do Status das OPs abre já filtrado no pedido
+  const buscaLink = new URLSearchParams(location.search).get('busca');
+  if (buscaLink) {
+    $('agBusca').value = buscaLink;
+    filtro.busca = buscaLink.toLowerCase();
+  }
   $('agSoProg').addEventListener('change', e => { filtro.soProg = e.target.checked; render(); });
 
   // ── Tela cheia ──────────────────────────────────────────────────────────
