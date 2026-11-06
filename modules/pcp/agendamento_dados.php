@@ -158,9 +158,9 @@ function agProgresso(PDO $db, $pg, array $pedidos): array
         $lista = implode(',', array_map('intval', array_keys($pedidos)));
         $slots = [];
         $proximo = [];
-        foreach ($db->query("SELECT PRG_CODIGO, PROD_CODIGO, AGD_TIPO, AGD_DATA, AGD_QTD, AGD_REALIZADO FROM PCP_AGENDA WHERE PRG_CODIGO IN ({$lista})") as $s) {
+        foreach ($db->query("SELECT PRG_CODIGO, AGD_TIPO, AGD_DATA, AGD_QTD, AGD_REALIZADO FROM PCP_AGENDA WHERE PRG_CODIGO IN ({$lista})") as $s) {
             $prg = (int) $s['PRG_CODIGO'];
-            $slots[$prg][(int) $s['PROD_CODIGO']][$s['AGD_TIPO']][] = $s;
+            $slots[$prg][$s['AGD_TIPO']][] = $s;
             if ($s['AGD_DATA'] >= $hoje && ($s['AGD_DATA'] < ($proximo[$prg] ?? '9999'))) {
                 $proximo[$prg] = $s['AGD_DATA'];
             }
@@ -180,7 +180,7 @@ function agProgresso(PDO $db, $pg, array $pedidos): array
     foreach ($pedidos as $prg => $op) {
         $tipos = [];
         foreach ($info[(int) $op]['tipos'] ?? [] as $tipo => $t) {
-            $tipos[$tipo] = agApurarSaldo($slots[$prg][(int) $op][$tipo] ?? [], $real[(int) $op][$tipo] ?? [], $t['qtd'], $hoje)
+            $tipos[$tipo] = agApurarSaldo($slots[$prg][$tipo] ?? [], $real[(int) $op][$tipo] ?? [], $t['qtd'], $hoje)
                 + ['total' => $t['qtd']];
         }
         if ($tipos) {
@@ -331,7 +331,6 @@ function agMontar(PDO $db, $pg, string $mes): array
         $k = "{$s['AGD_DATA']}|{$s['PROD_CODIGO']}|{$s['AGD_TIPO']}";
         $cards[$k]['agd']     = (int) $s['AGD_CODIGO'];
         $cards[$k]['prg']     = (int) $s['PRG_CODIGO'];
-        $cards[$k]['programado'] = true;
         $cards[$k]['plan']    = (float) $s['AGD_QTD'];
         $cards[$k]['usuario'] = (string) $s['AGD_USUARIO'];
         $cards[$k]['feito']   = $s['AGD_REALIZADO'] === null ? null : (float) $s['AGD_REALIZADO'];
@@ -369,7 +368,7 @@ function agMontar(PDO $db, $pg, string $mes): array
     // ── Saldo a agendar de cada pedido ativo, por tipo ───────────────────
     $slotsPorChave = [];
     foreach ($slots as $s) {
-        $slotsPorChave[$s['PRG_CODIGO'] . '|' . $s['PROD_CODIGO'] . '|' . $s['AGD_TIPO']][] = $s;
+        $slotsPorChave[$s['PRG_CODIGO'] . '|' . $s['AGD_TIPO']][] = $s;
     }
 
     $pendentes = [];
@@ -377,7 +376,7 @@ function agMontar(PDO $db, $pg, string $mes): array
         $op = (int) $p['PROD_CODIGO'];
         foreach ($info[$op]['tipos'] ?? [] as $tipo => $t) {
             $apurado = agApurarSaldo(
-                $slotsPorChave[$p['PRG_CODIGO'] . '|' . $op . '|' . $tipo] ?? [],
+                $slotsPorChave[$p['PRG_CODIGO'] . '|' . $tipo] ?? [],
                 $realDia[$op][$tipo] ?? [],
                 $t['qtd'],
                 $hoje
@@ -538,69 +537,6 @@ function agMarcarRealizado(PDO $db, int $agd, string $valor): void
     }
     $db->prepare('UPDATE PCP_AGENDA SET AGD_REALIZADO = ?, AGD_REALIZADO_POR = ? WHERE AGD_CODIGO = ?')
        ->execute([$valor === '' ? null : (float) $valor, $valor === '' ? null : usuNome(), $agd]);
-}
-
-// Troca a OP de um pedido da Reunião, mantendo datas e etapa. De hoje em diante a
-// agenda vai junto; os dias passados ficam na OP em que foram feitos, e o saldo da
-// OP nova não conta o que eles produziram.
-function agAlterarOp(PDO $db, int $prg, array $op, array $tiposOp): void
-{
-    $nova = (int) $op['prod_codigo'];
-    $stmt = $db->prepare('SELECT PROD_CODIGO FROM PCP_PROGRAMACAO WHERE PRG_CODIGO = ? AND PRG_FINALIZADO = 0');
-    $stmt->execute([$prg]);
-    $atual = $stmt->fetchColumn();
-    if ($atual === false) {
-        throw new RuntimeException('Este pedido não está mais na programação.');
-    }
-    if ((int) $atual === $nova) {
-        throw new RuntimeException('Este pedido já está nesta OP.');
-    }
-    if (trim((string) $op['finalizado']) !== 'N') {
-        throw new RuntimeException('Esta OP já está finalizada no ERP e não pode ser usada.');
-    }
-    $stmt = $db->prepare('SELECT COUNT(*) FROM PCP_PROGRAMACAO WHERE PROD_CODIGO = ? AND PRG_FINALIZADO = 0');
-    $stmt->execute([$nova]);
-    if ((int) $stmt->fetchColumn() > 0) {
-        throw new RuntimeException('Esta OP já está na programação.');
-    }
-
-    $hoje = date('Y-m-d');
-    $stmt = $db->prepare('SELECT DISTINCT AGD_TIPO FROM PCP_AGENDA WHERE PRG_CODIGO = ? AND AGD_DATA >= ?');
-    $stmt->execute([$prg, $hoje]);
-    $semTipo = array_diff($stmt->fetchAll(PDO::FETCH_COLUMN), $tiposOp);
-    if ($semTipo) {
-        $nomes = [PROD_TIPO_BAG => 'Big Bag', PROD_TIPO_SACARIA => 'Sacaria'];
-        throw new RuntimeException(
-            "A OP {$nova} não tem " . implode(' nem ', array_map(static fn ($t) => $nomes[$t], $semTipo))
-            . ', que este pedido tem agendado. Remova esses dias do calendário antes de alterar.'
-        );
-    }
-
-    $db->beginTransaction();
-    try {
-        $db->prepare('
-            UPDATE PCP_PROGRAMACAO
-               SET PROD_CODIGO = ?, VENDA_REF = ?, VEN_COD_PEDIDO = ?, CLI_CODIGO = ?, CLI_NOME = ?,
-                   PROD_DATA = ?, DATA_ENTREGA = ?, TIPO_PRODUCAO = ?
-             WHERE PRG_CODIGO = ?
-        ')->execute([
-            $nova,
-            $op['venda_ref'],
-            $op['ven_cod_pedido'],
-            $op['cli_codigo'],
-            $op['cli_nome'],
-            $op['prod_data'] ? substr((string) $op['prod_data'], 0, 10) : null,
-            $op['data_entrega'] ? substr((string) $op['data_entrega'], 0, 10) : null,
-            $op['tipo_producao'],
-            $prg,
-        ]);
-        $db->prepare('UPDATE PCP_AGENDA SET PROD_CODIGO = ? WHERE PRG_CODIGO = ? AND AGD_DATA >= ?')
-           ->execute([$nova, $prg, $hoje]);
-        $db->commit();
-    } catch (Throwable $e) {
-        $db->rollBack();
-        throw $e;
-    }
 }
 
 function agSincronizarPrevia(PDO $db, int $prg): void

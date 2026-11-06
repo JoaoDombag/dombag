@@ -353,29 +353,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') ==
     exit;
 }
 
-// ── AJAX: trocar a OP de um pedido programado ───────────────────────────────
-if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'alterar_op') {
-    header('Content-Type: application/json; charset=utf-8');
-    $prgCodigo = (int) ($_POST['prg_codigo'] ?? 0);
-    $prodCodigo = (int) ($_POST['prod_codigo'] ?? 0);
-    if (!$pg) {
-        echo json_encode(['error' => 'Não foi possível conectar ao banco de dados do ERP (PostgreSQL).']);
-        exit;
-    }
-    try {
-        $op = p2FetchOPUnica($pg, $prodCodigo);
-        if (!$op) {
-            throw new RuntimeException('OP não encontrada no ERP.');
-        }
-        $tipos = array_keys(agOpsInfo($pg, [$prodCodigo])[$prodCodigo]['tipos'] ?? []);
-        agAlterarOp($pdo, $prgCodigo, $op, $tipos);
-        echo json_encode(['ok' => true]);
-    } catch (Throwable $e) {
-        echo json_encode(['error' => $e->getMessage()]);
-    }
-    exit;
-}
-
 // ── AJAX: marcar como finalizado (local, não altera o ERP) ───────────────────
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'finalizar') {
     header('Content-Type: application/json; charset=utf-8');
@@ -495,8 +472,6 @@ if (!$pg && $error === '') {
   .p2-add-btn:disabled { opacity: .5; cursor: default; }
   .p2-finalizar-btn { padding: 5px 12px; height: 28px; border-radius: 7px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-family: 'Segoe UI', sans-serif; font-size: 11.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
   .p2-finalizar-btn:hover { background: rgba(0,201,167,.12); color: var(--teal); border-color: rgba(0,201,167,.3); }
-  .p2-acoes { display: flex; gap: 6px; justify-content: flex-end; }
-  .p2-troca th:nth-child(6), .p2-troca th:nth-child(7), .p2-troca td:nth-child(6), .p2-troca td:nth-child(7) { display: none; }
 </style>
 </head>
 <body>
@@ -613,10 +588,7 @@ if (!$pg && $error === '') {
                     <td class="td-nowrap"><?= p2Escape(p2FmtDateTime($row['prg_adicionado_em'] ?? '')) ?></td>
                     <td class="td-muted"><?= p2Escape($row['prg_adicionado_por'] ?? '—') ?></td>
                     <td class="td-right">
-                      <div class="p2-acoes">
-                        <button type="button" class="p2-finalizar-btn" data-cliente="<?= p2Escape($row['cli_nome'] ?? '') ?>" onclick="p2AbrirTroca(this, <?= (int) $row['prg_codigo'] ?>, <?= (int) $row['prod_codigo'] ?>)">Alterar OP</button>
-                        <button type="button" class="p2-finalizar-btn" onclick="p2Finalizar(<?= (int) $row['prg_codigo'] ?>)">Marcar como Finalizado</button>
-                      </div>
+                      <button type="button" class="p2-finalizar-btn" onclick="p2Finalizar(<?= (int) $row['prg_codigo'] ?>)">Marcar como Finalizado</button>
                     </td>
                   </tr>
                 <?php endforeach; ?>
@@ -633,7 +605,7 @@ if (!$pg && $error === '') {
 <!-- Modal: buscar/adicionar pedidos -->
 <div class="modal-overlay" id="p2ModalOverlay">
   <div class="modal-box p2-modal-box">
-    <h3 id="p2ModalTitulo">Adicionar Pedido à Programação</h3>
+    <h3>Adicionar Pedido à Programação</h3>
     <p>Somente OPs ainda não finalizadas no ERP (Finalizado = N) são exibidas.</p>
     <div class="p2-modal-body">
       <div class="p2-filter-row">
@@ -652,7 +624,7 @@ if (!$pg && $error === '') {
         <button type="button" class="btn-refresh" id="p2BtnBuscar">Buscar</button>
       </div>
       <div class="table-wrap" style="max-height:44vh;">
-        <table id="p2ResultsTable">
+        <table>
           <thead>
             <tr>
               <th>Cód. OP</th>
@@ -689,18 +661,9 @@ function p2FmtDate(v) {
 }
 
 // ── Modal de busca ────────────────────────────────────────────────────────────
-let p2Troca = null; // pedido cuja OP está sendo alterada; null ao adicionar
-
-function p2MostrarModal() {
-  document.getElementById('p2ModalTitulo').textContent = p2Troca ? `Alterar a OP ${p2Troca.op}` : 'Adicionar Pedido à Programação';
-  document.getElementById('p2ResultsTable').classList.toggle('p2-troca', !!p2Troca);
+function p2AbrirModal() {
   document.getElementById('p2ModalOverlay').classList.add('open');
   p2Buscar();
-}
-function p2AbrirModal() {
-  if (p2Troca) document.getElementById('p2Cliente').value = '';
-  p2Troca = null;
-  p2MostrarModal();
 }
 function p2FecharModal() {
   document.getElementById('p2ModalOverlay').classList.remove('open');
@@ -741,7 +704,7 @@ function p2Buscar() {
           <td>${p2FmtDate(op.data_entrega)}</td>
           <td><input type="date" class="p2-data-esperada"></td>
           <td><input type="date" class="p2-data-inicio" aria-label="Início da produção (opcional)"></td>
-          <td class="td-right"><button type="button" class="p2-add-btn" onclick="${p2Troca ? 'p2Alterar' : 'p2Adicionar'}(${op.prod_codigo}, this)">${p2Troca ? 'Usar esta OP' : 'Adicionar'}</button></td>
+          <td class="td-right"><button type="button" class="p2-add-btn" onclick="p2Adicionar(${op.prod_codigo}, this)">Adicionar</button></td>
         </tr>
       `).join('');
     })
@@ -789,42 +752,6 @@ function p2Adicionar(prodCodigo, btn) {
       alert('Erro ao adicionar OP à programação.');
       btn.disabled = false;
       btn.textContent = 'Adicionar';
-    });
-}
-
-// ── Alterar a OP de um pedido programado, pelo mesmo modal de busca ──────────
-function p2AbrirTroca(btn, prgCodigo, opAtual) {
-  p2Troca = { prg: prgCodigo, op: opAtual };
-  document.getElementById('p2CodOp').value = '';
-  document.getElementById('p2CodVenda').value = '';
-  document.getElementById('p2Cliente').value = btn.dataset.cliente;
-  p2MostrarModal();
-}
-
-function p2Alterar(prodCodigo, btn) {
-  const cliente = btn.closest('tr').cells[1].textContent;
-  if (!confirm(`Trocar a OP ${p2Troca.op} pela OP ${prodCodigo} (${cliente})?\n\nDatas e etapa continuam no pedido. Os dias agendados de hoje em diante passam para a OP ${prodCodigo}; os dias passados ficam na OP ${p2Troca.op}.`)) return;
-  btn.disabled = true;
-  btn.textContent = 'Alterando...';
-  fetch('?action=alterar_op', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'XMLHttpRequest' },
-    body: new URLSearchParams({ action: 'alterar_op', prg_codigo: p2Troca.prg, prod_codigo: prodCodigo }).toString(),
-  })
-    .then(r => r.json())
-    .then(data => {
-      if (data.error || !data.ok) {
-        alert(data.error || 'Não foi possível alterar a OP.');
-        btn.disabled = false;
-        btn.textContent = 'Usar esta OP';
-        return;
-      }
-      window.location.reload();
-    })
-    .catch(() => {
-      alert('Erro ao alterar a OP.');
-      btn.disabled = false;
-      btn.textContent = 'Usar esta OP';
     });
 }
 

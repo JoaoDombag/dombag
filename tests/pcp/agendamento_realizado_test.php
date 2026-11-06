@@ -124,35 +124,5 @@ agMarcarDatas($db, 1, '', '');
 confere('sem entrega mantém a data', $entrega(), '2026-12-20');
 confere('entrega vazia recusa', recusa(fn () => agMarcarDatas($db, 1, '', '', '')), 'Informe a data de entrega esperada.');
 
-// ── Alterar a OP do pedido ───────────────────────────────────────────────
-$db->exec('ALTER TABLE PCP_PROGRAMACAO ADD COLUMN VEN_COD_PEDIDO TEXT');
-$db->exec('ALTER TABLE PCP_PROGRAMACAO ADD COLUMN CLI_CODIGO INT');
-$db->exec('ALTER TABLE PCP_PROGRAMACAO ADD COLUMN PROD_DATA TEXT');
-$db->exec('ALTER TABLE PCP_PROGRAMACAO ADD COLUMN DATA_ENTREGA TEXT');
-$db->exec('ALTER TABLE PCP_PROGRAMACAO ADD COLUMN TIPO_PRODUCAO TEXT');
-$db->exec("INSERT INTO PCP_PROGRAMACAO (PRG_CODIGO, PROD_CODIGO, PRG_FINALIZADO) VALUES (2, 4000, 0), (3, 5000, 1)");
-$novaOp = static fn (int $n, string $fim = 'N') => [
-    'prod_codigo' => $n, 'venda_ref' => '3900', 'ven_cod_pedido' => '77', 'cli_codigo' => '9', 'cli_nome' => 'Cliente Novo',
-    'prod_data' => '2026-11-01 00:00:00', 'data_entrega' => '2026-12-01 00:00:00', 'tipo_producao' => 'P', 'finalizado' => $fim,
-];
-$opsAgenda = static fn () => $db->query('SELECT AGD_CODIGO, PROD_CODIGO FROM PCP_AGENDA ORDER BY AGD_CODIGO')->fetchAll(PDO::FETCH_KEY_PAIR);
-$antes = $opsAgenda();
-
-confere('OP igual recusa', recusa(fn () => agAlterarOp($db, 1, $novaOp(3187), ['BAG'])), 'Este pedido já está nesta OP.');
-confere('OP finalizada recusa', recusa(fn () => agAlterarOp($db, 1, $novaOp(3200, 'S'), ['BAG'])), 'Esta OP já está finalizada no ERP e não pode ser usada.');
-confere('OP de outro pedido recusa', recusa(fn () => agAlterarOp($db, 1, $novaOp(4000), ['BAG'])), 'Esta OP já está na programação.');
-confere('pedido finalizado recusa', recusa(fn () => agAlterarOp($db, 3, $novaOp(3200), ['BAG'])), 'Este pedido não está mais na programação.');
-confere(
-    'OP sem o tipo agendado recusa',
-    recusa(fn () => agAlterarOp($db, 1, $novaOp(3200), ['SACARIA'])),
-    'A OP 3200 não tem Big Bag, que este pedido tem agendado. Remova esses dias do calendário antes de alterar.'
-);
-confere('recusa não muda a agenda', $opsAgenda(), $antes);
-
-agAlterarOp($db, 1, $novaOp(3200), ['BAG']);
-$linha = $db->query('SELECT PROD_CODIGO, VENDA_REF, CLI_NOME, DATA_ENTREGA, DATA_ENTREGA_ESPERADA FROM PCP_PROGRAMACAO WHERE PRG_CODIGO = 1')->fetch(PDO::FETCH_NUM);
-confere('pedido fica com os dados da OP nova e mantém a entrega esperada', $linha, [3200, '3900', 'Cliente Novo', '2026-12-01', '2026-12-20']);
-confere('dia passado fica na OP antiga, hoje em diante vai para a nova', $opsAgenda(), [1 => 3187, 2 => 3200, 3 => 3200]);
-
 echo $falhas ? "\n{$falhas} falha(s)\n" : "\nTudo certo\n";
 exit($falhas ? 1 : 0);
