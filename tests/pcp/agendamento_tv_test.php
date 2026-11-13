@@ -51,12 +51,16 @@ confere('card comum não está ativo', agTvCard(card([]), $hoje)['agora'], false
 
 // OPs com apontamento aberto
 $info = [3187 => ['pedido' => '3829', 'cliente' => 'A'], 4000 => ['pedido' => '4001', 'cliente' => 'B']];
-$comAtivas = agTvComAtivas([card([]), card(['dia' => '2026-11-03', 'plan' => 10.0])], [3187, 4000, 9999], $info, $hoje);
+$ativa = static fn (int $op, string $tipo = 'BAG') => ['op' => $op, 'tipo' => $tipo];
+$comAtivas = agTvComAtivas([card([]), card(['dia' => '2026-11-03', 'plan' => 10.0])], [$ativa(3187), $ativa(4000), $ativa(9999)], $info, $hoje);
 confere('card de hoje marcado', $comAtivas[0]['agora'] ?? false, true);
 confere('dia passado não marcado', isset($comAtivas[1]['agora']), false);
 confere('ativa sem card ganha um hoje', [$comAtivas[2]['op'], $comAtivas[2]['dia'], $comAtivas[2]['agora']], [4000, $hoje, true]);
 confere('OP de outra empresa fica fora', count($comAtivas), 3);
-confere('sacaria não é marcada', agTvComAtivas([card(['tipo' => 'SACARIA'])], [3187], $info, $hoje)[0]['agora'] ?? false, false);
+confere('bag ativo não marca a sacaria', agTvComAtivas([card(['tipo' => 'SACARIA'])], [$ativa(3187)], $info, $hoje)[0]['agora'] ?? false, false);
+confere('sacaria ativa é marcada', agTvComAtivas([card(['tipo' => 'SACARIA'])], [$ativa(3187, 'SACARIA')], $info, $hoje)[0]['agora'] ?? false, true);
+$sacAtiva = agTvComAtivas([], [$ativa(4000, 'SACARIA')], $info, $hoje);
+confere('sacaria ativa sem card ganha um', [$sacAtiva[0]['tipo'], agTvCard($sacAtiva[0], $hoje)['qtd']], ['SACARIA', 'Sacaria sem agenda']);
 
 // Grade: novembro/2026 cobre 6 semanas completas
 $cards = [

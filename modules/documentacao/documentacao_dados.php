@@ -26,14 +26,14 @@ const DOC_CAMINHO = [
     ['Pedido', 'Entra pelo ERP', 'vendas'],
     ['Reunião', 'Vai para a programação', 'planejar'],
     ['Agendamento', 'Ganha dia na agenda', 'planejar'],
-    ['Produção', 'Os bags são apontados', 'produzir'],
+    ['Produção', 'Cada etapa é apontada', 'produzir'],
     ['Conferência', 'Defeitos e rastreio', 'conferir'],
     ['Saída', 'O pedido é finalizado', 'saida'],
 ];
 
 // href => [área, o que a tela faz, tela cuja permissão vale aqui (opcional)]
 const DOC_TELAS = [
-    '/dashboard'         => ['inicio', 'Resumo do dia: bags produzidos, pedidos finalizados e OPs em andamento.'],
+    '/dashboard'         => ['inicio', 'Resumo do dia: bags produzidos (analisados), pedidos finalizados e OPs em andamento.'],
     '/assistente'        => ['inicio', 'Tire dúvidas sobre como usar o sistema. Administradores e representantes também consultam dados e pedem relatórios em PDF ou Excel.'],
     '/dashboard/widgets' => ['inicio', 'Escolha o que aparece no seu Dashboard. Vale só para você.'],
 
@@ -50,14 +50,14 @@ const DOC_TELAS = [
     '/pcp/etapas'        => ['planejar', 'Cadastro das etapas usadas na Reunião de Planejamento.', '/pcp/reuniao'],
     '/pcp/status-ops'    => ['planejar', 'Situação das OPs programadas, com o andamento e o link para o calendário. Pedido todo produzido não conta como atrasado.'],
 
-    '/pcp/tempo-real'    => ['produzir', 'Acompanhe os apontamentos abertos, com atualização automática.'],
+    '/pcp/tempo-real'    => ['produzir', 'Acompanhe os apontamentos abertos de todas as etapas, de bag e de sacaria, com atualização automática. Com muitas máquinas, cada quadro rola por dentro.'],
     '/pcp/painel-ops'    => ['produzir', 'Status e produção de cada ordem de produção.'],
     '/pcp/ordens'        => ['produzir', 'Lista de ordens de produção. Clique em uma ordem para ver os detalhes.'],
     '/pcp/monitor'       => ['produzir', 'Acompanhamento da produção de cada máquina em tempo real.'],
     '/pcp/fila'          => ['produzir', 'Fila de trabalho das máquinas.'],
-    '/pcp/painel-funcionarios' => ['produzir', 'Bags produzidos por pessoa no período, com relatório em PDF.'],
-    '/pcp/bi'            => ['produzir', 'Painel para TV com bags do mês, meta, OPs ativas e produção por pessoa.'],
-    '/pcp/bi-individual' => ['produzir', 'Total de bags do dia contra a meta, e a produção de cada pessoa.'],
+    '/pcp/painel-funcionarios' => ['produzir', 'Bags analisados por pessoa no período e, à parte, o que cada uma fez em outras etapas (costuras, impressão, sacaria). Gera PDF.'],
+    '/pcp/bi'            => ['produzir', 'Painel para TV com bags produzidos (analisados) no mês, meta, OPs ativas e bags analisados por pessoa.'],
+    '/pcp/bi-individual' => ['produzir', 'Bags produzidos (analisados) do dia contra a meta. Ao lado, o que cada pessoa fez passa como slides, uma atividade por vez (Costura alça, Análise, Impressão...), trocando a cada 12 segundos. As bolinhas no topo levam direto a uma atividade e o botão Travar deixa a tela parada nela. Para uma TV sempre na mesma atividade, abra com ?atividade=7 (Análise) ou o código da atividade.'],
     '/yzidro/producao'   => ['produzir', 'Ordens finalizadas, com os itens separados por setor.'],
 
     '/relatorios/producao'      => ['conferir', 'Produção por máquina e por dia, com bag e sacaria somados. Gera PDF.'],
@@ -141,12 +141,14 @@ const DOC_GUIAS = [
 ];
 
 const DOC_NUMEROS = [
-    ['Por que a sacaria não aparece em tempo real?',
-     'Só os bags têm apontamento. A sacaria entra quando a OP é lançada no ERP, geralmente de uma vez, então a data é a do lançamento e não a da fabricação.'],
+    ['O que conta como produzido?',
+     'Só bags analisados. Desde novembro de 2026 a fábrica aponta várias etapas da mesma peça, como impressão, costuras e corte. Somar as etapas contaria o mesmo bag várias vezes, então produção, meta e média por hora usam só a Análise. O que cada pessoa fez nas outras etapas aparece à parte, como "outras etapas", no Painel de Funcionários e no BI Individual.'],
+    ['E a sacaria?',
+     'A sacaria não entra na produção do BI, do Dashboard nem do Painel de Funcionários. No Agendamento e no andamento da OP, ela segue pelo Corte apontado ou, sem Corte, pelo fechamento da OP no ERP, que costuma ser lançado de uma vez.'],
     ['"Pedidos finalizados" é o mesmo que faturamento?',
      'Não. Pedidos finalizados usam o valor do pedido, sem IPI, na data em que ele saiu. Faturamento é o total das NF-e autorizadas. Os dois normalmente não batem.'],
     ['Por que o Relatório de Produção é diferente do BI?',
-     'O Relatório de Produção soma bag e sacaria por máquina. O BI e o Painel de Funcionários contam só bags apontados.'],
+     'O Relatório de Produção soma bag e sacaria por máquina. O BI conta só bags analisados.'],
     ['Por que um pedido não aparece no calendário?',
      'O calendário mostra só pedidos com pelo menos um dia na agenda. Pedido da Reunião sem dia marcado fica em "A agendar". Na tela cheia aparecem apenas os cards dos dias agendados.'],
     ['Por que o "Produzido no mês" do Agendamento é menor que o de outros relatórios?',
@@ -168,7 +170,11 @@ const DOC_NUMEROS = [
 const DOC_TERMOS = [
     ['OP', 'Ordem de produção. É a unidade de trabalho da fábrica e costuma estar ligada a um pedido.'],
     ['Apontamento', 'Registro no ERP de quem trabalhou em uma OP, com início, fim e quantidade.'],
-    ['Apontamento aberto', 'Trabalho iniciado e ainda sem fim registrado. É o que a TV marca como "Produzindo agora".'],
+    ['Apontamento aberto', 'Trabalho iniciado e ainda sem fim registrado, em qualquer etapa. É o que a TV marca como "Produzindo agora", no bag ou na sacaria.'],
+    ['Setup', 'Status do apontamento enquanto a máquina é preparada, antes de produzir. Acontece em atividades como Impressão e Corte. Aparece em laranja no Tempo Real.'],
+    ['Etapa de produção', 'Atividade apontada no ERP, como Impressão, Costura de alça, Costura de fundo, Corte ou Análise. Cada uma conta na sua unidade.'],
+    ['Produzido', 'Bag analisado, a última etapa do bag. É o que entra na produção, na meta e na média por hora.'],
+    ['Outras etapas', 'O que a pessoa fez fora da Análise, como costuras, impressão ou sacaria. Aparece à parte e não conta como produzido.'],
     ['NSU', 'Número que identifica um bag individual e permite rastreá-lo.'],
     ['Lote', 'Identificação do material consumido ou do produto gerado em uma OP.'],
     ['Agendado', 'Quantidade prevista para um dia no Agendamento de Produção.'],

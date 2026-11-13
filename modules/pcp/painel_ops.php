@@ -144,13 +144,30 @@ function popBuildBaseCte(array $filters): array
            SELECT V.COD_PRODUCAO, V.COD_PRODUTO, V.DATA_EMISSAO, V.DATA_ENTREGA, V.DATA_FINALIZA
                  ,V.COD_CLIENTE, V.CLIENTE, V.PRODUTO, V.UNIDADE, V.TAMANHO, V.VENDA_REF
                  ,V.QTD_PEDIDO, V.VALOR_UNIT, V.TOTAL_PRODUTOS
-                 ,COALESCE((
-                     SELECT SUM(A.OIAP_QTD_PRODUZIDA)
-                       FROM OP_ITENS_ATIVIDADES_APONTADAS A
-                      WHERE A.PROD_CODIGO = V.COD_PRODUCAO
-                        AND A.PRO_CODIGO  = V.COD_PRODUTO
-                        AND NOT A.OIAP_EXCLUIDO
-                  ), 0)                                                        AS QTD_PRODUZIDA_REAL
+                 -- Prontos = etapa final do tipo (producao_tipo.php). Sacaria
+                 -- sem Corte apontado segue pelo fechamento confirmado da OP.
+                 ,CASE WHEN NOT EXISTS (
+                           SELECT 1 FROM OP_ITENS_ATIVIDADES_APONTADAS C
+                            WHERE C.PROD_CODIGO = V.COD_PRODUCAO AND C.PRO_CODIGO = V.COD_PRODUTO
+                              AND C.ATP_CODIGO = " . PROD_ATP_SACARIA_PRONTA . "
+                              AND NOT C.OIAP_EXCLUIDO AND TRIM(C.OIAP_STATUS) <> 'C')
+                         AND (SELECT P.GRP_CODIGO FROM PRODUTO P WHERE P.PRO_CODIGO = V.COD_PRODUTO) = " . PROD_GRP_SACARIA . "
+                       THEN COALESCE((
+                           SELECT SUM(I.OIP_QTD) FROM OP_ITENS_PRODUZIDOS I
+                            WHERE I.PROD_CODIGO = V.COD_PRODUCAO AND I.PRO_CODIGO = V.COD_PRODUTO
+                              AND TRIM(I.OIP_STATUS) = 'F'), 0)
+                       ELSE COALESCE((
+                           SELECT SUM(A.OIAP_QTD_PRODUZIDA)
+                             FROM OP_ITENS_ATIVIDADES_APONTADAS A
+                            WHERE A.PROD_CODIGO = V.COD_PRODUCAO
+                              AND A.PRO_CODIGO  = V.COD_PRODUTO
+                              AND " . prodProntoSql('A') . "
+                              AND NOT A.OIAP_EXCLUIDO
+                              AND TRIM(A.OIAP_STATUS) <> 'C'), 0)
+                  END                                                          AS QTD_PRODUZIDA_REAL
+                 ,(SELECT COUNT(*) FROM OP_ITENS_ATIVIDADES_APONTADAS A
+                    WHERE A.PROD_CODIGO = V.COD_PRODUCAO AND A.PRO_CODIGO = V.COD_PRODUTO
+                      AND NOT A.OIAP_EXCLUIDO AND TRIM(A.OIAP_STATUS) <> 'C') AS QTD_APONTAMENTOS
                  ,(SELECT P.GRP_CODIGO FROM PRODUTO P WHERE P.PRO_CODIGO = V.COD_PRODUTO) AS GRP_CODIGO
              FROM VW_ORDEM_PRODUCAO V
              {$where}
@@ -163,7 +180,7 @@ function popBuildBaseCte(array $filters): array
                  ,CASE
                     WHEN B.DATA_FINALIZA IS NOT NULL THEN 'FINALIZADA'
                     WHEN COALESCE(AT.QTD_ATIVOS, 0) > 0 THEN 'EM_PRODUCAO'
-                    WHEN B.QTD_PRODUZIDA_REAL > 0 THEN 'EM_PRODUCAO'
+                    WHEN B.QTD_PRODUZIDA_REAL > 0 OR B.QTD_APONTAMENTOS > 0 THEN 'EM_PRODUCAO'
                     WHEN B.DATA_ENTREGA IS NOT NULL AND B.DATA_ENTREGA < CURRENT_DATE THEN 'ATRASADA'
                     ELSE 'PENDENTE'
                   END                                                          AS STATUS_CALC
@@ -192,9 +209,11 @@ function popFetchApontamentosOP($pg, int $codProducao, int $codProduto): array
     $sql = "
         SELECT IAA.OIAP_CODIGO, IAA.OIAP_STATUS, IAA.OIAP_DATA_HORA_INICIO, IAA.OIAP_DATA_HORA_FIM
               ,IAA.OIAP_QTD_PRODUZIDA, F.FU_CODIGO, F.FU_NOME, CT.CT_CODIGO, CT.CT_DESCRICAO
+              ,TRIM(ATP.ATP_DESCRICAO) AS ETAPA
           FROM OP_ITENS_ATIVIDADES_APONTADAS IAA
          INNER JOIN FUNCIONARIO     F  ON F.FU_CODIGO  = IAA.FU_CODIGO
          INNER JOIN CENTRO_TRABALHO CT ON CT.CT_CODIGO = IAA.CT_CODIGO
+          LEFT JOIN ATIVIDADE_PRODUCAO ATP ON ATP.ATP_CODIGO = IAA.ATP_CODIGO
          WHERE IAA.PROD_CODIGO = $1
            AND IAA.PRO_CODIGO  = $2
            AND NOT IAA.OIAP_EXCLUIDO
@@ -206,6 +225,10 @@ function popFetchApontamentosOP($pg, int $codProducao, int $codProduto): array
     }
     $rows = pg_fetch_all($res) ?: [];
     pg_free_result($res);
+    foreach ($rows as &$r) {
+        $r['etapa'] = prodEtapaNome($r['etapa'] ?? '');
+    }
+    unset($r);
     return $rows;
 }
 
@@ -493,14 +516,10 @@ $totalOPs = array_sum($contagens);
                     <td><?= popEscape($row['produto'] ?? '—') ?></td>
                     <td class="td-right"><?= number_format($pedido, 0, ',', '.') ?></td>
                     <td>
-                      <?php if ((int) ($row['grp_codigo'] ?? 0) === PROD_GRP_SACARIA): ?>
-                        <span class="td-muted">Sem apontamento</span>
-                      <?php else: ?>
                       <div class="pop-bar-wrap">
                         <div class="pop-bar-bg"><div class="pop-bar-fill<?= $over ? ' over' : '' ?>" style="width:<?= $fillPct ?>%"></div></div>
                         <span class="pop-bar-pct"><?= $pct ?>%</span>
                       </div>
-                      <?php endif; ?>
                     </td>
                     <td class="td-muted">
                       <?= popEscape($row['at_ct_descricao'] ?? '—') ?>
@@ -545,6 +564,7 @@ const STATUS_MAP = {
 };
 const AT_STATUS_MAP = {
   A:  ['Em Andamento', 'info'],
+  S:  ['Setup', 'warn'],   // preparando a máquina (impressão, corte)
   EP: ['Em Produção', 'ok'],
   P:  ['Pausado', 'warn'],
   F:  ['Finalizado', 'info'],
@@ -594,7 +614,8 @@ function abrirDetalheOP(op) {
         <span class="pop-progress-pct">${pedido > 0 ? pct + '%' : '—'}</span>
       </div>
       <div class="pop-bar-bg" style="height:8px;"><div class="pop-bar-fill${over ? ' over' : ''}" style="width:${Math.min(100, pct)}%"></div></div>
-      <div class="pop-progress-nums">${sacaria ? 'Sacaria não tem apontamento no ERP' : 'Bags produzidos: <strong>' + produzida.toLocaleString('pt-BR') + '</strong>'} / Pedido: <strong>${pedido.toLocaleString('pt-BR')}</strong></div>
+      <div class="pop-progress-nums">${sacaria ? 'Sacarias prontas' : 'Bags prontos'}: <strong>${produzida.toLocaleString('pt-BR')}</strong> / Pedido: <strong>${pedido.toLocaleString('pt-BR')}</strong></div>
+      <div class="pop-progress-nums td-muted">${sacaria ? 'Conta o Corte; sem Corte apontado, o fechamento da OP no ERP.' : 'Conta a Análise, última etapa do bag.'}</div>
     </div>
 
     <div class="pop-field-group">
@@ -636,11 +657,12 @@ function abrirDetalheOP(op) {
       el.innerHTML = `
         <div style="overflow-x:auto;">
           <table class="pop-apont-table">
-            <thead><tr><th>Operador</th><th>Centro de Trabalho</th><th>Status</th><th class="td-right">Bags</th><th>Início</th><th>Fim</th></tr></thead>
+            <thead><tr><th>Operador</th><th>Etapa</th><th>Centro de Trabalho</th><th>Status</th><th class="td-right">${sacaria ? 'Sacarias' : 'Bags'}</th><th>Início</th><th>Fim</th></tr></thead>
             <tbody>
               ${lista.map(a => `
                 <tr>
                   <td>${popEsc(a.fu_nome)}</td>
+                  <td>${popEsc(a.etapa || '—')}</td>
                   <td class="td-muted">${popEsc(a.ct_descricao)}</td>
                   <td>${popAtStatusPill(a.oiap_status)}</td>
                   <td class="td-right">${Number(a.oiap_qtd_produzida || 0).toLocaleString('pt-BR')}</td>

@@ -5,8 +5,9 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
 require_once __DIR__ . '/bi_individual_dados.php';
 
 // ══════════════════════════════════════════════════════════════
-//  DOMBAG — BI Individual: total de bags produzidos no dia x meta TOTAL
-//  da equipe, e ao lado a produção de cada funcionário (painel para TV)
+//  DOMBAG — BI Individual: total de bags prontos no dia (Análise) x meta
+//  TOTAL da equipe, e ao lado a produção de cada funcionário na sua etapa
+//  e unidade (bags ou sacarias), em painel para TV
 //  Fonte: PostgreSQL ERP Yzidro (somente leitura) + meta local (MySQL)
 // ══════════════════════════════════════════════════════════════
 
@@ -177,11 +178,34 @@ if (!$pg) {
   .biz-ind-qtd { grid-row: span 3; text-align: right; font-variant-numeric: tabular-nums; }
   .biz-ind-qtd b { display: block; font-size: calc(clamp(20px, 2.1cqw, 40px) * var(--biz-ind-esc, 1)); font-weight: 900; color: #fff; line-height: 1.05; }
   .biz-ind-qtd span { font-size: calc(clamp(10px, .85cqw, 15px) * var(--biz-ind-esc, 1)); font-weight: 700; color: var(--biz-muted); }
+  .biz-ind-qtd span + span { display: block; }
   .biz-ind-bar { height: calc(clamp(6px, .55cqw, 11px) * var(--biz-ind-esc, 1)); background: rgba(255,255,255,.07); border-radius: 6px; overflow: hidden; }
   .biz-ind-fill { height: 100%; border-radius: 6px; background: linear-gradient(90deg, var(--biz-blue), var(--biz-teal)); transition: width .5s ease; }
   .biz-ind-op { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: calc(clamp(11px, .95cqw, 17px) * var(--biz-ind-esc, 1)); font-weight: 700; color: var(--biz-teal); }
   .biz-ind-op > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .biz-ind-op.off { color: var(--biz-muted); font-weight: 600; }
+
+  /* ── Slides: uma atividade por vez, trocando sozinho ── */
+  .biz-slide-titulo { color: var(--biz-teal); }
+  .biz-slide-titulo:not(:empty)::before { content: '· '; color: var(--biz-muted); }
+  .biz-slide-dots { display: flex; gap: 6px; }
+  .biz-slide-dots button { width: 10px; height: 10px; padding: 0; border-radius: 50%; border: 0; cursor: pointer; background: rgba(255,255,255,.18); }
+  .biz-slide-dots button.on { background: var(--biz-teal); }
+  .biz-slide-trava { display: inline-flex; align-items: center; gap: 5px; font: inherit; font-size: clamp(11px, .8cqw, 14px); font-weight: 800; padding: 3px 10px; border-radius: 20px; cursor: pointer; border: 1px solid var(--biz-border); background: transparent; color: var(--biz-muted); }
+  .biz-slide-trava:hover { color: var(--biz-text); }
+  .biz-slide-trava.on { background: rgba(255,199,102,.16); border-color: rgba(255,199,102,.5); color: #ffc766; }
+  .biz-slide-trava:focus-visible { outline: 2px solid var(--biz-teal); outline-offset: 2px; }
+  .biz-slide-dots button:focus-visible { outline: 2px solid var(--biz-teal); outline-offset: 2px; }
+  /* Barra fina embaixo da lista: quanto falta para a próxima atividade */
+  .biz-slide-tempo { flex: 0 0 auto; height: 3px; margin-top: 8px; border-radius: 2px; background: rgba(255,255,255,.07); overflow: hidden; }
+  .biz-slide-tempo > div { height: 100%; width: 0; background: var(--biz-teal); opacity: .6; }
+  .biz-slide-tempo.corre > div { width: 100%; transition: width var(--biz-slide-ms, 12000ms) linear; }
+  .biz-ind-list.entra { animation: bizSlideEntra .45s ease; }
+  @keyframes bizSlideEntra { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .biz-ind-list.entra { animation: none; }
+    .biz-slide-tempo.corre > div { transition: none; }
+  }
   .biz-live-dot-sm { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--biz-teal); animation: bizPulse 1.8s infinite; }
 
   /* ── Tela em pé ou estreita (retrato, tablet): o total vira uma faixa no
@@ -299,7 +323,7 @@ if (!$pg) {
       <div class="topbar-left">
         <div class="page-title">
           <h1>BI Individual</h1>
-          <p>Total de bags produzidos x meta do dia, e a produção de cada pessoa — atualização automática</p>
+          <p>Bags produzidos (analisados) x meta do dia, e o que cada pessoa fez em cada atividade — atualização automática</p>
         </div>
       </div>
       <div class="topbar-actions">
@@ -344,7 +368,7 @@ if (!$pg) {
         <!-- Esquerda: total de bags produzidos no dia x meta total da equipe -->
         <div class="biz-card biz-total" id="biTotalCard">
           <div class="biz-card-head">
-            <h2>Total de Bags Produzidos <span id="biDiaTitulo"><?= biiEscape($payload['dia_label']) ?></span></h2>
+            <h2>Bags Produzidos <span id="biDiaTitulo"><?= biiEscape($payload['dia_label']) ?></span></h2>
             <div class="biz-head-right">
               <button type="button" class="biz-meta-btn" id="biMetaEditBtn" title="Editar meta total do dia" aria-label="Editar meta total do dia">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
@@ -371,10 +395,15 @@ if (!$pg) {
         <!-- Direita: produção de cada pessoa (ranking), com a O.P ativa -->
         <div class="biz-card biz-ind">
           <div class="biz-card-head">
-            <h2>Produção Individual</h2>
-            <span class="biz-count-badge" id="biFuncsCount">0</span>
+            <h2>Produção Individual <span class="biz-slide-titulo" id="biSlideTitulo"></span></h2>
+            <div class="biz-head-right">
+              <div class="biz-slide-dots" id="biSlideDots" aria-label="Atividades"></div>
+              <button type="button" class="biz-slide-trava" id="biSlideTrava" aria-pressed="false" title="Travar nesta atividade"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Travar</span></button>
+              <span class="biz-count-badge" id="biFuncsCount">0</span>
+            </div>
           </div>
           <div class="biz-ind-list" id="biIndList"></div>
+          <div class="biz-slide-tempo" id="biSlideTempo" hidden><div></div></div>
         </div>
 
       </div>
@@ -449,8 +478,10 @@ function biRenderGauge(svg, pct, hit, semMeta) {
 }
 
 // ── Total do dia x meta total ────────────────────────────────────────────────
+// Só bags prontos (Análise) entram no total: as outras etapas e a sacaria
+// aparecem em cada pessoa, na sua unidade.
 function biRenderTotal(funcs) {
-  const total = funcs.reduce((s, f) => s + Number(f.qtd_produzida || 0), 0);
+  const total = funcs.reduce((s, f) => s + Number(f.bag_pronto || 0), 0);
   const meta = biMetaAtual;
   const hit = meta > 0 && total >= meta;
   const pct = meta > 0 ? (total / meta) * 100 : 0;
@@ -486,32 +517,178 @@ function biFuncOpAtiva(f) {
   return `<div class="biz-ind-op"><span class="biz-live-dot-sm"></span><span><strong>O.P ${o.op}</strong>${o.cliente ? ' - ' + biEsc(o.cliente) : ''}${mais}</span></div>`;
 }
 
-// ── Lista individual: barra proporcional a quem mais produziu, quantidade e
-// participação no total. Com muita gente, 2 colunas pra caber na TV. ────────
+// ── Slides: uma atividade por vez (Impressão, Costura alça, Análise...) ─────
+// Cada pessoa aparece no slide de cada atividade em que trabalhou, com a
+// quantidade daquela atividade. Só a Análise é "produzido" (bag analisado);
+// nas outras atividades o número é o que foi feito naquela etapa.
+// Troca sozinho a cada BI_SLIDE_MS, a não ser que esteja travado numa
+// atividade (botão no topo, ou ?atividade=CÓDIGO na URL para uma TV fixa).
+// A atualização dos dados (15s) não reinicia a contagem nem troca o slide.
+const BI_SLIDE_MS = 12000;
+const BI_ATP_ANALISE = <?= (int) PROD_ATP_BAG_PRONTO ?>;
+const BI_TRAVA_CHAVE = 'bii_trava_atividade';
+let biSlides = [];
+let biSlideAtp = null;
+let biSlideTimer = null;
+let biTrava = null; // { atp, etapa } quando travado numa atividade
+
+// Trava salva neste navegador; a URL (?atividade=7) tem prioridade
+(function biLeTrava() {
+  const daUrl = Number(new URLSearchParams(location.search).get('atividade'));
+  if (daUrl > 0) {
+    biTrava = { atp: daUrl, etapa: '' };
+  } else {
+    try { biTrava = JSON.parse(localStorage.getItem(BI_TRAVA_CHAVE) || 'null'); } catch (e) { biTrava = null; }
+  }
+  if (biTrava) biSlideAtp = Number(biTrava.atp);
+})();
+
+function biSalvaTrava() {
+  try {
+    if (biTrava) localStorage.setItem(BI_TRAVA_CHAVE, JSON.stringify(biTrava));
+    else localStorage.removeItem(BI_TRAVA_CHAVE);
+  } catch (e) { /* sem armazenamento: vale só nesta tela */ }
+}
+
+function biMontaSlides(funcs) {
+  const mapa = new Map();
+  funcs.forEach(f => (f.atividades || []).forEach(a => {
+    if (!mapa.has(a.atp)) {
+      mapa.set(a.atp, { atp: Number(a.atp), etapa: a.etapa, unidade: a.unidade, ordem: Number(a.ordem), pessoas: [] });
+    }
+    mapa.get(a.atp).pessoas.push({ nome: f.nome, qtd: Number(a.qtd || 0), ops_detalhe: a.ops_detalhe || [] });
+  }));
+  const slides = [...mapa.values()].sort((x, y) => x.ordem - y.ordem);
+  slides.forEach(s => {
+    s.pessoas.sort((x, y) => (y.qtd - x.qtd) || x.nome.localeCompare(y.nome));
+    s.total = s.pessoas.reduce((t, p) => t + p.qtd, 0);
+    // Só bag analisado é produzido; nas outras etapas é o feito na etapa
+    s.rotulo = s.atp === BI_ATP_ANALISE ? 'bags analisados' : s.unidade + ' na etapa';
+  });
+  return slides;
+}
+
+function biSlideAtual() {
+  return biSlides.find(s => s.atp === biSlideAtp) || null;
+}
+
 function biRenderFuncs(funcs) {
-  const total = biRenderTotal(funcs);
-  document.getElementById('biFuncsCount').textContent = funcs.length + (funcs.length === 1 ? ' pessoa' : ' pessoas');
+  biRenderTotal(funcs);
+  biSlides = biMontaSlides(funcs);
+  if (biTrava) {
+    biSlideAtp = Number(biTrava.atp);
+    const s = biSlideAtual();
+    if (s && biTrava.etapa !== s.etapa) { biTrava.etapa = s.etapa; biSalvaTrava(); }
+  } else if (!biSlideAtual()) {
+    biSlideAtp = biSlides.length ? biSlides[0].atp : null;
+  }
+  biMostraSlide(false);
+}
+
+function biMostraTrava() {
+  const btn = document.getElementById('biSlideTrava');
+  btn.setAttribute('aria-pressed', biTrava ? 'true' : 'false');
+  btn.classList.toggle('on', !!biTrava);
+  btn.title = biTrava ? 'Destravar: voltar a passar as atividades' : 'Travar nesta atividade';
+  btn.querySelector('span').textContent = biTrava ? 'Travado' : 'Travar';
+  btn.hidden = !biTrava && biSlides.length < 1;
+}
+
+function biMostraSlide(trocou) {
   const list = document.getElementById('biIndList');
-  if (!funcs.length) {
+  const s = biSlideAtual();
+  const idx = biSlides.indexOf(s);
+  document.getElementById('biSlideTitulo').textContent = s ? s.etapa : (biTrava ? (biTrava.etapa || 'Atividade ' + biTrava.atp) : '');
+  document.getElementById('biSlideDots').innerHTML = biSlides.length > 1 || biTrava
+    ? biSlides.map((x, i) => `<button type="button" class="${i === idx ? 'on' : ''}" data-atp="${x.atp}" title="${biEsc(x.etapa)}" aria-label="Mostrar ${biEsc(x.etapa)}"></button>`).join('')
+    : '';
+  document.getElementById('biSlideTempo').hidden = !!biTrava || biSlides.length < 2;
+  biMostraTrava();
+
+  if (!s) {
+    document.getElementById('biFuncsCount').textContent = '0 pessoas';
     list.style.gridTemplateColumns = '1fr';
     list.style.gridTemplateRows = '';
-    list.innerHTML = '<div class="biz-empty-msg">Ninguém produziu ' + (biDiaLabel === 'HOJE' ? 'hoje' : 'em ' + biEsc(biDiaLabel)) + '.</div>';
+    const quando = biDiaLabel === 'HOJE' ? 'hoje' : 'em ' + biEsc(biDiaLabel);
+    list.innerHTML = biTrava
+      ? `<div class="biz-empty-msg">Ninguém trabalhou nesta atividade ${quando}.</div>`
+      : `<div class="biz-empty-msg">Ninguém produziu ${quando}.</div>`;
     return;
   }
-  const maior = Math.max(...funcs.map(f => Number(f.qtd_produzida || 0)), 1);
-  list.innerHTML = funcs.map(f => {
-    const qtd = Number(f.qtd_produzida || 0);
-    const part = total > 0 ? (qtd / total) * 100 : 0;
+  const n = s.pessoas.length;
+  document.getElementById('biFuncsCount').textContent = `${n} ${n === 1 ? 'pessoa' : 'pessoas'} · ${biFmt(s.total, 0)} ${s.rotulo}`;
+  // Barra proporcional a quem mais fez nesta atividade
+  const maior = Math.max(1, ...s.pessoas.map(p => p.qtd));
+  list.innerHTML = s.pessoas.map(p => {
+    const part = s.total > 0 ? (p.qtd / s.total) * 100 : 0;
     return `
       <div class="biz-ind-row">
-        <div class="biz-ind-name">${biEsc(f.nome)}</div>
-        <div class="biz-ind-qtd"><b>${biFmt(qtd, 0)}</b><span>${biFmt(part, 0)}% do total</span></div>
-        <div class="biz-ind-bar"><div class="biz-ind-fill" style="width:${(qtd / maior) * 100}%"></div></div>
-        ${biFuncOpAtiva(f)}
+        <div class="biz-ind-name">${biEsc(p.nome)}</div>
+        <div class="biz-ind-qtd"><b>${biFmt(p.qtd, 0)}</b><span>${biEsc(s.rotulo)} · ${biFmt(part, 0)}%</span></div>
+        <div class="biz-ind-bar"><div class="biz-ind-fill" style="width:${(p.qtd / maior) * 100}%"></div></div>
+        ${biFuncOpAtiva(p)}
       </div>`;
   }).join('');
-  biAjustaLinhas(funcs.length);
+  biAjustaLinhas(n);
+  if (trocou) {
+    list.classList.remove('entra');
+    void list.offsetWidth; // reinicia a animação de entrada
+    list.classList.add('entra');
+  }
 }
+
+// Barra fina embaixo da lista: corre até a próxima troca
+function biSlideTempoReinicia() {
+  const barra = document.getElementById('biSlideTempo');
+  barra.style.setProperty('--biz-slide-ms', BI_SLIDE_MS + 'ms');
+  barra.classList.remove('corre');
+  void barra.offsetWidth;
+  barra.classList.add('corre');
+}
+
+function biSlideAgenda() {
+  clearInterval(biSlideTimer);
+  biSlideTimer = setInterval(biProximoSlide, BI_SLIDE_MS);
+  biSlideTempoReinicia();
+}
+
+function biProximoSlide() {
+  if (biTrava || biSlides.length < 2) return;
+  const i = biSlides.indexOf(biSlideAtual());
+  biSlideAtp = biSlides[(i + 1) % biSlides.length].atp;
+  biMostraSlide(true);
+  biSlideTempoReinicia();
+}
+
+// Clicar numa bolinha vai direto para a atividade. Travado, a trava passa
+// para a atividade escolhida; solto, recomeça a contagem.
+document.getElementById('biSlideDots').addEventListener('click', e => {
+  const b = e.target.closest('button[data-atp]');
+  if (!b) return;
+  biSlideAtp = Number(b.dataset.atp);
+  if (biTrava) {
+    biTrava = { atp: biSlideAtp, etapa: (biSlideAtual() || {}).etapa || '' };
+    biSalvaTrava();
+  }
+  biMostraSlide(true);
+  if (!biTrava) biSlideAgenda();
+});
+
+// Travar / destravar na atividade que está na tela
+document.getElementById('biSlideTrava').addEventListener('click', () => {
+  if (biTrava) {
+    biTrava = null;
+    biSalvaTrava();
+    if (!biSlideAtual()) biSlideAtp = biSlides.length ? biSlides[0].atp : null;
+    biMostraSlide(false);
+    biSlideAgenda();
+  } else if (biSlideAtual()) {
+    biTrava = { atp: biSlideAtp, etapa: biSlideAtual().etapa };
+    biSalvaTrava();
+    clearInterval(biSlideTimer);
+    biMostraSlide(false);
+  }
+});
 
 // ── Grade da lista: colunas, escala e altura das linhas conforme o espaço ───
 // Mais de 10 pessoas → 2 colunas (preenchidas coluna por coluna, pra ler o
@@ -608,7 +785,7 @@ function biApplyScale() {
   stage.style.height = availH + 'px';
   wrap.scrollTop = 0;
   // A altura da lista mudou junto com o painel: recalcula as linhas
-  biAjustaLinhas(biUltimosFuncs.length);
+  biAjustaLinhas((biSlideAtual() || { pessoas: [] }).pessoas.length);
 }
 window.addEventListener('resize', biApplyScale);
 biMqMobile.addEventListener('change', biApplyScale);
@@ -627,6 +804,7 @@ function biRenderAll(data) {
 
 const BI_INITIAL = <?= json_encode($payload, JSON_UNESCAPED_UNICODE) ?>;
 biRenderAll(BI_INITIAL);
+if (!biTrava) biSlideAgenda();
 
 // ── Atualização periódica (tempo real) ────────────────────────────────────────
 function biRefresh() {

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/producao_tipo.php';
 
 // ══════════════════════════════════════════════════════════════
 //  DOMBAG — Acompanhar Produção em Tempo Real
@@ -28,6 +29,8 @@ function trFetchMaquinasAtivas($pg): array
               ,IAA.OIAP_QTD_PRODUZIDA
               ,IAA.ATP_CODIGO
               ,ATP.ATP_TIPO_APONTAMENTO
+              ,TRIM(ATP.ATP_DESCRICAO)                                         AS ETAPA
+              ," . prodTipoGrupoSql('P') . "                                 AS TIPO
               ,(SELECT COUNT(*)
                   FROM OP_ITENS_ATIVIDADES_LOGS L
                  WHERE L.OIAP_CODIGO = IAA.OIAP_CODIGO
@@ -54,7 +57,16 @@ function trFetchMaquinasAtivas($pg): array
                   FROM OP_ITENS_ATIVIDADES_APONTADAS IAA2
                  WHERE IAA2.PROD_CODIGO = IAA.PROD_CODIGO
                    AND IAA2.PRO_CODIGO  = IAA.PRO_CODIGO
-                   AND NOT IAA2.OIAP_EXCLUIDO)                                 AS OP_QTD_PRODUZIDA_TOTAL
+                   AND " . prodProntoSql('IAA2') . "
+                   AND NOT IAA2.OIAP_EXCLUIDO
+                   AND TRIM(IAA2.OIAP_STATUS) <> 'C')                          AS OP_QTD_PRODUZIDA_TOTAL
+              ,(SELECT COALESCE(SUM(IAA3.OIAP_QTD_PRODUZIDA), 0)
+                  FROM OP_ITENS_ATIVIDADES_APONTADAS IAA3
+                 WHERE IAA3.PROD_CODIGO = IAA.PROD_CODIGO
+                   AND IAA3.PRO_CODIGO  = IAA.PRO_CODIGO
+                   AND IAA3.ATP_CODIGO  = IAA.ATP_CODIGO
+                   AND NOT IAA3.OIAP_EXCLUIDO
+                   AND TRIM(IAA3.OIAP_STATUS) <> 'C')                          AS OP_QTD_ETAPA
           FROM OP_ITENS_ATIVIDADES_APONTADAS IAA
          INNER JOIN ATIVIDADE_PRODUCAO ATP ON ATP.ATP_CODIGO = IAA.ATP_CODIGO
          INNER JOIN CENTRO_TRABALHO   CT  ON CT.CT_CODIGO   = IAA.CT_CODIGO
@@ -73,7 +85,16 @@ function trFetchMaquinasAtivas($pg): array
     }
     $rows = pg_fetch_all($res) ?: [];
     pg_free_result($res);
-    return $rows;
+    return array_map('trComEtapa', $rows);
+}
+
+// Etapa legível e unidade (bags/sacarias) do apontamento
+function trComEtapa(array $r): array
+{
+    $r['etapa']   = prodEtapaNome($r['etapa'] ?? '');
+    $r['unidade'] = prodUnidade($r['tipo'] ?? null);
+    $r['pronto']  = in_array((int) ($r['atp_codigo'] ?? 0), [PROD_ATP_BAG_PRONTO, PROD_ATP_SACARIA_PRONTA], true);
+    return $r;
 }
 
 function trFetchTodosCentros($pg): array
@@ -102,9 +123,13 @@ function trFetchUltimoApontamentoCentro($pg, int $ctCodigo): ?array
               ,IAA.OIAP_DATA_HORA_INICIO
               ,IAA.OIAP_DATA_HORA_FIM
               ,IAA.OIAP_QTD_PRODUZIDA
+              ,IAA.ATP_CODIGO
+              ,TRIM(ATP.ATP_DESCRICAO) AS ETAPA
+              ," . prodTipoGrupoSql('P') . " AS TIPO
           FROM OP_ITENS_ATIVIDADES_APONTADAS IAA
          INNER JOIN FUNCIONARIO F ON F.FU_CODIGO  = IAA.FU_CODIGO
          INNER JOIN PRODUTO     P ON P.PRO_CODIGO = IAA.PRO_CODIGO
+          LEFT JOIN ATIVIDADE_PRODUCAO ATP ON ATP.ATP_CODIGO = IAA.ATP_CODIGO
          INNER JOIN CLIENTES    C ON C.CLI_CODIGO = IAA.CLI_CODIGO
          WHERE NOT IAA.OIAP_EXCLUIDO
            AND IAA.CT_CODIGO = $1
@@ -117,7 +142,7 @@ function trFetchUltimoApontamentoCentro($pg, int $ctCodigo): ?array
     }
     $row = pg_fetch_assoc($res) ?: null;
     pg_free_result($res);
-    return $row ?: null;
+    return $row ? trComEtapa($row) : null;
 }
 
 function trStatusLabel(string $status): array
@@ -125,6 +150,7 @@ function trStatusLabel(string $status): array
     $status = trim($status);
     $map = [
         'A'  => ['Em Andamento', 'info'],
+        'S'  => ['Setup', 'warn'],          // preparando a máquina (impressão, corte)
         'EP' => ['Em Produção', 'ok'],
         'P'  => ['Pausado', 'warn'],
         'F'  => ['Finalizado', 'info'],
@@ -207,8 +233,19 @@ $jsParadas = json_encode($paradas, JSON_UNESCAPED_UNICODE);
 <link rel="stylesheet" href="/public/css/unified_admin.css">
 <link rel="icon" href="/public/css/icone.ico" type="image/png">
 <style>
-  .tr-grids { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
-  @media (max-width: 1100px) { .tr-grids { grid-template-columns: 1fr; } }
+  /* Os quadros ocupam a altura da tela e rolam por dentro: com muitas
+     máquinas ativas as linhas de baixo ficavam cortadas. */
+  .tr-grids { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: minmax(0, 1fr); gap: 16px; align-items: start;
+              flex: 1 1 auto; min-height: 0; }
+  .tr-grids > .panel-table { max-height: 100%; }
+  .tr-grids .table-wrap { overflow-y: auto; }
+  .tr-grids thead th { position: sticky; top: 0; z-index: 1; background: var(--card-bg); }
+  /* Tela estreita: os quadros ficam um embaixo do outro e a página inteira rola */
+  @media (max-width: 1100px) {
+    .content { overflow-y: auto; }
+    .tr-grids { grid-template-columns: 1fr; grid-template-rows: none; flex: none; }
+    .tr-grids > .panel-table { max-height: none; flex: none; }
+  }
 
   .tr-panel-title { display: flex; align-items: center; gap: 8px; }
   .tr-count-badge { font-size: 10.5px; font-weight: 700; padding: 2px 9px; border-radius: 20px; }
@@ -394,6 +431,7 @@ let selecionado = null; // { tipo: 'ativa'|'parada', codigo: ct_codigo }
 
 const STATUS_MAP = {
   A:  ['Em Andamento', 'info'],
+  S:  ['Setup', 'warn'],   // preparando a máquina (impressão, corte)
   EP: ['Em Produção', 'ok'],
   P:  ['Pausado', 'warn'],
   F:  ['Finalizado', 'info'],
@@ -440,7 +478,7 @@ function renderGrids() {
       <tr class="tr-row${selecionado && selecionado.tipo === 'ativa' && selecionado.codigo === +m.ct_codigo ? ' selected' : ''}" data-ct="${m.ct_codigo}">
         <td>
           <div class="tr-ct-name">${trEsc(m.ct_descricao)}</div>
-          <div class="tr-ct-code">Cód. ${trEsc(m.ct_codigo)}</div>
+          <div class="tr-ct-code">${m.etapa ? trEsc(m.etapa) + ' · ' : ''}Cód. ${trEsc(m.ct_codigo)}</div>
         </td>
         <td>${trStatusPill(m.oiap_status)}</td>
         <td>${trEsc(m.fu_nome)}</td>
@@ -484,16 +522,18 @@ function tickTimers() {
 setInterval(tickTimers, 1000);
 
 // ── Barra de progresso: quantidade lida (produzida) vs. quantidade do pedido ──
-function trProgressBarHtml(qtdProduzida, qtdPedido) {
+// Prontos = só a etapa final do tipo (Análise no bag, Corte na sacaria).
+function trProgressBarHtml(qtdProduzida, qtdPedido, unidade) {
   const produzida = Number(qtdProduzida || 0);
   const pedido = Number(qtdPedido || 0);
+  unidade = unidade || 'unidades';
   if (!pedido) {
     return `
     <div class="tr-progress">
       <div class="tr-progress-header">
         <span class="tr-progress-title">Progresso da OP</span>
       </div>
-      <div class="tr-progress-nums">Quantidade do pedido não encontrada para esta OP — bags produzidos: <strong>${produzida.toLocaleString('pt-BR')}</strong></div>
+      <div class="tr-progress-nums">Quantidade do pedido não encontrada para esta OP — ${unidade} prontos: <strong>${produzida.toLocaleString('pt-BR')}</strong></div>
     </div>`;
   }
   const pct = Math.round((produzida / pedido) * 100);
@@ -506,7 +546,7 @@ function trProgressBarHtml(qtdProduzida, qtdPedido) {
         <span class="tr-progress-pct${over ? ' over' : ''}">${pct}%</span>
       </div>
       <div class="tr-progress-bar"><div class="tr-progress-fill${over ? ' over' : ''}" style="width:${fillPct}%"></div></div>
-      <div class="tr-progress-nums">Bags lidos (OP completa): <strong>${produzida.toLocaleString('pt-BR')}</strong> / Pedido: <strong>${pedido.toLocaleString('pt-BR')}</strong></div>
+      <div class="tr-progress-nums">Prontos (OP completa): <strong>${produzida.toLocaleString('pt-BR')}</strong> / Pedido: <strong>${pedido.toLocaleString('pt-BR')}</strong> ${unidade}</div>
     </div>`;
 }
 
@@ -526,13 +566,14 @@ function abrirDetalheAtiva(ctCodigo) {
       <div class="tr-live-timer-lbl">Tempo desde o início do apontamento</div>
     </div>
 
-    ${trProgressBarHtml(m.op_qtd_produzida_total, m.op_qtd_pedido)}
+    ${trProgressBarHtml(m.op_qtd_produzida_total, m.op_qtd_pedido, m.unidade)}
 
     <div class="tr-field-group">
       <div class="tr-field-group-title">Apontamento</div>
       <div class="tr-field-row"><span class="tr-field-label">Status</span><span class="tr-field-value">${trStatusPill(m.oiap_status)}</span></div>
       <div class="tr-field-row"><span class="tr-field-label">Código do Apontamento</span><span class="tr-field-value">${trEsc(m.oiap_codigo)}</span></div>
       <div class="tr-field-row"><span class="tr-field-label">Início</span><span class="tr-field-value">${trFmtDateTime(m.oiap_data_hora_inicio)}</span></div>
+      <div class="tr-field-row"><span class="tr-field-label">Etapa</span><span class="tr-field-value">${trEsc(m.etapa || '—')}${m.pronto ? ' (conta como pronto)' : ''}</span></div>
       <div class="tr-field-row"><span class="tr-field-label">Tipo de Apontamento</span><span class="tr-field-value">${trEsc(m.atp_tipo_apontamento || '—')}</span></div>
     </div>
 
@@ -541,7 +582,8 @@ function abrirDetalheAtiva(ctCodigo) {
       <div class="tr-field-row"><span class="tr-field-label">Cód. OP</span><span class="tr-field-value">${trEsc(m.prod_codigo ?? '—')}</span></div>
       <div class="tr-field-row"><span class="tr-field-label">Cliente</span><span class="tr-field-value">${trEsc(m.cli_nome)} (${trEsc(m.cli_codigo)})</span></div>
       <div class="tr-field-row"><span class="tr-field-label">Produto</span><span class="tr-field-value">${trEsc(m.pro_descricao)} (${trEsc(m.pro_codigo)})</span></div>
-      <div class="tr-field-row"><span class="tr-field-label">Bags Produzidos (neste apontamento)</span><span class="tr-field-value">${Number(m.oiap_qtd_produzida || 0).toLocaleString('pt-BR')}</span></div>
+      <div class="tr-field-row"><span class="tr-field-label">Neste apontamento</span><span class="tr-field-value">${Number(m.oiap_qtd_produzida || 0).toLocaleString('pt-BR')} ${trEsc(m.unidade)}</span></div>
+      <div class="tr-field-row"><span class="tr-field-label">Nesta etapa (OP completa)</span><span class="tr-field-value">${Number(m.op_qtd_etapa || 0).toLocaleString('pt-BR')} ${trEsc(m.unidade)}</span></div>
     </div>
 
     <div class="tr-field-group">
@@ -594,7 +636,8 @@ function abrirDetalheParada(ctCodigo) {
           <div class="tr-field-row"><span class="tr-field-label">Cód. OP</span><span class="tr-field-value">${trEsc(u.prod_codigo ?? '—')}</span></div>
           <div class="tr-field-row"><span class="tr-field-label">Cliente</span><span class="tr-field-value">${trEsc(u.cli_nome)} (${trEsc(u.cli_codigo)})</span></div>
           <div class="tr-field-row"><span class="tr-field-label">Produto</span><span class="tr-field-value">${trEsc(u.pro_descricao)} (${trEsc(u.pro_codigo)})</span></div>
-          <div class="tr-field-row"><span class="tr-field-label">Bags Produzidos</span><span class="tr-field-value">${Number(u.oiap_qtd_produzida || 0).toLocaleString('pt-BR')}</span></div>
+          <div class="tr-field-row"><span class="tr-field-label">Etapa</span><span class="tr-field-value">${trEsc(u.etapa || '—')}</span></div>
+          <div class="tr-field-row"><span class="tr-field-label">Produzido</span><span class="tr-field-value">${Number(u.oiap_qtd_produzida || 0).toLocaleString('pt-BR')} ${trEsc(u.unidade)}</span></div>
         </div>
         <div class="tr-field-group">
           <div class="tr-field-group-title">Operador</div>

@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/producao_tipo.php';
 require $_SERVER['DOCUMENT_ROOT'] . '/vendor/autoload.php';
 
 use Dompdf\Dompdf;
@@ -53,6 +54,7 @@ function pfpBuildBaseCte(string $dataIni, string $dataFim): array
         WITH APONT AS (
            SELECT IAA.OIAP_CODIGO, IAA.FU_CODIGO, IAA.CT_CODIGO, IAA.PROD_CODIGO, IAA.PRO_CODIGO
                  ,IAA.OIAP_QTD_PRODUZIDA, IAA.OIAP_DATA_HORA_INICIO
+                 " . prodApontExtrasSql('IAA') . "
              FROM OP_ITENS_ATIVIDADES_APONTADAS IAA
             WHERE NOT IAA.OIAP_EXCLUIDO
               AND IAA.OIAP_DATA_HORA_INICIO::date >= $1
@@ -89,6 +91,7 @@ function pfpFetchRanking($pg, string $dataIni, string $dataFim): array
               ,COALESCE(SUM(EXTRACT(EPOCH FROM T.PRODUTIVO)), 0)              AS SEG_PRODUTIVO
               ,COALESCE(SUM(EXTRACT(EPOCH FROM T.PAUSADO)), 0)                AS SEG_PAUSADO
               ,COALESCE(SUM(T.PAUSAS), 0)                                     AS QTD_PAUSAS
+              " . prodSomasPessoaSql('A', 'T') . "
           FROM APONT A
          INNER JOIN FUNCIONARIO F ON F.FU_CODIGO = A.FU_CODIGO
           LEFT JOIN TEMPO T ON T.OIAP_CODIGO = A.OIAP_CODIGO
@@ -101,7 +104,7 @@ function pfpFetchRanking($pg, string $dataIni, string $dataFim): array
     }
     $rows = pg_fetch_all($res) ?: [];
     pg_free_result($res);
-    return $rows;
+    return prodOrdenaPessoas(array_map('prodPessoaUnidade', $rows));
 }
 
 // ── Detalhamento diário de todos os funcionários, em uma única consulta ──────
@@ -115,6 +118,7 @@ function pfpFetchDetalheTodos($pg, string $dataIni, string $dataFim): array
               ,COALESCE(SUM(A.OIAP_QTD_PRODUZIDA), 0)                         AS QTD_PRODUZIDA
               ,COALESCE(SUM(EXTRACT(EPOCH FROM T.PRODUTIVO)), 0)              AS SEG_PRODUTIVO
               ,COALESCE(SUM(EXTRACT(EPOCH FROM T.PAUSADO)), 0)                AS SEG_PAUSADO
+              " . prodSomasPessoaSql('A', 'T') . "
           FROM APONT A
          INNER JOIN FUNCIONARIO F ON F.FU_CODIGO = A.FU_CODIGO
           LEFT JOIN TEMPO T ON T.OIAP_CODIGO = A.OIAP_CODIGO
@@ -130,7 +134,7 @@ function pfpFetchDetalheTodos($pg, string $dataIni, string $dataFim): array
 
     $porFuncionario = [];
     foreach ($rows as $r) {
-        $porFuncionario[(int) $r['fu_codigo']][] = $r;
+        $porFuncionario[(int) $r['fu_codigo']][] = prodPessoaUnidade($r);
     }
     return $porFuncionario;
 }
@@ -161,8 +165,11 @@ $totalSegProdutivo = array_reduce($ranking, fn ($c, $r) => $c + (float) $r['seg_
 $totalSegPausado = array_reduce($ranking, fn ($c, $r) => $c + (float) $r['seg_pausado'], 0.0);
 $totalPausas = array_reduce($ranking, fn ($c, $r) => $c + (int) $r['qtd_pausas'], 0);
 $totalApontamentos = array_reduce($ranking, fn ($c, $r) => $c + (int) $r['qtd_apontamentos'], 0);
-$mediaGeralHora = $totalSegProdutivo > 0 ? $totalQtdProduzida / ($totalSegProdutivo / 3600) : 0.0;
 $maiorQtdProduzida = $ranking ? max(array_column($ranking, 'qtd_produzida')) : 0;
+// Totais só com peças prontas (bags na Análise): somar etapas repetiria peças
+$prontos = prodTotaisProntos($ranking);
+$totalQtdProduzida = $prontos['bag_pronto'];
+$mediaGeralHora = $prontos['bags_hora'];
 
 // ── HTML ──────────────────────────────────────────────────────────────────────
 ob_start();
@@ -241,11 +248,11 @@ table.dias td { padding: 4px 6px; font-size: 9px; border-bottom: 1px solid #eef1
   </div>
   <div class="kpi-cell">
     <div class="kpi-val"><?= number_format($totalQtdProduzida, 0, ',', '.') ?></div>
-    <div class="kpi-lbl">Bags Produzidos</div>
+    <div class="kpi-lbl">Bags Produzidos (analisados)</div>
   </div>
   <div class="kpi-cell">
     <div class="kpi-val"><?= number_format($mediaGeralHora, 1, ',', '.') ?></div>
-    <div class="kpi-lbl">Média Geral / Hora</div>
+    <div class="kpi-lbl">Bags Analisados / Hora</div>
   </div>
   <div class="kpi-cell">
     <div class="kpi-val"><?= number_format($totalSegProdutivo / 3600, 1, ',', '.') ?>h</div>
@@ -272,12 +279,13 @@ table.dias td { padding: 4px 6px; font-size: 9px; border-bottom: 1px solid #eef1
       <th class="r">Apont.</th>
       <th class="r">OPs</th>
       <th class="r">Máquinas</th>
-      <th class="r">Bags Produzidos</th>
+      <th class="r">Bags Analisados</th>
+      <th class="r">Outras Etapas</th>
       <th class="r">T. Produtivo</th>
       <th class="r">T. Pausado</th>
       <th class="r">Pausas</th>
       <th class="r">% Produtivo</th>
-      <th class="r">Média/h</th>
+      <th class="r">Analisados/h</th>
     </tr>
   </thead>
   <tbody>
@@ -285,7 +293,7 @@ table.dias td { padding: 4px 6px; font-size: 9px; border-bottom: 1px solid #eef1
         $segProd = (float) $row['seg_produtivo'];
         $segPausa = (float) $row['seg_pausado'];
         $qtdProd = (float) $row['qtd_produzida'];
-        $mediaHora = $segProd > 0 ? $qtdProd / ($segProd / 3600) : null;
+        $mediaHora = (float) $row['seg_produzido'] > 0 ? $qtdProd / ((float) $row['seg_produzido'] / 3600) : null;
         $pctProdutivo = ($segProd + $segPausa) > 0 ? round(($segProd / ($segProd + $segPausa)) * 100) : null;
         $barPct = $maiorQtdProduzida > 0 ? round(($qtdProd / $maiorQtdProduzida) * 100) : 0;
     ?>
@@ -300,6 +308,7 @@ table.dias td { padding: 4px 6px; font-size: 9px; border-bottom: 1px solid #eef1
           <div class="bar-cell val"><?= number_format($qtdProd, 0, ',', '.') ?></div>
         </div>
       </td>
+      <td class="r"><?= $row['outros_txt'] !== '' ? pfpEscape($row['outros_txt']) . '<br><span style="color:#889;font-size:8px;">' . pfpEscape($row['outras_etapas']) . '</span>' : '—' ?></td>
       <td class="r"><?= pfpEscape(pfpSecondsToHms($segProd)) ?></td>
       <td class="r"><?= pfpEscape(pfpSecondsToHms($segPausa)) ?></td>
       <td class="r"><?= number_format((int) $row['qtd_pausas'], 0, ',', '.') ?></td>
@@ -317,15 +326,15 @@ table.dias td { padding: 4px 6px; font-size: 9px; border-bottom: 1px solid #eef1
     $dias = $detalheDias[$fuCodigo] ?? [];
     $segProd = (float) $row['seg_produtivo'];
     $qtdProd = (float) $row['qtd_produzida'];
-    $mediaHora = $segProd > 0 ? $qtdProd / ($segProd / 3600) : null;
+    $mediaHora = (float) $row['seg_produzido'] > 0 ? $qtdProd / ((float) $row['seg_produzido'] / 3600) : null;
 ?>
   <div class="func-block">
     <div class="func-head">
       <div class="nome"><?= pfpEscape($row['fu_nome']) ?> <span style="font-weight:400;color:#889;">(<?= pfpEscape($fuCodigo) ?>)</span></div>
       <div class="stats">
-        Qtd.: <b><?= number_format($qtdProd, 0, ',', '.') ?></b> &nbsp;·&nbsp;
+        Bags analisados: <b><?= number_format($qtdProd, 0, ',', '.') ?></b><?= $row['outros_txt'] !== '' ? ' · Outras etapas: ' . pfpEscape($row['outros_txt']) . ' (' . pfpEscape($row['outras_etapas']) . ')' : '' ?> &nbsp;·&nbsp;
         T. Produtivo: <b><?= pfpEscape(pfpSecondsToHms($segProd)) ?></b> &nbsp;·&nbsp;
-        Média/h: <b><?= $mediaHora === null ? '—' : number_format($mediaHora, 1, ',', '.') ?></b>
+        Analisados/h: <b><?= $mediaHora === null ? '—' : number_format($mediaHora, 1, ',', '.') ?></b>
       </div>
     </div>
     <?php if (!$dias): ?>
@@ -336,22 +345,24 @@ table.dias td { padding: 4px 6px; font-size: 9px; border-bottom: 1px solid #eef1
         <tr>
           <th>Dia</th>
           <th class="r">Apont.</th>
-          <th class="r">Bags Produzidos</th>
+          <th class="r">Bags Analisados</th>
+          <th class="r">Outras Etapas</th>
           <th class="r">T. Produtivo</th>
           <th class="r">T. Pausado</th>
-          <th class="r">Média/h</th>
+          <th class="r">Analisados/h</th>
         </tr>
       </thead>
       <tbody>
         <?php foreach ($dias as $d):
             $dSegProd = (float) $d['seg_produtivo'];
             $dQtd = (float) $d['qtd_produzida'];
-            $dMediaHora = $dSegProd > 0 ? $dQtd / ($dSegProd / 3600) : null;
+            $dMediaHora = (float) $d['seg_produzido'] > 0 ? $dQtd / ((float) $d['seg_produzido'] / 3600) : null;
         ?>
         <tr>
           <td><?= pfpEscape(pfpFmtDate($d['dia'])) ?></td>
           <td class="r"><?= number_format((int) $d['qtd_apontamentos'], 0, ',', '.') ?></td>
           <td class="r"><?= number_format($dQtd, 0, ',', '.') ?></td>
+          <td class="r"><?= $d['outros_txt'] !== '' ? pfpEscape($d['outros_txt']) : '—' ?></td>
           <td class="r"><?= pfpEscape(pfpSecondsToHms($dSegProd)) ?></td>
           <td class="r"><?= pfpEscape(pfpSecondsToHms((float) $d['seg_pausado'])) ?></td>
           <td class="r"><?= $dMediaHora === null ? '—' : number_format($dMediaHora, 1, ',', '.') ?></td>

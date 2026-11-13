@@ -114,6 +114,28 @@ confere('realizado marcado iniciou', agNaoIniciou(5.0, 0.0, 0.0), false);
 confere('produção no ERP iniciou', agNaoIniciou(null, 5.0, 0.0), false);
 confere('lançamento em aberto iniciou', agNaoIniciou(null, 0.0, 5.0), false);
 confere('zero marcado com produção no ERP iniciou', agNaoIniciou(0.0, 5.0, 0.0), false);
+confere('etapa anterior apontada iniciou', agNaoIniciou(null, 0.0, 0.0, 2), false);
+confere('sem apontamento em etapa nenhuma não iniciou', agNaoIniciou(null, 0.0, 0.0, 0), true);
+
+// Regra de peça pronta e nomes de etapa (producao_tipo.php)
+confere('pronto é Análise ou Corte', prodProntoSql('A'), 'A.ATP_CODIGO IN (7, 14)');
+confere('nome da etapa', [prodEtapaNome('ATV COSTURA ALÇA'), prodEtapaNome('ATV IMPRESSÃO SACARIA'), prodEtapaNome(null)], ['Costura alça', 'Impressão sacaria', '']);
+confere('unidade por tipo', [prodUnidade('BAG'), prodUnidade('SACARIA'), prodUnidade(null)], ['bags', 'sacarias', 'unidades']);
+// Produzido por pessoa = só bags analisados; o resto fica em outras etapas
+$p = prodPessoaUnidade(['qtd_bag' => '0', 'qtd_sac' => '7300', 'qtd_bag_pronto' => '0', 'etapas' => 'ATV IMPRESSÃO SACARIA', 'etapas_outras' => 'ATV IMPRESSÃO SACARIA']);
+confere('quem só imprimiu sacaria não produziu bag', [$p['qtd_produzida'], $p['outros_txt'], $p['outras_etapas']], [0.0, '7.300 sacarias', 'Impressão sacaria']);
+$p = prodPessoaUnidade(['qtd_bag' => '55', 'qtd_sac' => '0', 'qtd_bag_pronto' => '45', 'seg_bag_pronto' => '3600',
+    'etapas' => 'ATV ANALISAR BIG BAG|ATV COSTURA ALÇA', 'etapas_outras' => 'ATV COSTURA ALÇA']);
+confere('analisados contam, costura fica à parte', [$p['qtd_produzida'], $p['outros_bag'], $p['outros_txt'], $p['outras_etapas'], $p['seg_produzido']],
+    [45.0, 10.0, '10 bags', 'Costura alça', 3600.0]);
+confere('ranking: quem mais analisou primeiro', array_column(prodOrdenaPessoas([
+    ['qtd_produzida' => 0.0, 'outros_bag' => 50.0], ['qtd_produzida' => 10.0], ['qtd_produzida' => 30.0],
+]), 'qtd_produzida'), [30.0, 10.0, 0.0]);
+$t = prodTotaisProntos([
+    ['qtd_bag_pronto' => '30', 'qtd_sac_pronta' => '0', 'seg_bag_pronto' => '3600'],
+    ['qtd_bag_pronto' => '0', 'qtd_sac_pronta' => '7300', 'seg_bag_pronto' => '0'],
+]);
+confere('totais só com prontos', [$t['bag_pronto'], $t['sac_pronta'], $t['bags_hora']], [30.0, 7300.0, 30.0]);
 confere('editar segue recusando dia passado', recusa(fn () => agSlotAberto($db, 1)), 'Dias passados não podem ser alterados.');
 $movePassado = static fn (string $dia) => agMover($db, null, agSlotAberto($db, 1, true), $dia);
 confere('dia com realizado não sai', recusa(fn () => $movePassado($amanha)), 'Este dia já tem produção e não pode ser movido.');

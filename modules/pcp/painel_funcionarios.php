@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/producao_tipo.php';
 
 // ══════════════════════════════════════════════════════════════
 //  DOMBAG — Painel de Produção por Funcionário
@@ -136,6 +137,7 @@ function pfBuildBaseCte(array $filters): array
         WITH APONT AS (
            SELECT IAA.OIAP_CODIGO, IAA.OIAP_STATUS, IAA.FU_CODIGO, IAA.CT_CODIGO, IAA.PROD_CODIGO, IAA.PRO_CODIGO, IAA.CLI_CODIGO
                  ,IAA.OIAP_QTD_PRODUZIDA, IAA.OIAP_DATA_HORA_INICIO, IAA.OIAP_DATA_HORA_FIM
+                 " . prodApontExtrasSql('IAA') . "
              FROM OP_ITENS_ATIVIDADES_APONTADAS IAA
             WHERE {$where}
         ),
@@ -172,6 +174,7 @@ function pfFetchRanking($pg, array $filters): array
               ,COALESCE(SUM(EXTRACT(EPOCH FROM T.PRODUTIVO)), 0)              AS SEG_PRODUTIVO
               ,COALESCE(SUM(EXTRACT(EPOCH FROM T.PAUSADO)), 0)                AS SEG_PAUSADO
               ,COALESCE(SUM(T.PAUSAS), 0)                                     AS QTD_PAUSAS
+              " . prodSomasPessoaSql('A', 'T') . "
           FROM APONT A
          INNER JOIN FUNCIONARIO F ON F.FU_CODIGO = A.FU_CODIGO
           LEFT JOIN TEMPO T ON T.OIAP_CODIGO = A.OIAP_CODIGO
@@ -185,7 +188,8 @@ function pfFetchRanking($pg, array $filters): array
     }
     $rows = pg_fetch_all($res) ?: [];
     pg_free_result($res);
-    return $rows;
+    // Produzido = bags analisados; outras etapas ficam à parte
+    return prodOrdenaPessoas(array_map('prodPessoaUnidade', $rows));
 }
 
 // ── Produção agregada por dia (todos os funcionários filtrados) ─────────────
@@ -195,7 +199,8 @@ function pfFetchPorDia($pg, array $filters): array
     $sql = "
         {$baseSql}
         SELECT A.OIAP_DATA_HORA_INICIO::date                                   AS DIA
-              ,COALESCE(SUM(A.OIAP_QTD_PRODUZIDA), 0)                         AS QTD_PRODUZIDA
+              -- Produzido = só bags analisados (somar as etapas repetiria peças)
+              ,COALESCE(SUM(A.OIAP_QTD_PRODUZIDA) FILTER (WHERE A.ATP_CODIGO = " . PROD_ATP_BAG_PRONTO . "), 0) AS QTD_PRODUZIDA
               ,COALESCE(SUM(EXTRACT(EPOCH FROM T.PRODUTIVO)), 0)              AS SEG_PRODUTIVO
           FROM APONT A
           LEFT JOIN TEMPO T ON T.OIAP_CODIGO = A.OIAP_CODIGO
@@ -224,6 +229,7 @@ function pfFetchDetalheFuncionario($pg, array $filters, int $fuCodigo): array
               ,COALESCE(SUM(A.OIAP_QTD_PRODUZIDA), 0)                         AS QTD_PRODUZIDA
               ,COALESCE(SUM(EXTRACT(EPOCH FROM T.PRODUTIVO)), 0)              AS SEG_PRODUTIVO
               ,COALESCE(SUM(EXTRACT(EPOCH FROM T.PAUSADO)), 0)                AS SEG_PAUSADO
+              " . prodSomasPessoaSql('A', 'T') . "
           FROM APONT A
           LEFT JOIN TEMPO T ON T.OIAP_CODIGO = A.OIAP_CODIGO
          GROUP BY A.OIAP_DATA_HORA_INICIO::date
@@ -235,7 +241,7 @@ function pfFetchDetalheFuncionario($pg, array $filters, int $fuCodigo): array
     }
     $rows = pg_fetch_all($res) ?: [];
     pg_free_result($res);
-    return $rows;
+    return array_map('prodPessoaUnidade', $rows);
 }
 
 // ── Grid de apontamentos individuais (aba "Apontamentos") ────────────────────
@@ -247,6 +253,7 @@ function pfFetchApontamentos($pg, array $filters): array
         SELECT A.OIAP_CODIGO, A.OIAP_STATUS, A.OIAP_DATA_HORA_INICIO, A.OIAP_DATA_HORA_FIM, A.OIAP_QTD_PRODUZIDA
               ,F.FU_CODIGO, F.FU_NOME
               ,CT.CT_CODIGO, CT.CT_DESCRICAO
+              ,A.ETAPA, A.GRP_CODIGO
               ,A.PROD_CODIGO, C.CLI_NOME, P.PRO_CODIGO, P.PRO_DESCRICAO
               ,COALESCE(EXTRACT(EPOCH FROM T.PRODUTIVO), 0)                    AS SEG_PRODUTIVO
               ,COALESCE(EXTRACT(EPOCH FROM T.PAUSADO), 0)                      AS SEG_PAUSADO
@@ -323,6 +330,7 @@ function pfStatusLabel(string $status): array
 {
     $map = [
         'A'  => ['Em Andamento', 'info'],
+        'S'  => ['Setup', 'warn'],          // preparando a máquina (impressão, corte)
         'EP' => ['Em Produção', 'ok'],
         'P'  => ['Pausado', 'warn'],
         'F'  => ['Finalizado', 'info'],
@@ -339,15 +347,17 @@ function pfComputeTotais(array $ranking): array
     $totalSegPausado = array_reduce($ranking, fn ($c, $r) => $c + (float) $r['seg_pausado'], 0.0);
     $totalPausas = array_reduce($ranking, fn ($c, $r) => $c + (int) $r['qtd_pausas'], 0);
     $totalApontamentos = array_reduce($ranking, fn ($c, $r) => $c + (int) $r['qtd_apontamentos'], 0);
+    $prontos = prodTotaisProntos($ranking);
 
     return [
         'funcionarios'       => count($ranking),
-        'qtd_produzida'      => $totalQtdProduzida,
+        // Peças prontas: só a etapa final (bags na Análise); somar as etapas repetiria peças
+        'qtd_produzida'      => $prontos['bag_pronto'],
         'seg_produtivo'      => $totalSegProdutivo,
         'seg_pausado'        => $totalSegPausado,
         'pausas'             => $totalPausas,
         'apontamentos'       => $totalApontamentos,
-        'media_geral_hora'   => $totalSegProdutivo > 0 ? $totalQtdProduzida / ($totalSegProdutivo / 3600) : 0.0,
+        'media_geral_hora'   => $prontos['bags_hora'],
     ];
 }
 
@@ -461,7 +471,9 @@ $totalSegProdutivo = array_reduce($ranking, fn ($c, $r) => $c + (float) $r['seg_
 $totalSegPausado = array_reduce($ranking, fn ($c, $r) => $c + (float) $r['seg_pausado'], 0.0);
 $totalPausas = array_reduce($ranking, fn ($c, $r) => $c + (int) $r['qtd_pausas'], 0);
 $totalApontamentos = array_reduce($ranking, fn ($c, $r) => $c + (int) $r['qtd_apontamentos'], 0);
-$mediaGeralHora = $totalSegProdutivo > 0 ? $totalQtdProduzida / ($totalSegProdutivo / 3600) : 0.0;
+$prontos = prodTotaisProntos($ranking);
+$totalQtdProduzida = $prontos['bag_pronto'];
+$mediaGeralHora = $prontos['bags_hora'];
 
 $activeFiltersCount = count(array_filter([
     $filters['fu_codigo'], $filters['ct_codigo'], $filters['atp_codigo'],
@@ -473,7 +485,11 @@ $rankingMediaHora = [];
 foreach ($ranking as $r) {
     $nome = $r['fu_nome'];
     $rankingProducao[$nome] = (float) $r['qtd_produzida'];
-    $segProd = (float) $r['seg_produtivo'];
+    $segProd = (float) $r['seg_produzido']; // horas da Análise
+    if ((float) $r['qtd_produzida'] <= 0) {
+        unset($rankingProducao[$nome]);
+        continue;
+    }
     if ($segProd > 0) {
         $rankingMediaHora[$nome] = round((float) $r['qtd_produzida'] / ($segProd / 3600), 2);
     }
@@ -678,15 +694,15 @@ $jsSimplesHoje = pfJz(['ranking' => $simplesRankingHoje, 'totais' => $simplesTot
             <div class="kpi-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/></svg></div>
           </div>
           <div class="kpi-value"><?= number_format($totalQtdProduzida, 0, ',', '.') ?></div>
-          <div class="kpi-footer">total no período filtrado</div>
+          <div class="kpi-footer">bags analisados no período</div>
         </div>
         <div class="kpi-card blue">
           <div class="kpi-header">
-            <span class="kpi-label">Média por Hora (geral)</span>
+            <span class="kpi-label">Bags por Hora</span>
             <div class="kpi-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
           </div>
           <div class="kpi-value"><?= number_format($mediaGeralHora, 1, ',', '.') ?></div>
-          <div class="kpi-footer">bags / hora produtiva</div>
+          <div class="kpi-footer">analisados / hora produtiva na Análise</div>
         </div>
         <div class="kpi-card amber">
           <div class="kpi-header">
@@ -813,7 +829,7 @@ $jsSimplesHoje = pfJz(['ranking' => $simplesRankingHoje, 'totais' => $simplesTot
         <div class="charts-row">
           <div class="chart-panel">
             <div class="chart-head">
-              <div class="chart-title">Produção por Dia</div>
+              <div class="chart-title">Bags Analisados por Dia</div>
               <div class="chart-sub">Soma de todos os funcionários filtrados</div>
             </div>
             <div class="chart-body" id="bodyPorDia"><canvas id="chartPorDia" height="200"></canvas></div>
@@ -829,7 +845,7 @@ $jsSimplesHoje = pfJz(['ranking' => $simplesRankingHoje, 'totais' => $simplesTot
         <div class="charts-row-2">
           <div class="chart-panel">
             <div class="chart-head">
-              <div class="chart-title">Ranking — Quantidade Produzida</div>
+              <div class="chart-title">Ranking — Bags Analisados</div>
               <div class="chart-sub">Top 12 funcionários no período filtrado</div>
             </div>
             <div class="chart-body" id="bodyRankProd"><canvas id="chartRankProd" height="240"></canvas></div>
@@ -859,18 +875,19 @@ $jsSimplesHoje = pfJz(['ranking' => $simplesRankingHoje, 'totais' => $simplesTot
                   <th class="td-right">Apontamentos</th>
                   <th class="td-right">OPs Distintas</th>
                   <th class="td-right">Máquinas</th>
-                  <th class="td-right">Bags Produzidos</th>
+                  <th class="td-right">Bags Analisados</th>
+                  <th class="td-right">Outras Etapas</th>
                   <th class="td-right">Tempo Produtivo</th>
                   <th class="td-right">Tempo Pausado</th>
                   <th class="td-right">Pausas</th>
                   <th class="td-right">% Produtivo</th>
-                  <th class="td-right">Média/Hora</th>
+                  <th class="td-right">Analisados/Hora</th>
                 </tr>
               </thead>
               <tbody>
                 <?php if (!$ranking): ?>
                   <tr>
-                    <td colspan="10">
+                    <td colspan="11">
                       <div class="td-muted" style="padding:24px;text-align:center;">Nenhum apontamento encontrado com os filtros informados.</div>
                     </td>
                   </tr>
@@ -879,16 +896,20 @@ $jsSimplesHoje = pfJz(['ranking' => $simplesRankingHoje, 'totais' => $simplesTot
                       $segProd = (float) $row['seg_produtivo'];
                       $segPausa = (float) $row['seg_pausado'];
                       $qtdProd = (float) $row['qtd_produzida'];
-                      $mediaHora = $segProd > 0 ? $qtdProd / ($segProd / 3600) : null;
+                      // Média por hora da Análise: horas em outras etapas não geram bag analisado
+                      $segAnalise = (float) $row['seg_produzido'];
+                      $mediaHora = $segAnalise > 0 ? $qtdProd / ($segAnalise / 3600) : null;
                       $pctProdutivo = ($segProd + $segPausa) > 0 ? round(($segProd / ($segProd + $segPausa)) * 100) : null;
                       $pctClass = $pctProdutivo === null ? 'warn' : ($pctProdutivo >= 85 ? 'ok' : ($pctProdutivo >= 60 ? 'warn' : 'danger'));
                   ?>
                     <tr class="pf-row" data-fu="<?= pfEscape($row['fu_codigo']) ?>" data-nome="<?= pfEscape($row['fu_nome']) ?>">
-                      <td class="pf-name"><?= pfEscape($row['fu_nome']) ?> <span class="td-muted">(<?= pfEscape($row['fu_codigo']) ?>)</span></td>
+                      <td class="pf-name"><?= pfEscape($row['fu_nome']) ?> <span class="td-muted">(<?= pfEscape($row['fu_codigo']) ?>)</span>
+                        <?php if ($row['etapas'] !== ''): ?><div class="td-muted" style="font-size:11.5px;"><?= pfEscape($row['etapas']) ?></div><?php endif; ?></td>
                       <td class="td-right"><?= number_format((int) $row['qtd_apontamentos'], 0, ',', '.') ?></td>
                       <td class="td-right"><?= number_format((int) $row['qtd_ops'], 0, ',', '.') ?></td>
                       <td class="td-right"><?= number_format((int) $row['qtd_maquinas'], 0, ',', '.') ?></td>
-                      <td class="td-right"><?= number_format($qtdProd, 0, ',', '.') ?></td>
+                      <td class="td-right"><?= $qtdProd > 0 ? number_format($qtdProd, 0, ',', '.') : '<span class="td-muted">—</span>' ?></td>
+                      <td class="td-right"><?php if ($row['outros_txt'] !== ''): ?><?= pfEscape($row['outros_txt']) ?><div class="td-muted" style="font-size:11.5px;"><?= pfEscape($row['outras_etapas']) ?></div><?php else: ?><span class="td-muted">—</span><?php endif; ?></td>
                       <td class="td-right"><?= pfEscape(pfSecondsToHms($segProd)) ?></td>
                       <td class="td-right"><?= pfEscape(pfSecondsToHms($segPausa)) ?></td>
                       <td class="td-right"><?= number_format((int) $row['qtd_pausas'], 0, ',', '.') ?></td>
@@ -917,13 +938,14 @@ $jsSimplesHoje = pfJz(['ranking' => $simplesRankingHoje, 'totais' => $simplesTot
                   <th>Status</th>
                   <th>Código</th>
                   <th>Operador</th>
+                  <th>Etapa</th>
                   <th>Centro de Trabalho</th>
                   <th>Cód. OP</th>
                   <th>Cliente</th>
                   <th>Produto</th>
                   <th>Início</th>
                   <th>Fim</th>
-                  <th class="td-right">Bags Produzidos</th>
+                  <th class="td-right">Produzido</th>
                   <th class="td-right">T. Produtivo</th>
                   <th class="td-right">T. Pausado</th>
                   <th class="td-right">Pausas</th>
@@ -932,7 +954,7 @@ $jsSimplesHoje = pfJz(['ranking' => $simplesRankingHoje, 'totais' => $simplesTot
               <tbody>
                 <?php if (!$apontamentos): ?>
                   <tr>
-                    <td colspan="13">
+                    <td colspan="14">
                       <div class="td-muted" style="padding:24px;text-align:center;">Nenhum apontamento encontrado com os filtros informados.</div>
                     </td>
                   </tr>
@@ -944,13 +966,14 @@ $jsSimplesHoje = pfJz(['ranking' => $simplesRankingHoje, 'totais' => $simplesTot
                       <td><span class="status-pill <?= $stClass ?>"><?= pfEscape($stLabel) ?></span></td>
                       <td class="td-muted"><?= pfEscape($row['oiap_codigo'] ?? '—') ?></td>
                       <td><?= pfEscape($row['fu_nome'] ?? '—') ?></td>
+                      <td><?= pfEscape(prodEtapaNome($row['etapa'] ?? '') ?: '—') ?></td>
                       <td><?= pfEscape($row['ct_descricao'] ?? '—') ?></td>
                       <td class="td-muted"><?= pfEscape($row['prod_codigo'] ?? '—') ?></td>
                       <td><?= pfEscape($row['cli_nome'] ?? '—') ?></td>
                       <td><?= pfEscape($row['pro_descricao'] ?? '—') ?></td>
                       <td class="td-nowrap"><?= pfEscape(pfFmtDateTime($row['oiap_data_hora_inicio'] ?? '')) ?></td>
                       <td class="td-nowrap"><?= pfEscape(pfFmtDateTime($row['oiap_data_hora_fim'] ?? '')) ?></td>
-                      <td class="td-right"><?= number_format((float) ($row['oiap_qtd_produzida'] ?? 0), 0, ',', '.') ?></td>
+                      <td class="td-right"><?= number_format((float) ($row['oiap_qtd_produzida'] ?? 0), 0, ',', '.') ?> <span class="td-muted"><?= (int) ($row['grp_codigo'] ?? 0) === PROD_GRP_SACARIA ? 'sacarias' : 'bags' ?></span></td>
                       <td class="td-right"><?= pfEscape(pfSecondsToHms((float) ($row['seg_produtivo'] ?? 0))) ?></td>
                       <td class="td-right"><?= pfEscape(pfSecondsToHms((float) ($row['seg_pausado'] ?? 0))) ?></td>
                       <td class="td-right"><?= number_format((int) ($row['qtd_pausas'] ?? 0), 0, ',', '.') ?></td>
@@ -1148,7 +1171,7 @@ function pfRenderSimples(data) {
     <div class="pf-simples-kpis">
       <div class="pf-simples-kpi">
         <div class="pf-simples-kpi-val">${Number(t.qtd_produzida || 0).toLocaleString('pt-BR')}</div>
-        <div class="pf-simples-kpi-lbl">Bags Produzidos</div>
+        <div class="pf-simples-kpi-lbl">Bags Produzidos (analisados)</div>
       </div>
       <div class="pf-simples-kpi">
         <div class="pf-simples-kpi-val">${Number(t.media_geral_hora || 0).toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</div>
@@ -1166,17 +1189,18 @@ function pfRenderSimples(data) {
     return;
   }
 
-  const maiorQtd = Math.max(...ranking.map(r => Number(r.qtd_produzida || 0)), 1);
+  // Barra relativa a quem mais analisou
+  const maiorQtd = Math.max(1, ...ranking.map(r => Number(r.qtd_produzida || 0)));
   const cardsHtml = ranking.map(r => {
     const qtd = Number(r.qtd_produzida || 0);
-    const segProd = Number(r.seg_produtivo || 0);
+    const segProd = Number(r.seg_produzido || 0);
     const mediaHora = segProd > 0 ? (qtd / (segProd / 3600)) : null;
     const pct = Math.round((qtd / maiorQtd) * 100);
     return `
       <div class="pf-simples-card">
         <div class="pf-simples-card-name">${pfEsc(r.fu_nome)}</div>
         <div class="pf-simples-card-qtd">${qtd.toLocaleString('pt-BR')}</div>
-        <div class="pf-simples-card-lbl">Bags produzidos</div>
+        <div class="pf-simples-card-lbl">bags analisados${r.outros_txt ? ' · ' + pfEsc(r.outros_txt) + ' em ' + pfEsc(r.outras_etapas) : ''}</div>
         <div class="pf-simples-bar-bg"><div class="pf-simples-bar-fill" style="width:${pct}%"></div></div>
         <div class="pf-simples-card-foot">
           <span>Média/h: <b>${mediaHora === null ? '—' : mediaHora.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</b></span>
@@ -1267,7 +1291,7 @@ function pfBarChart(canvasId, bodyId, dataObj, label) {
     const labels = dias.map(d => { const p = d.split('-'); return p[2] + '/' + p[1]; });
     new Chart(document.getElementById('chartPorDia'), {
       type: 'line',
-      data: { labels, datasets: [{ label: 'Qtd. produzida', data: valores,
+      data: { labels, datasets: [{ label: 'Bags analisados', data: valores,
         backgroundColor: 'rgba(45,106,255,.15)', borderColor: '#2d6aff', borderWidth: 2,
         fill: true, tension: 0.35, pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: '#2d6aff' }] },
       options: {
@@ -1348,18 +1372,21 @@ function abrirDetalheFuncionario(fuCodigo, nome) {
       }
       const totalQtd = dias.reduce((a, d) => a + Number(d.qtd_produzida || 0), 0);
       const totalProd = dias.reduce((a, d) => a + Number(d.seg_produtivo || 0), 0);
+      const totalAnalise = dias.reduce((a, d) => a + Number(d.seg_produzido || 0), 0);
       const totalPausa = dias.reduce((a, d) => a + Number(d.seg_pausado || 0), 0);
       const totalApont = dias.reduce((a, d) => a + Number(d.qtd_apontamentos || 0), 0);
-      const mediaHora = totalProd > 0 ? (totalQtd / (totalProd / 3600)) : 0;
+      const mediaHora = totalAnalise > 0 ? (totalQtd / (totalAnalise / 3600)) : 0;
 
       const linhas = dias.map(d => {
         const segP = Number(d.seg_produtivo || 0);
+        const segA = Number(d.seg_produzido || 0);
         const qtd = Number(d.qtd_produzida || 0);
-        const mh = segP > 0 ? (qtd / (segP / 3600)) : null;
+        const mh = segA > 0 ? (qtd / (segA / 3600)) : null;
         return `<tr>
           <td>${pfFmtDate(d.dia)}</td>
           <td class="td-right">${Number(d.qtd_apontamentos || 0).toLocaleString('pt-BR')}</td>
           <td class="td-right">${qtd.toLocaleString('pt-BR')}</td>
+          <td class="td-right">${d.outros_txt ? pfEsc(d.outros_txt) : '—'}</td>
           <td class="td-right">${pfSecondsToHms(segP)}</td>
           <td class="td-right">${mh === null ? '—' : mh.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</td>
         </tr>`;
@@ -1367,8 +1394,8 @@ function abrirDetalheFuncionario(fuCodigo, nome) {
 
       document.getElementById('pfDrawerBody').innerHTML = `
         <div class="pf-mini-kpis">
-          <div class="pf-mini-kpi"><div class="pf-mini-kpi-val">${totalQtd.toLocaleString('pt-BR')}</div><div class="pf-mini-kpi-lbl">Bags Produzidos</div></div>
-          <div class="pf-mini-kpi"><div class="pf-mini-kpi-val">${mediaHora.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</div><div class="pf-mini-kpi-lbl">Média / Hora</div></div>
+          <div class="pf-mini-kpi"><div class="pf-mini-kpi-val">${totalQtd.toLocaleString('pt-BR')}</div><div class="pf-mini-kpi-lbl">Bags analisados</div></div>
+          <div class="pf-mini-kpi"><div class="pf-mini-kpi-val">${mediaHora.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</div><div class="pf-mini-kpi-lbl">Analisados / Hora</div></div>
           <div class="pf-mini-kpi"><div class="pf-mini-kpi-val">${pfSecondsToHms(totalProd)}</div><div class="pf-mini-kpi-lbl">Tempo Produtivo</div></div>
           <div class="pf-mini-kpi"><div class="pf-mini-kpi-val">${pfSecondsToHms(totalPausa)}</div><div class="pf-mini-kpi-lbl">Tempo Pausado</div></div>
         </div>
@@ -1376,7 +1403,7 @@ function abrirDetalheFuncionario(fuCodigo, nome) {
           <div class="pf-field-group-title">Detalhamento Diário (${dias.length} dia${dias.length !== 1 ? 's' : ''}, ${totalApont} apontamento${totalApont !== 1 ? 's' : ''})</div>
           <div style="overflow-x:auto;">
             <table class="pf-day-table">
-              <thead><tr><th>Dia</th><th class="td-right">Apont.</th><th class="td-right">Qtd.</th><th class="td-right">T. Produtivo</th><th class="td-right">Média/h</th></tr></thead>
+              <thead><tr><th>Dia</th><th class="td-right">Apont.</th><th class="td-right">Analisados</th><th class="td-right">Outras etapas</th><th class="td-right">T. Produtivo</th><th class="td-right">Analisados/h</th></tr></thead>
               <tbody>${linhas}</tbody>
             </table>
           </div>

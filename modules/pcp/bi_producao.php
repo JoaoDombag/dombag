@@ -40,26 +40,34 @@ function biSaveMeta(PDO $pdo, float $valor): void
     $stmt->execute([':k' => BI_META_CHAVE, ':v' => (string) $valor]);
 }
 
-// ── OPs ativas: total de bags (qtd. do pedido) x quantidade lida (produzida) ──
+// ── OPs ativas: total do pedido x peças prontas (etapa final do tipo) ────────
+//  ETAPAS = etapas com apontamento aberto agora; UNIDADE = bags ou sacarias.
 function biFetchOpsAtivas($pg): array
 {
     $sql = "
         WITH OPS_ATIVAS AS (
-            SELECT DISTINCT IAA.PROD_CODIGO, IAA.PRO_CODIGO, IAA.CLI_CODIGO
+            SELECT IAA.PROD_CODIGO, IAA.PRO_CODIGO, MIN(IAA.CLI_CODIGO) AS CLI_CODIGO,
+                   STRING_AGG(DISTINCT TRIM(ATP.ATP_DESCRICAO), '|') AS ETAPAS
               FROM OP_ITENS_ATIVIDADES_APONTADAS IAA
+              LEFT JOIN ATIVIDADE_PRODUCAO ATP ON ATP.ATP_CODIGO = IAA.ATP_CODIGO
              WHERE NOT IAA.OIAP_EXCLUIDO
+               AND TRIM(IAA.OIAP_STATUS) <> 'C'
                AND IAA.OIAP_DATA_HORA_FIM IS NULL
+             GROUP BY IAA.PROD_CODIGO, IAA.PRO_CODIGO
         )
         SELECT OA.PROD_CODIGO
               ,OA.PRO_CODIGO
               ,P.PRO_DESCRICAO
               ,C.CLI_NOME
+              ,OA.ETAPAS
+              ," . prodTipoGrupoSql('P') . " AS TIPO
               ,VOP.QTD_PEDIDO AS OP_QTD_PEDIDO
               ,COALESCE((
                   SELECT SUM(IAA2.OIAP_QTD_PRODUZIDA)
                     FROM OP_ITENS_ATIVIDADES_APONTADAS IAA2
                    WHERE IAA2.PROD_CODIGO = OA.PROD_CODIGO
                      AND IAA2.PRO_CODIGO  = OA.PRO_CODIGO
+                     AND " . prodProntoSql('IAA2') . "
                      AND NOT IAA2.OIAP_EXCLUIDO
                      AND TRIM(IAA2.OIAP_STATUS) <> 'C'
               ), 0) AS OP_QTD_PRODUZIDA_TOTAL
@@ -75,10 +83,18 @@ function biFetchOpsAtivas($pg): array
     }
     $rows = pg_fetch_all($res) ?: [];
     pg_free_result($res);
+    foreach ($rows as &$r) {
+        $r['unidade'] = prodUnidade($r['tipo'] ?? null);
+        $r['etapas']  = implode(', ', array_map('prodEtapaNome', explode('|', (string) ($r['etapas'] ?? ''))));
+    }
+    unset($r);
     return $rows;
 }
 
-// ── Produção válida (não cancelada) do mês/ano informado ─────────────────────
+// Filtro dos apontamentos de bag pronto (Análise): base da meta e do ritmo
+const BI_BAG_PRONTO = 'ATP_CODIGO = ' . PROD_ATP_BAG_PRONTO;
+
+// ── Bags prontos (não cancelados) do mês/ano informado ───────────────────────
 function biFetchProducaoMes($pg, int $ano, int $mes): float
 {
     $sql = "
@@ -86,6 +102,7 @@ function biFetchProducaoMes($pg, int $ano, int $mes): float
           FROM OP_ITENS_ATIVIDADES_APONTADAS
          WHERE NOT OIAP_EXCLUIDO
            AND TRIM(OIAP_STATUS) <> 'C'
+           AND " . BI_BAG_PRONTO . "
            AND EXTRACT(YEAR FROM OIAP_DATA_HORA_INICIO) = $1
            AND EXTRACT(MONTH FROM OIAP_DATA_HORA_INICIO) = $2
     ";
@@ -98,7 +115,8 @@ function biFetchProducaoMes($pg, int $ano, int $mes): float
     return (float) ($row['qtd'] ?? 0);
 }
 
-// ── Total produzido (não cancelado) por mês, no ano informado ────────────────
+
+// ── Bags prontos (não cancelados) por mês, no ano informado ──────────────────
 function biFetchMonthly($pg, int $ano): array
 {
     $sql = "
@@ -107,6 +125,7 @@ function biFetchMonthly($pg, int $ano): array
           FROM OP_ITENS_ATIVIDADES_APONTADAS
          WHERE NOT OIAP_EXCLUIDO
            AND TRIM(OIAP_STATUS) <> 'C'
+           AND " . BI_BAG_PRONTO . "
            AND EXTRACT(YEAR FROM OIAP_DATA_HORA_INICIO) = $1
          GROUP BY MES
     ";
@@ -122,7 +141,8 @@ function biFetchMonthly($pg, int $ano): array
     return $porMes;
 }
 
-// ── Horas produtivas no mês/ano informado (para calcular o ritmo bags/hora) ──
+// ── Horas produtivas da Análise no mês/ano (para o ritmo bags/hora) ──────────
+//  Só a etapa que conta o bag pronto: horas de outras etapas inflariam o divisor.
 function biFetchHorasProdutivasMes($pg, int $ano, int $mes): float
 {
     $sql = "
@@ -130,6 +150,7 @@ function biFetchHorasProdutivasMes($pg, int $ano, int $mes): float
             SELECT OIAP_CODIGO
               FROM OP_ITENS_ATIVIDADES_APONTADAS
              WHERE NOT OIAP_EXCLUIDO
+               AND " . BI_BAG_PRONTO . "
                AND EXTRACT(YEAR FROM OIAP_DATA_HORA_INICIO) = $1
                AND EXTRACT(MONTH FROM OIAP_DATA_HORA_INICIO) = $2
         )
@@ -158,7 +179,10 @@ function biFetchIndicadoresHoje($pg): array
 
     $sql = "
         WITH APONT AS (
-            SELECT OIAP_CODIGO, FU_CODIGO, OIAP_QTD_PRODUZIDA
+            SELECT OIAP_CODIGO, FU_CODIGO,
+                   -- Só a Análise conta bag pronto; as outras etapas contam pessoas e horas
+                   CASE WHEN " . BI_BAG_PRONTO . " THEN OIAP_QTD_PRODUZIDA ELSE 0 END AS OIAP_QTD_PRODUZIDA,
+                   (" . BI_BAG_PRONTO . ") AS PRONTO
               FROM OP_ITENS_ATIVIDADES_APONTADAS
              WHERE NOT OIAP_EXCLUIDO
                AND TRIM(OIAP_STATUS) <> 'C'
@@ -182,6 +206,7 @@ function biFetchIndicadoresHoje($pg): array
               ,COUNT(DISTINCT A.OIAP_CODIGO)                      AS APONTAMENTOS
               ,COALESCE(SUM(A.OIAP_QTD_PRODUZIDA), 0)             AS QTD_PRODUZIDA
               ,COALESCE(SUM(EXTRACT(EPOCH FROM T.PRODUTIVO)), 0)  AS SEG_PRODUTIVO
+              ,COALESCE(SUM(EXTRACT(EPOCH FROM T.PRODUTIVO)) FILTER (WHERE A.PRONTO), 0) AS SEG_PRODUTIVO_BAG
               ,COALESCE(SUM(EXTRACT(EPOCH FROM T.PAUSADO)), 0)    AS SEG_PAUSADO
               ,COALESCE(SUM(T.PAUSAS), 0)                         AS QTD_PAUSAS
           FROM APONT A
@@ -198,6 +223,7 @@ function biFetchIndicadoresHoje($pg): array
     }
 
     $segProdutivo = (float) ($row['seg_produtivo'] ?? 0);
+    $segBag       = (float) ($row['seg_produtivo_bag'] ?? 0);
     $qtdProduzida = (float) ($row['qtd_produzida'] ?? 0);
 
     return [
@@ -207,9 +233,11 @@ function biFetchIndicadoresHoje($pg): array
         'seg_produtivo'  => $segProdutivo,
         'seg_pausado'    => (float) ($row['seg_pausado'] ?? 0),
         'pausas'         => (int) ($row['qtd_pausas'] ?? 0),
-        'media_hora'     => $segProdutivo > 0 ? $qtdProduzida / ($segProdutivo / 3600) : 0.0,
+        // Ritmo só da Análise: bags prontos por hora produtiva de quem analisa
+        'media_hora'     => $segBag > 0 ? $qtdProduzida / ($segBag / 3600) : 0.0,
     ];
 }
+
 
 function biBuildPayload($pg, PDO $pdo): array
 {
@@ -607,12 +635,12 @@ if (!$pg) {
             <div class="biz-kpi-mini k-teal">
               <div class="biz-kpi-mini-label">Bags Produzidos</div>
               <div class="biz-kpi-mini-value" id="biKpiQtdProduzida">0</div>
-              <div class="biz-kpi-mini-foot">total no dia</div>
+              <div class="biz-kpi-mini-foot">analisados no dia</div>
             </div>
             <div class="biz-kpi-mini k-blue">
-              <div class="biz-kpi-mini-label">Média/Hora (geral)</div>
+              <div class="biz-kpi-mini-label">Bags / Hora</div>
               <div class="biz-kpi-mini-value" id="biKpiMediaHora">0</div>
-              <div class="biz-kpi-mini-foot">unid. / hora produtiva</div>
+              <div class="biz-kpi-mini-foot">por hora produtiva na Análise</div>
             </div>
             <div class="biz-kpi-mini k-amber">
               <div class="biz-kpi-mini-label">Horas Produtivas</div>
@@ -637,10 +665,10 @@ if (!$pg) {
 
         <div class="biz-toprow" id="biToprow">
 
-          <!-- OPs ativas: total de bags x quantos lidos -->
+          <!-- OPs ativas: total do pedido x peças prontas -->
           <div class="biz-card" data-widget="ops_ativas">
             <div class="biz-card-head">
-              <h2>OPs Ativas — Bags Lidos</h2>
+              <h2>OPs Ativas — Peças Prontas</h2>
               <span class="biz-count-badge" id="biOpsCount">0</span>
             </div>
             <div class="biz-ops-list" id="biOpsList"></div>
@@ -672,7 +700,7 @@ if (!$pg) {
         <!-- Produção individual de hoje: quem já produziu, e o total da equipe x meta total (BI Individual) -->
         <div class="biz-card" data-widget="individual">
           <div class="biz-card-head">
-            <h2>Bags por Pessoa Hoje <span class="biz-ind-meta" id="biIndMetaTxt"></span></h2>
+            <h2>Bags Produzidos por Pessoa Hoje <span class="biz-ind-meta" id="biIndMetaTxt"></span></h2>
             <span class="biz-count-badge" id="biIndCount">0</span>
           </div>
           <div class="biz-ind-grid" id="biIndGrid"></div>
@@ -792,7 +820,7 @@ function biOpsCols(n) {
   return n <= 0 ? 1 : Math.ceil(n / 3);
 }
 
-// ── OPs ativas: barra de progresso (bags lidos x total do pedido) ────────────
+// ── OPs ativas: barra de progresso (peças prontas x total do pedido) ─────────
 function biRenderOps(ops) {
   document.getElementById('biOpsCount').textContent = ops.length;
   const el = document.getElementById('biOpsList');
@@ -818,7 +846,7 @@ function biRenderOps(ops) {
           <div class="biz-op-pct${over ? ' over' : ''}">${temPedido ? pct + '%' : '—'}</div>
         </div>
         <div class="biz-op-bar"><div class="biz-op-fill${over ? ' over' : ''}" style="width:${fillPct}%"></div></div>
-        <div class="biz-op-nums">Bags lidos: <strong>${produzido.toLocaleString('pt-BR')}</strong> / Total: <strong>${temPedido ? pedido.toLocaleString('pt-BR') : '—'}</strong></div>
+        <div class="biz-op-nums">Prontos: <strong>${produzido.toLocaleString('pt-BR')}</strong> / Total: <strong>${temPedido ? pedido.toLocaleString('pt-BR') : '—'}</strong> ${biEsc(op.unidade || '')}${op.etapas ? ' · Agora: ' + biEsc(op.etapas) : ''}</div>
       </div>
     `;
   }).join('');
@@ -827,19 +855,24 @@ function biRenderOps(ops) {
 // ── Produção individual de hoje: barra de cada pessoa + O.P ativa ──────────
 // A meta é TOTAL da equipe (definida no BI Individual): o cabeçalho mostra o
 // total x meta; a barra de cada pessoa é proporcional a quem mais produziu.
-function biRenderIndividual(funcs, meta) {
-  const total = funcs.reduce((s, f) => s + Number(f.qtd_produzida || 0), 0);
+function biRenderIndividual(todos, meta) {
+  // Produzido = só bags analisados: aparece quem analisou hoje, com a
+  // quantidade da Análise. As outras atividades ficam no BI Individual.
+  const funcs = todos
+    .filter(f => Number(f.bag_pronto || 0) > 0)
+    .sort((a, b) => Number(b.bag_pronto) - Number(a.bag_pronto));
+  const total = funcs.reduce((s, f) => s + Number(f.bag_pronto || 0), 0);
   document.getElementById('biIndCount').textContent = funcs.length;
   document.getElementById('biIndMetaTxt').textContent = '· total ' + biFmt(total, 0)
     + (meta > 0 ? ' de ' + biFmt(meta, 0) + ' (' + biFmt((total / meta) * 100, 0) + '%)' : '');
   const el = document.getElementById('biIndGrid');
   if (!funcs.length) {
-    el.innerHTML = '<div class="biz-empty-msg">Ninguém produziu hoje ainda.</div>';
+    el.innerHTML = '<div class="biz-empty-msg">Nenhum bag analisado hoje ainda.</div>';
     return;
   }
-  const maior = Math.max(...funcs.map(f => Number(f.qtd_produzida || 0)), 1);
+  const maior = Math.max(1, ...funcs.map(f => Number(f.bag_pronto || 0)));
   el.innerHTML = funcs.map(f => {
-    const qtd = Number(f.qtd_produzida || 0);
+    const qtd = Number(f.bag_pronto || 0);
     const part = total > 0 ? (qtd / total) * 100 : 0;
     const ativa = (f.ops_detalhe || []).find(o => o.em_producao);
     const op = ativa
@@ -857,7 +890,6 @@ function biRenderIndividual(funcs, meta) {
     `;
   }).join('');
 }
-
 function biRenderIndicadores(ind) {
   ind = ind || {};
   document.getElementById('biKpiFuncionarios').textContent = biFmt(ind.funcionarios, 0);
@@ -1112,9 +1144,9 @@ document.getElementById('biFsExit').addEventListener('click', () => {
 // ── Personalizar Painel: escolher quais widgets aparecem (salvo no navegador) ──
 const BI_WIDGET_CATALOG = [
   { id: 'indicadores',    label: 'Indicadores do Dia',             default: true },
-  { id: 'ops_ativas',     label: 'OPs Ativas — Bags Lidos',        default: true },
-  { id: 'meta_mes',       label: 'Bags do Mês x Meta',             default: true },
-  { id: 'individual',     label: 'Bags por Pessoa Hoje',           default: true },
+  { id: 'ops_ativas',     label: 'OPs Ativas — Peças Prontas',     default: true },
+  { id: 'meta_mes',       label: 'Bags Produzidos no Mês x Meta',  default: true },
+  { id: 'individual',     label: 'Bags Produzidos por Pessoa Hoje', default: true },
   { id: 'grafico_mensal', label: 'Gráfico Mensal (linha)',         default: false },
 ];
 const BI_WIDGET_STORAGE_KEY = 'bi_widget_config';

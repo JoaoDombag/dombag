@@ -84,40 +84,46 @@ function agTvCard(array $c, string $hoje): array
     ];
 }
 
-// OPs de bag com apontamento aberto agora. Sacaria não tem apontamento.
+// OPs com apontamento aberto agora, em qualquer etapa: [['op' => int, 'tipo' => BAG|SACARIA], ...]
 function agTvOpsAtivas($pg): array
 {
-    return array_map('intval', array_column(agPgAll($pg, "
-        SELECT DISTINCT A.PROD_CODIGO AS op
+    return array_map(static fn ($r) => ['op' => (int) $r['op'], 'tipo' => $r['tipo']], agPgAll($pg, "
+        SELECT DISTINCT A.PROD_CODIGO AS op, " . prodTipoGrupoSql('P') . " AS tipo
           FROM OP_ITENS_ATIVIDADES_APONTADAS A
           JOIN PRODUTO P ON P.PRO_CODIGO = A.PRO_CODIGO
          WHERE NOT A.OIAP_EXCLUIDO
            AND TRIM(A.OIAP_STATUS) <> 'C'
            AND A.OIAP_DATA_HORA_FIM IS NULL
-           AND P.GRP_CODIGO = " . AG_GRP_BAG . "
-    "), 'op'));
+           AND P.GRP_CODIGO IN (" . PROD_GRP_BAG . ', ' . PROD_GRP_SACARIA . ")
+         ORDER BY 1, 2
+    "));
 }
 
-// Marca os cards de hoje das OPs ativas e cria card para a OP ativa que ainda
-// não tem card hoje, como a iniciada ontem ou sem leitura. OP fora de $info é
-// de outra empresa.
+// Marca os cards de hoje das OPs ativas (mesmo tipo) e cria card para a OP
+// ativa que ainda não tem card hoje, como a iniciada ontem ou sem leitura.
+// OP fora de $info é de outra empresa.
 function agTvComAtivas(array $cards, array $ativas, array $info, string $hoje): array
 {
-    $semCard = array_fill_keys($ativas, true);
+    $semCard = [];
+    foreach ($ativas as $a) {
+        $semCard["{$a['op']}|{$a['tipo']}"] = $a;
+    }
     foreach ($cards as &$c) {
-        if ($c['dia'] === $hoje && $c['tipo'] === PROD_TIPO_BAG && isset($semCard[$c['op']])) {
+        $k = "{$c['op']}|{$c['tipo']}";
+        if ($c['dia'] === $hoje && isset($semCard[$k])) {
             $c['agora'] = true;
-            unset($semCard[$c['op']]);
+            unset($semCard[$k]);
         }
     }
     unset($c);
 
-    foreach (array_keys($semCard) as $op) {
+    foreach ($semCard as $a) {
+        $op = $a['op'];
         if (!isset($info[$op])) {
             continue;
         }
         $cards[] = [
-            'dia' => $hoje, 'op' => $op, 'tipo' => PROD_TIPO_BAG,
+            'dia' => $hoje, 'op' => $op, 'tipo' => $a['tipo'],
             'pedido' => $info[$op]['pedido'], 'cliente' => $info[$op]['cliente'],
             'plan' => 0.0, 'real' => 0.0, 'aberto' => 0.0,
             'status' => 'produzido', 'tarde' => false, 'agora' => true,
@@ -308,7 +314,7 @@ function agTvBuscar(PDO $pdo, $pg, string $mes): array
     }
     $d      = agMontar($pdo, $pg, $mes);
     $ativas = agTvOpsAtivas($pg);
-    $d['cards'] = agTvComAtivas($d['cards'], $ativas, agOpsInfo($pg, $ativas), $d['hoje']);
+    $d['cards'] = agTvComAtivas($d['cards'], $ativas, agOpsInfo($pg, array_unique(array_column($ativas, 'op'))), $d['hoje']);
 
     $finalizados = agTvBuscarFinalizados($pdo, $pg, $d['ini'], $d['fim']);
     $info = agOpsInfo($pg, array_column($finalizados, 'op'));

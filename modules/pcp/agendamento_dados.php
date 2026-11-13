@@ -8,11 +8,13 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/producao_tipo.php';
 //  Previsto = PCP_AGENDA (MySQL), um registro por pedido, tipo e dia.
 //  Realizado = AGD_REALIZADO, marcado à mão; vale no dia no lugar do ERP.
 //  Produzido = ERP, somente leitura:
-//    Bag: apontamentos, mesma regra do BI, no dia da leitura.
-//    Sacaria: OP_ITENS_PRODUZIDOS, no dia do lançamento. A fábrica costuma
-//    lançar a OP de uma vez, então a data é a do lançamento, não a da
-//    fabricação. Status 'E' ainda é a quantidade esperada: fica como
-//    "em aberto" e não conta como produzido.
+//    Bag: apontamento da Análise (etapa final), no dia da leitura.
+//    Sacaria: apontamento do Corte. OP sem Corte apontado segue por
+//    OP_ITENS_PRODUZIDOS, no dia do lançamento: a fábrica costuma lançar a
+//    OP de uma vez, então a data é a do lançamento, não a da fabricação.
+//    Status 'E' ainda é a quantidade esperada: fica como "em aberto" e não
+//    conta como produzido. Regra em prodProntaSql (producao_tipo.php).
+//    Apontamento de qualquer outra etapa não soma, mas indica que iniciou.
 //
 //  Dias passados são registro: só hoje e os dias à frente podem mudar. Há
 //  duas exceções: o realizado marca-se em hoje e nos dias passados, e o pedido
@@ -20,7 +22,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/producao_tipo.php';
 //  O que faltou num dia passado volta sozinho para o saldo a agendar.
 // ══════════════════════════════════════════════════════════════════════
 
-const AG_GRP_BAG = 6; // GRUPOS.GRP_CODIGO no ERP
+const AG_GRP_BAG = PROD_GRP_BAG;
 const AG_MARCOS  = ['inicio' => 'DATA_INICIO_PRODUCAO'];
 const AG_TIPO_NOME = [PROD_TIPO_BAG => 'Big Bag', PROD_TIPO_SACARIA => 'Sacaria'];
 
@@ -62,31 +64,10 @@ function agGrade(string $mes): array
     ];
 }
 
-// Produção por dia, OP e tipo. $cond recebe as colunas de data e de OP e devolve o filtro.
+// Produção pronta por dia, OP e tipo: regra única em prodProntaSql.
 function agProducaoSql(callable $cond): string
 {
-    $grpBag = AG_GRP_BAG;
-    $grpSac = PROD_GRP_SACARIA;
-    return "
-        SELECT A.OIAP_DATA_HORA_INICIO::date AS dia, A.PROD_CODIGO AS op, '" . PROD_TIPO_BAG . "' AS tipo,
-               SUM(A.OIAP_QTD_PRODUZIDA) AS qtd, 0 AS aberto
-          FROM OP_ITENS_ATIVIDADES_APONTADAS A
-          JOIN PRODUTO P ON P.PRO_CODIGO = A.PRO_CODIGO
-         WHERE NOT A.OIAP_EXCLUIDO
-           AND TRIM(A.OIAP_STATUS) <> 'C'
-           AND P.GRP_CODIGO = {$grpBag}
-           AND " . $cond('A.OIAP_DATA_HORA_INICIO', 'A.PROD_CODIGO') . "
-         GROUP BY 1, 2
-        UNION ALL
-        SELECT I.OIP_DATA_INICIAL::date, I.PROD_CODIGO, '" . PROD_TIPO_SACARIA . "',
-               COALESCE(SUM(I.OIP_QTD) FILTER (WHERE TRIM(I.OIP_STATUS) = 'F'), 0),
-               COALESCE(SUM(I.OIP_QTD) FILTER (WHERE TRIM(I.OIP_STATUS) = 'E'), 0)
-          FROM OP_ITENS_PRODUZIDOS I
-          JOIN PRODUTO P ON P.PRO_CODIGO = I.PRO_CODIGO
-         WHERE P.GRP_CODIGO = {$grpSac}
-           AND " . $cond('I.OIP_DATA_INICIAL', 'I.PROD_CODIGO') . "
-         GROUP BY 1, 2
-    ";
+    return prodProntaSql($cond);
 }
 
 function agProducaoPeriodo($pg, string $ini, string $fim): array
@@ -312,7 +293,7 @@ function agMontar(PDO $db, $pg, string $mes): array
     $iniciou = [];   // [op][tipo] => produção em qualquer dia, na mesma regra de agNaoIniciou
     foreach ($producaoOps as $r) {
         $realDia[(int) $r['op']][$r['tipo']][$r['dia']] = (float) $r['qtd'];
-        if (!agNaoIniciou(null, (float) $r['qtd'], (float) $r['aberto'])) {
+        if (!agNaoIniciou(null, (float) $r['qtd'], (float) $r['aberto'], (int) ($r['apont'] ?? 0))) {
             $iniciou[(int) $r['op']][$r['tipo']] = true;
         }
     }
@@ -340,7 +321,7 @@ function agMontar(PDO $db, $pg, string $mes): array
             'programado' => $prg !== null,
             'entrega' => $prg['DATA_ENTREGA_ESPERADA'] ?? null,
             'inicio'  => $prg['DATA_INICIO_PRODUCAO'] ?? null,
-            'agd' => 0, 'usuario' => '', 'plan' => 0.0, 'real' => 0.0, 'aberto' => 0.0,
+            'agd' => 0, 'usuario' => '', 'plan' => 0.0, 'real' => 0.0, 'aberto' => 0.0, 'apont' => 0,
             'feito' => null, 'feito_por' => '',
         ];
     };
@@ -362,13 +343,19 @@ function agMontar(PDO $db, $pg, string $mes): array
     }
     foreach ($producaoGrade as $r) {
         $op = (int) $r['op'];
+        $k  = "{$r['dia']}|{$op}|{$r['tipo']}";
         if (!isset($info[$op]) || ((float) $r['qtd'] <= 0 && (float) $r['aberto'] <= 0)) {
-            continue; // outra empresa, ou linha zerada
+            // Outra empresa, ou só etapas intermediárias: não vira card, mas
+            // o dia agendado deixa de ser "não iniciado".
+            if (isset($cards[$k])) {
+                $cards[$k]['apont'] += (int) ($r['apont'] ?? 0);
+            }
+            continue;
         }
         $novoCard($op, $r['tipo'], $r['dia']);
-        $k = "{$r['dia']}|{$op}|{$r['tipo']}";
-        $cards[$k]['real']   = (float) $r['qtd'];
-        $cards[$k]['aberto'] = (float) $r['aberto'];
+        $cards[$k]['real']   += (float) $r['qtd'];
+        $cards[$k]['aberto'] += (float) $r['aberto'];
+        $cards[$k]['apont']  += (int) ($r['apont'] ?? 0);
     }
 
     foreach ($cards as &$c) {
@@ -384,7 +371,7 @@ function agMontar(PDO $db, $pg, string $mes): array
         };
         $c['editavel'] = $temPlano && $c['dia'] >= $hoje;
         $c['movel']    = $c['editavel'] || ($pg && $temPlano && empty($prgFinalizado[$c['prg']])
-            && agNaoIniciou($c['feito'], $c['erp'], $c['aberto']));
+            && agNaoIniciou($c['feito'], $c['erp'], $c['aberto'], $c['apont']));
         $c['tarde']    = $temPlano && $c['status'] !== 'cumprido' && $c['entrega'] && $c['dia'] > $c['entrega'];
     }
     unset($c);
@@ -595,10 +582,11 @@ function agMarcoDetalhe(?string $tipo, ?bool $iniciada): string
     return $tipo === null ? '' : AG_TIPO_NOME[$tipo] . ' · ' . ($iniciada ? 'Iniciada' : 'Não iniciada');
 }
 
-// Sem produção marcada, confirmada ou em aberto. Realizado zero é "nada produzido".
-function agNaoIniciou(?float $feito, float $erp, float $aberto): bool
+// Sem produção marcada, confirmada, em aberto ou apontada em qualquer etapa.
+// Realizado zero é "nada produzido".
+function agNaoIniciou(?float $feito, float $erp, float $aberto, int $apont = 0): bool
 {
-    return ($feito ?? 0.0) <= 0 && $erp <= 0 && $aberto <= 0;
+    return ($feito ?? 0.0) <= 0 && $erp <= 0 && $aberto <= 0 && $apont <= 0;
 }
 
 function agExigirNaoIniciado($pg, array $slot): void
@@ -612,7 +600,7 @@ function agExigirNaoIniciado($pg, array $slot): void
     }
     foreach (agProducaoOps($pg, [(int) $slot['PROD_CODIGO']]) as $r) {
         if ($r['dia'] === $slot['AGD_DATA'] && $r['tipo'] === $slot['AGD_TIPO']
-            && !agNaoIniciou(null, (float) $r['qtd'], (float) $r['aberto'])) {
+            && !agNaoIniciou(null, (float) $r['qtd'], (float) $r['aberto'], (int) ($r['apont'] ?? 0))) {
             throw new RuntimeException($erro);
         }
     }

@@ -1,10 +1,11 @@
 <?php
 declare(strict_types=1);
+require_once dirname(__DIR__) . '/pcp/producao_tipo.php';
 
 // ══════════════════════════════════════════════════════════════════════
 //  DOMBAG — Dados do Dashboard (ERP Yzidro, somente leitura)
-//  Produção = apontamentos (OP_ITENS_ATIVIDADES_APONTADAS), mesma regra do
-//  BI da Produção. Saída = VENDAS finalizadas (DATA_FINALIZA), mesma regra
+//  Produção = peça pronta (prodProntaSql em producao_tipo.php), mesma regra
+//  do BI da Produção e do Agendamento. Saída = VENDAS finalizadas (DATA_FINALIZA), mesma regra
 //  do relatório Histórico de Faturamento (EST 14, modelos de venda reais).
 // ══════════════════════════════════════════════════════════════════════
 
@@ -25,30 +26,35 @@ function dashPgAll($pg, string $sql, array $params = []): array
     return $rows;
 }
 
-// ── Produção por dia (últimos N dias, só dias com apontamento) ───────────
-function dashProducaoPorDia($pg, int $dias = 14): array
+// ── Produção pronta por dia e tipo, desde uma data ───────────────────────
+//  Regra de peça pronta em prodProntaSql: bag na Análise, sacaria no Corte
+//  (ou no fechamento da OP enquanto não houver Corte apontado).
+//  Devolve [dia => ['BAG' => x, 'SACARIA' => y]].
+function dashProntoPorDia($pg, string $desde): array
 {
     $rows = dashPgAll($pg, "
-        SELECT OIAP_DATA_HORA_INICIO::date AS dia, COALESCE(SUM(OIAP_QTD_PRODUZIDA), 0) AS qtd
-          FROM OP_ITENS_ATIVIDADES_APONTADAS
-         WHERE NOT OIAP_EXCLUIDO
-           AND TRIM(OIAP_STATUS) <> 'C'
-           AND OIAP_DATA_HORA_INICIO >= CURRENT_DATE - $1::int
-         GROUP BY 1
-    ", [$dias - 1]);
-    return array_column(array_map(fn ($r) => [$r['dia'], (float) $r['qtd']], $rows), 1, 0);
+        SELECT dia, tipo, SUM(qtd) AS qtd
+          FROM (" . prodProntaSql(fn (string $data) => "{$data} >= \$1::date") . ") X
+         WHERE tipo IS NOT NULL
+         GROUP BY 1, 2
+    ", [$desde]);
+    $dias = [];
+    foreach ($rows as $r) {
+        $dias[$r['dia']][$r['tipo']] = (float) $r['qtd'];
+    }
+    return $dias;
 }
 
-function dashProducaoMes($pg): float
+// Soma um tipo de dashProntoPorDia a partir de uma data
+function dashSomaPronto(array $dias, string $tipo, string $desde): float
 {
-    $r = dashPgAll($pg, "
-        SELECT COALESCE(SUM(OIAP_QTD_PRODUZIDA), 0) AS qtd
-          FROM OP_ITENS_ATIVIDADES_APONTADAS
-         WHERE NOT OIAP_EXCLUIDO
-           AND TRIM(OIAP_STATUS) <> 'C'
-           AND OIAP_DATA_HORA_INICIO >= DATE_TRUNC('month', CURRENT_DATE)
-    ");
-    return (float) ($r[0]['qtd'] ?? 0);
+    $t = 0.0;
+    foreach ($dias as $d => $q) {
+        if ($d >= $desde) {
+            $t += $q[$tipo] ?? 0.0;
+        }
+    }
+    return $t;
 }
 
 // ── Quem/qual OP está produzindo agora (apontamento em aberto) ───────────
@@ -64,26 +70,31 @@ function dashProduzindoAgora($pg): array
     return ['funcionarios' => (int) ($r[0]['funcionarios'] ?? 0), 'ops' => (int) ($r[0]['ops'] ?? 0)];
 }
 
-// ── OPs em produção agora: lido x total do pedido (mesma base do BI) ─────
+// ── OPs em produção agora: pronto x total do pedido (mesma base do BI) ───
+//  "lido" conta só a etapa final do tipo; "etapas" diz o que está aberto.
 function dashOpsAtivas($pg): array
 {
     $rows = dashPgAll($pg, "
         WITH OA AS (
             SELECT IAA.PROD_CODIGO, IAA.PRO_CODIGO, MIN(IAA.CLI_CODIGO) AS CLI_CODIGO,
-                   COUNT(DISTINCT IAA.FU_CODIGO) AS FUNCS
+                   COUNT(DISTINCT IAA.FU_CODIGO) AS FUNCS,
+                   STRING_AGG(DISTINCT TRIM(ATP.ATP_DESCRICAO), '|') AS ETAPAS
               FROM OP_ITENS_ATIVIDADES_APONTADAS IAA
+              LEFT JOIN ATIVIDADE_PRODUCAO ATP ON ATP.ATP_CODIGO = IAA.ATP_CODIGO
              WHERE NOT IAA.OIAP_EXCLUIDO
                AND TRIM(IAA.OIAP_STATUS) <> 'C'
                AND IAA.OIAP_DATA_HORA_FIM IS NULL
              GROUP BY IAA.PROD_CODIGO, IAA.PRO_CODIGO
         )
-        SELECT OA.PROD_CODIGO AS op, OA.FUNCS AS funcs,
+        SELECT OA.PROD_CODIGO AS op, OA.FUNCS AS funcs, OA.ETAPAS AS etapas,
                COALESCE(P.PRO_DESCRICAO, '') AS produto,
+               " . prodTipoGrupoSql('P') . " AS tipo,
                COALESCE(NULLIF(TRIM(C.CLI_NOME_FANTASIA), ''), C.CLI_NOME, '') AS cliente,
                COALESCE(VOP.QTD_PEDIDO, 0) AS pedido,
                COALESCE((SELECT SUM(I2.OIAP_QTD_PRODUZIDA)
                            FROM OP_ITENS_ATIVIDADES_APONTADAS I2
                           WHERE I2.PROD_CODIGO = OA.PROD_CODIGO AND I2.PRO_CODIGO = OA.PRO_CODIGO
+                            AND " . prodProntoSql('I2') . "
                             AND NOT I2.OIAP_EXCLUIDO AND TRIM(I2.OIAP_STATUS) <> 'C'), 0) AS lido
           FROM OA
           LEFT JOIN PRODUTO           P   ON P.PRO_CODIGO     = OA.PRO_CODIGO
@@ -95,6 +106,9 @@ function dashOpsAtivas($pg): array
         'op'      => (int) $r['op'],
         'funcs'   => (int) $r['funcs'],
         'produto' => $r['produto'],
+        'tipo'    => $r['tipo'],
+        'unidade' => prodUnidade($r['tipo']),
+        'etapas'  => implode(', ', array_map('prodEtapaNome', explode('|', (string) $r['etapas']))),
         'cliente' => $r['cliente'],
         'pedido'  => (float) $r['pedido'],
         'lido'    => (float) $r['lido'],

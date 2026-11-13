@@ -15,7 +15,7 @@ const DASH_WIDGETS_PREFIXO = 'dashboard_widgets_v2_';
 const DASH_WIDGETS = [
     'kpi_producao' => [
         'label' => 'KPIs — Produção',
-        'desc'  => 'Bags produzidos hoje (vs. dia anterior), bags do mês x meta e quem está produzindo agora',
+        'desc'  => 'Bags produzidos (analisados) hoje vs. dia anterior, bags do mês x meta e quem está produzindo agora',
         'icon'  => '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
         'pagina' => '/pcp/bi', 'menu' => 'producao',
     ],

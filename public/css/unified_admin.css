@@ -346,7 +346,7 @@ tbody tr:hover td { background:rgba(255,255,255,.025); }
 .status-pill {
   display:inline-flex; align-items:center; gap:5px;
   padding:3px 10px; border-radius:20px;
-  font-size:11.5px; font-weight:600;
+  font-size:11.5px; font-weight:600; white-space:nowrap;
 }
 .status-pill::before { content:''; width:5px; height:5px; border-radius:50%; background:currentColor; }
 .status-pill.ok     { background:rgba(0,201,167,.12); color:var(--teal); }

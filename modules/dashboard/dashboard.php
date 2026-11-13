@@ -35,7 +35,7 @@ if (dashW('trello_geral') || dashW('trello_atividade')) {
 // ── Dados do ERP (só o que os widgets ativos usam) ────────────────────
 $erp_ok   = false;
 $hoje     = date('Y-m-d');
-$prodDias = [];      // 'Y-m-d' => qtd
+$prodDias = [];      // 'Y-m-d' => bags analisados (produzidos)
 $prodMes  = 0.0;
 $metaMes  = 0.0;
 $agora    = ['funcionarios' => 0, 'ops' => 0];
@@ -49,8 +49,9 @@ $pg = ($precisaProducao || $precisaSaida || dashW('ops_produzindo')) ? dbPG() : 
 if ($pg) {
     $erp_ok = true;
     if ($precisaProducao) {
-        $prodDias = dashProducaoPorDia($pg, 14);
-        $prodMes  = dashProducaoMes($pg);
+        $pronto   = dashProntoPorDia($pg, min(date('Y-m-01'), date('Y-m-d', strtotime('-13 days'))));
+        $prodDias = array_map(fn ($q) => $q[PROD_TIPO_BAG] ?? 0.0, $pronto);
+        $prodMes  = dashSomaPronto($pronto, PROD_TIPO_BAG, date('Y-m-01'));
         $agora    = dashProduzindoAgora($pg);
         try {
             $v = dbPDO()->query("SELECT PAR_VALOR FROM PARAMETROS WHERE PAR_CHAVE = 'meta_producao'")->fetchColumn();
@@ -85,7 +86,7 @@ $saidasDoMes = array_values(array_filter($saidasMes, fn ($s) => $s['dia'] >= dat
 $totHoje = dashSomaSaidas($saidasHoje);
 $totMes  = dashSomaSaidas($saidasDoMes);
 
-// Série de 14 dias: produção (bags apontados) x saída de bags
+// Série de 14 dias: produção (bags prontos na Análise) x saída de bags
 $serie = ['labels' => [], 'producao' => [], 'saida' => []];
 $bagsPorDia = [];
 foreach ($saidasMes as $s) {
@@ -229,7 +230,7 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
             </div>
             <div class="kpi-value"><?= fmtNum($prodHoje) ?></div>
             <div class="kpi-footer">
-              bags apontados
+              bags analisados
               <?php if ($diaAnterior): ?>&nbsp;· <?= date('d/m', strtotime($diaAnterior)) ?>: <b><?= fmtNum($prodAnterior) ?></b><?php endif; ?>
             </div>
           </div>
@@ -334,12 +335,12 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
               <span class="dash-num"><span class="dash-live"></span>O.P <?= e($o['op']) ?></span>
               <div class="dash-row-main">
                 <div class="dash-row-t" title="<?= e($o['cliente']) ?>"><?= e($o['cliente'] ?: '—') ?></div>
-                <div class="dash-row-s" title="<?= e($o['produto']) ?>"><?= e($o['produto']) ?> · <?= $o['funcs'] ?> pessoa<?= $o['funcs'] !== 1 ? 's' : '' ?></div>
+                <div class="dash-row-s" title="<?= e($o['produto']) ?>"><?= e($o['produto']) ?> · <?= $o['funcs'] ?> pessoa<?= $o['funcs'] !== 1 ? 's' : '' ?><?= $o['etapas'] !== '' ? ' · ' . e($o['etapas']) : '' ?></div>
                 <?php if ($o['pedido'] > 0): ?><div class="dash-bar"><div class="dash-bar-fill<?= $pct > 100 ? ' over' : '' ?>" style="width:<?= min(100, $pct) ?>%"></div></div><?php endif; ?>
               </div>
               <div class="dash-row-r">
                 <span class="dash-row-v"><?= $o['pedido'] > 0 ? $pct . '%' : '—' ?></span>
-                <span class="dash-row-s"><?= fmtNum($o['lido']) ?> / <?= $o['pedido'] > 0 ? fmtNum($o['pedido']) : '—' ?> bags</span>
+                <span class="dash-row-s"><?= fmtNum($o['lido']) ?> / <?= $o['pedido'] > 0 ? fmtNum($o['pedido']) : '—' ?> <?= e($o['unidade']) ?></span>
               </div>
             </div>
           <?php endforeach; endif; ?>
@@ -609,7 +610,7 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
   }
 })();
 
-// ── Gráfico: produção (bags apontados) x saída de bags, 14 dias ───────
+// ── Gráfico: produção (bags prontos na Análise) x saída de bags, 14 dias ───────
 (function () {
   const ctx = document.getElementById('chartProdSaida');
   if (!ctx || typeof Chart === 'undefined') return;

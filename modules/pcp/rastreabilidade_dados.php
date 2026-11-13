@@ -10,9 +10,10 @@ declare(strict_types=1);
 //  Lote → OP_ITENS_CONSUMIDOS liga lote à OP. O ERP NÃO registra qual rolo
 //        foi em qual bag: o lote de um bag é "os lotes consumidos pela OP".
 //  Nota de compra → primeiro ANDAMENTO_ESTOQUE do lote com CMP_CODIGO.
-//  Produzido → bag: apontado na análise (mesma regra do Relatório de Defeitos,
-//        que define as funções rd*); sacaria: OP_ITENS_PRODUZIDOS confirmado,
-//        porque não tem apontamento. Sacaria também não tem defeito no ERP.
+//  Produzido → etapa final do tipo (prodProntoSql em producao_tipo.php): bag
+//        na Análise (mesma regra do Relatório de Defeitos, que define as
+//        funções rd*); sacaria no Corte. Sacaria sem Corte apontado segue
+//        por OP_ITENS_PRODUZIDOS confirmado. Sacaria não tem defeito no ERP.
 //  Lote do produto final → OP_ITENS_PRODUZIDOS.LT_CODIGO: nasce no fechamento,
 //        por OP e produto. O ERP não liga bag a lote final; em entrega parcial
 //        as leituras seguem na OP original e os lotes saem na OP-saldo.
@@ -248,7 +249,8 @@ function rtProducaoOp(array $itens, array $apontado, array $produzido, array $de
         $d = $defeitos[$pro] ?? [];
         $numeros = [
             'pedido'      => (float) $i['qtd_pedido'],
-            'produzido'   => $sacaria ? $fechado : (float) ($apontado[$pro] ?? 0),
+            // Sacaria pronta = Corte apontado; sem Corte, o fechamento da OP
+            'produzido'   => $sacaria && !isset($apontado[$pro]) ? $fechado : (float) ($apontado[$pro] ?? 0),
             'fechado'     => $fechado,
             'aberto'      => $aberto,
             'com_defeito' => (float) ($d['com_defeito'] ?? 0),
@@ -301,7 +303,7 @@ function rtFichaOp($pg, int $op, int $limite): ?array
         SELECT PRO_CODIGO AS PRO, SUM(OIAP_QTD_PRODUZIDA) AS QTD
           FROM OP_ITENS_ATIVIDADES_APONTADAS
          WHERE NOT OIAP_EXCLUIDO AND TRIM(OIAP_STATUS) <> 'C'
-           AND ATP_CODIGO = " . RD_ATP_ANALISE . " AND PROD_CODIGO = \$1
+           AND " . prodProntoSql('OP_ITENS_ATIVIDADES_APONTADAS') . " AND PROD_CODIGO = \$1
          GROUP BY PRO_CODIGO
     ", [$op]);
 
