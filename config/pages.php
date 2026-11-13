@@ -20,17 +20,11 @@
 // ── Grupos do menu lateral ────────────────────────────────────────────────────
 // icon = conteúdo interno do SVG (sem a tag <svg> externa)
 $DOMBAG_GRUPOS = [
-    'vendas' => [
-        'label'      => 'Vendas',
-        'tooltip'    => 'Vendas',
+    'planejamento' => [
+        'label'      => 'Planejamento',
+        'tooltip'    => 'Planejamento',
         'admin_only' => false,
-        'icon'       => '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
-    ],
-    'yzidro' => [
-        'label'      => 'Yzidro',
-        'tooltip'    => 'Yzidro',
-        'admin_only' => false,
-        'icon'       => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 15 21.84"/><path d="M21 5V8"/><path d="M21 12L18 17H22L19 22"/><path d="M3 12A9 3 0 0 0 14.59 14.87"/>',
+        'icon'       => '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="m9 16 2 2 4-4"/>',
     ],
     'producao' => [
         'label'      => 'Produção',
@@ -38,23 +32,29 @@ $DOMBAG_GRUPOS = [
         'admin_only' => false,
         'icon'       => '<path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M14 6a6 6 0 0 1 6 6v3"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><rect x="2" y="15" width="20" height="4" rx="1"/>',
     ],
-    'maquinas' => [
-        'label'      => 'Máquinas',
-        'tooltip'    => 'Máquinas',
+    'conferencia' => [
+        'label'      => 'Conferência',
+        'tooltip'    => 'Conferência',
         'admin_only' => false,
-        'icon'       => '<path d="M11 10.27 7 3.34"/><path d="m11 13.73-4 6.93"/><path d="M12 22v-2"/><path d="M12 2v2"/><path d="M14 12h8"/><path d="m17 20.66-1-1.73"/><path d="m17 3.34-1 1.73"/><path d="M2 12h2"/><path d="m20.66 17-1.73-1"/><path d="m20.66 7-1.73 1"/><path d="m3.34 17 1.73-1"/><path d="m3.34 7 1.73 1"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="12" r="8"/>',
+        'icon'       => '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
     ],
-    'trello' => [
-        'label'      => 'Trello',
-        'tooltip'    => 'Trello',
+    'comercial' => [
+        'label'      => 'Vendas',
+        'tooltip'    => 'Vendas',
         'admin_only' => false,
-        'icon'       => '<rect x="3" y="3" width="7" height="18" rx="2"/><rect x="14" y="3" width="7" height="11" rx="2"/>',
+        'icon'       => '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/>',
     ],
-    'relatorios' => [
-        'label'      => 'Relatórios',
-        'tooltip'    => 'Relatórios',
+    'estoque' => [
+        'label'      => 'Saída e Estoque',
+        'tooltip'    => 'Saída e Estoque',
         'admin_only' => false,
-        'icon'       => '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>',
+        'icon'       => '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+    ],
+    'cadastros' => [
+        'label'      => 'Cadastros',
+        'tooltip'    => 'Cadastros',
+        'admin_only' => false,
+        'icon'       => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>',
     ],
     'usuarios' => [
         'label'      => 'Usuários',
@@ -116,81 +116,64 @@ $DOMBAG_PAGINAS = [
         'publico' => true,
         'icon'    => '<path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/>',
     ],
-    [
-        'href'    => '/produtos',
-        'label'   => 'Produtos',
-        'grupo'   => null,
-        'menu'    => true,
-        'publico' => false,
-        'icon'    => '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
-    ],
-    [
-        'href'    => '/produtos/cadastro',
-        'label'   => 'Cadastro de Produtos',
-        'grupo'   => null,
-        'menu'    => false,
-        'publico' => false,
-        'icon'    => '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
-    ],
+    // ── Planejamento ────────────────────────────────────────────────────────────
+    ['href' => '/pcp/reuniao', 'label' => 'Reunião de Planejamento', 'grupo' => 'planejamento', 'menu' => true, 'publico' => false],
+    ['href' => '/pcp/agendamento', 'label' => 'Agendamento de Produção', 'grupo' => 'planejamento', 'menu' => true, 'publico' => false],
+    ['href' => '/pcp/tv', 'label' => 'Agendamento na TV', 'grupo' => 'planejamento', 'menu' => true, 'publico' => false],
+    ['href' => '/pcp/planejamento', 'label' => 'Planejamento', 'grupo' => 'planejamento', 'menu' => true, 'publico' => false],
+    ['href' => '/pcp/etapas', 'label' => 'Etapas de Produção', 'grupo' => 'planejamento', 'menu' => false, 'publico' => false],
 
-    // ── Vendas ────────────────────────────────────────────────────────────────
-    ['href' => '/vendas',           'label' => 'Pedidos de Venda',  'grupo' => 'vendas', 'menu' => true,  'publico' => false],
-    ['href' => '/vendas/simulacao', 'label' => 'Simulação',         'grupo' => 'vendas', 'menu' => true,  'publico' => false],
-
-    // ── Yzidro ────────────────────────────────────────────────────────────────
-    ['href' => '/yzidro/pedidos',     'label' => 'Pedidos de Venda',        'grupo' => 'yzidro', 'menu' => true,  'publico' => false],
-    ['href' => '/yzidro/consulta',    'label' => 'Consulta Vendas',         'grupo' => 'yzidro', 'menu' => true,  'publico' => false],
-
-    ['href' => '/yzidro/producao',   'label' => 'Produção (por setor)',    'grupo' => 'yzidro', 'menu' => true,  'publico' => false],
-
-    // ── Produção ──────────────────────────────────────────────────────────────
-    ['href' => '/pcp/planejamento','label' => 'Planejamento',            'grupo' => 'producao', 'menu' => true,  'publico' => false],
-    ['href' => '/pcp/reuniao',     'label' => 'Reunião de Planejamento', 'grupo' => 'producao', 'menu' => true,  'publico' => false],
-    ['href' => '/pcp/agendamento', 'label' => 'Agendamento de Produção', 'grupo' => 'producao', 'menu' => true,  'publico' => false],
-    ['href' => '/pcp/etapas',      'label' => 'Etapas de Produção',      'grupo' => 'producao', 'menu' => false, 'publico' => false],
-    ['href' => '/pcp/ordens',      'label' => 'Ordens de Produção',      'grupo' => 'producao', 'menu' => true,  'publico' => false],
-    ['href' => '/pcp/pdf',         'label' => 'PDF de Produção',         'grupo' => 'producao', 'menu' => false, 'publico' => false],
-    ['href' => '/pcp/monitor',     'label' => 'Monitor de Máquinas',     'grupo' => 'producao', 'menu' => true,  'publico' => false],
-    ['href' => '/pcp/tempo-real',  'label' => 'Produção em Tempo Real',  'grupo' => 'producao', 'menu' => true,  'publico' => false],
-    ['href' => '/pcp/painel-ops',  'label' => 'Painel de OPs',           'grupo' => 'producao', 'menu' => true,  'publico' => false],
+    // ── Produção ────────────────────────────────────────────────────────────────
+    ['href' => '/pcp/tempo-real', 'label' => 'Produção em Tempo Real', 'grupo' => 'producao', 'menu' => true, 'publico' => false],
+    ['href' => '/pcp/painel-ops', 'label' => 'Painel de OPs', 'grupo' => 'producao', 'menu' => true, 'publico' => false],
+    ['href' => '/pcp/ordens', 'label' => 'Ordens de Produção', 'grupo' => 'producao', 'menu' => true, 'publico' => false],
+    ['href' => '/pcp/monitor', 'label' => 'Monitor de Máquinas', 'grupo' => 'producao', 'menu' => true, 'publico' => false],
+    ['href' => '/pcp/fila', 'label' => 'Fila de Máquinas', 'grupo' => 'producao', 'menu' => true, 'publico' => false],
+    ['href' => '/yzidro/producao', 'label' => 'Produção (por setor)', 'grupo' => 'producao', 'menu' => true, 'publico' => false],
     ['href' => '/pcp/painel-funcionarios', 'label' => 'Produção por Funcionário', 'grupo' => 'producao', 'menu' => true, 'publico' => false],
     ['href' => '/pcp/painel-funcionarios-pdf', 'label' => 'Relatório de Funcionários (PDF)', 'grupo' => 'producao', 'menu' => false, 'publico' => false],
-    ['href' => '/pcp/bi',                  'label' => 'BI da Produção',           'grupo' => 'producao', 'menu' => true,  'publico' => false],
-    ['href' => '/pcp/bi-individual',       'label' => 'BI Individual',            'grupo' => 'producao', 'menu' => true,  'publico' => false],
-    ['href' => '/pcp/tv',                  'label' => 'Agendamento na TV',        'grupo' => 'producao', 'menu' => false, 'publico' => false],
-    ['href' => '/pcp/rastreabilidade',     'label' => 'Rastreabilidade',          'grupo' => 'producao', 'menu' => true,  'publico' => false],
+    ['href' => '/pcp/bi', 'label' => 'BI da Produção', 'grupo' => 'producao', 'menu' => true, 'publico' => false],
+    ['href' => '/pcp/bi-individual', 'label' => 'BI Individual', 'grupo' => 'producao', 'menu' => true, 'publico' => false],
+    ['href' => '/pcp/pdf', 'label' => 'PDF de Produção', 'grupo' => 'producao', 'menu' => false, 'publico' => false],
 
-    // ── Máquinas ──────────────────────────────────────────────────────────────
-    ['href' => '/maquinas',           'label' => 'Máquinas',             'grupo' => 'maquinas', 'menu' => true,  'publico' => false],
-    ['href' => '/pcp/fila',           'label' => 'Fila de Máquinas',     'grupo' => 'maquinas', 'menu' => true,  'publico' => false],
+    // ── Conferência ─────────────────────────────────────────────────────────────
+    ['href' => '/pcp/rastreabilidade', 'label' => 'Rastreabilidade', 'grupo' => 'conferencia', 'menu' => true, 'publico' => false],
+    ['href' => '/relatorios/defeitos', 'label' => 'Relatório de Defeitos', 'grupo' => 'conferencia', 'menu' => true, 'publico' => false],
+    ['href' => '/relatorios/producao', 'label' => 'Relatório de Produção', 'grupo' => 'conferencia', 'menu' => true, 'publico' => false],
+    ['href' => '/relatorios/analise-bag', 'label' => 'Análise de Apontamento', 'grupo' => 'conferencia', 'menu' => true, 'publico' => false],
 
-    // ── Trello ────────────────────────────────────────────────────────────────
-    ['href' => '/trello', 'label' => 'Pedidos', 'grupo' => 'trello', 'menu' => true, 'publico' => false],
+    // ── Vendas ──────────────────────────────────────────────────────────────────
+    ['href' => '/yzidro/pedidos', 'label' => 'Importar Pedidos do ERP', 'grupo' => 'comercial', 'menu' => true, 'publico' => false],
+    ['href' => '/yzidro/consulta', 'label' => 'Pedidos em Aberto no ERP', 'grupo' => 'comercial', 'menu' => true, 'publico' => false],
+    ['href' => '/vendas', 'label' => 'Pedidos Importados', 'grupo' => 'comercial', 'menu' => true, 'publico' => false],
+    ['href' => '/vendas/simulacao', 'label' => 'Simulação', 'grupo' => 'comercial', 'menu' => true, 'publico' => false],
+    ['href' => '/trello', 'label' => 'Pedidos no Trello', 'grupo' => 'comercial', 'menu' => true, 'publico' => false],
 
-    // ── Relatórios ────────────────────────────────────────────────────────────
-    ['href' => '/relatorios/producao',         'label' => 'Relatório de Produção',  'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
-    ['href' => '/relatorios/estoque-futuro',   'label' => 'Estoque Futuro',         'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
-    ['href' => '/relatorios/posicao-estoque',  'label' => 'Posição de Estoque',     'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
-    ['href' => '/relatorios/controle-estoque', 'label' => 'Controle de Estoque',    'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
-    ['href' => '/relatorios/analise-bag',      'label' => 'Análise de Apontamento', 'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
-    ['href' => '/relatorios/historico-faturamento', 'label' => 'Histórico de Pedidos Finalizados', 'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
-    ['href' => '/relatorios/defeitos',         'label' => 'Relatório de Defeitos',  'grupo' => 'relatorios', 'menu' => true, 'publico' => false],
+    // ── Saída e Estoque ─────────────────────────────────────────────────────────
+    ['href' => '/relatorios/historico-faturamento', 'label' => 'Histórico de Pedidos Finalizados', 'grupo' => 'estoque', 'menu' => true, 'publico' => false],
+    ['href' => '/relatorios/posicao-estoque', 'label' => 'Posição de Estoque', 'grupo' => 'estoque', 'menu' => true, 'publico' => false],
+    ['href' => '/relatorios/estoque-futuro', 'label' => 'Estoque Futuro', 'grupo' => 'estoque', 'menu' => true, 'publico' => false],
+    ['href' => '/relatorios/controle-estoque', 'label' => 'Controle de Estoque', 'grupo' => 'estoque', 'menu' => true, 'publico' => false],
 
-    // ── Usuários ──────────────────────────────────────────────────────────────
-    ['href' => '/minha-senha',              'label' => 'Minha Senha',          'grupo' => 'usuarios', 'menu' => true,  'publico' => true,  'admin_only' => false],
-    ['href' => '/usuarios',                 'label' => 'Usuários',             'grupo' => 'usuarios', 'menu' => true,  'publico' => false, 'admin_only' => true],
-    ['href' => '/usuarios/cadastro',        'label' => 'Cadastro de Usuários', 'grupo' => 'usuarios', 'menu' => false, 'publico' => false, 'admin_only' => true],
-    ['href' => '/usuarios/grupos',          'label' => 'Grupos de Usuários',   'grupo' => 'usuarios', 'menu' => true,  'publico' => false, 'admin_only' => true],
-    ['href' => '/usuarios/grupos/cadastro', 'label' => 'Cadastro de Grupos',   'grupo' => 'usuarios', 'menu' => false, 'publico' => false, 'admin_only' => true],
+    // ── Cadastros ───────────────────────────────────────────────────────────────
+    ['href' => '/produtos', 'label' => 'Produtos', 'grupo' => 'cadastros', 'menu' => true, 'publico' => false],
+    ['href' => '/produtos/cadastro', 'label' => 'Cadastro de Produtos', 'grupo' => 'cadastros', 'menu' => false, 'publico' => false],
+    ['href' => '/maquinas', 'label' => 'Máquinas', 'grupo' => 'cadastros', 'menu' => true, 'publico' => false],
 
-    // ── Parâmetros ────────────────────────────────────────────────────────────
+    // ── Usuários ────────────────────────────────────────────────────────────────
+    ['href' => '/minha-senha', 'label' => 'Minha Senha', 'grupo' => 'usuarios', 'menu' => true, 'publico' => true, 'admin_only' => false],
+    ['href' => '/usuarios', 'label' => 'Usuários', 'grupo' => 'usuarios', 'menu' => true, 'publico' => false, 'admin_only' => true],
+    ['href' => '/usuarios/cadastro', 'label' => 'Cadastro de Usuários', 'grupo' => 'usuarios', 'menu' => false, 'publico' => false, 'admin_only' => true],
+    ['href' => '/usuarios/grupos', 'label' => 'Grupos de Usuários', 'grupo' => 'usuarios', 'menu' => true, 'publico' => false, 'admin_only' => true],
+    ['href' => '/usuarios/grupos/cadastro', 'label' => 'Cadastro de Grupos', 'grupo' => 'usuarios', 'menu' => false, 'publico' => false, 'admin_only' => true],
+
+    // ── Parâmetros ──────────────────────────────────────────────────────────────
     ['href' => '/modules/parametros/parametros.php', 'label' => 'Parâmetros do Sistema', 'grupo' => 'parametros', 'menu' => true, 'publico' => false],
-    ['href' => '/dashboard/widgets',                 'label' => 'Widgets do Dashboard',  'grupo' => 'parametros', 'menu' => true, 'publico' => true],
+    ['href' => '/dashboard/widgets', 'label' => 'Widgets do Dashboard', 'grupo' => 'parametros', 'menu' => true, 'publico' => true],
 
-    // ── Administrador (admin_only) ────────────────────────────────────────────
-    ['href' => '/admin/migrations',                  'label' => 'Migrations BD',         'grupo' => 'administrador', 'menu' => true, 'publico' => false, 'admin_only' => true],
-    ['href' => '/admin/atualiza-bd',                 'label' => 'Console SQL',            'grupo' => 'administrador', 'menu' => true, 'publico' => false, 'admin_only' => true],
-    ['href' => '/admin/menus-ativos',                'label' => 'Menus Ativos',           'grupo' => 'administrador', 'menu' => true, 'publico' => false, 'admin_only' => true],
-    ['href' => '/modules/usuarios/permissoes.php',   'label' => 'Permissões por Grupo',   'grupo' => 'administrador', 'menu' => true, 'publico' => false, 'admin_only' => true],
-
+    // ── Administrador (admin_only) ──────────────────────────────────────────────
+    ['href' => '/modules/usuarios/permissoes.php', 'label' => 'Permissões por Grupo', 'grupo' => 'administrador', 'menu' => true, 'publico' => false, 'admin_only' => true],
+    ['href' => '/admin/menus-ativos', 'label' => 'Menus Ativos', 'grupo' => 'administrador', 'menu' => true, 'publico' => false, 'admin_only' => true],
+    ['href' => '/admin/migrations', 'label' => 'Migrations BD', 'grupo' => 'administrador', 'menu' => true, 'publico' => false, 'admin_only' => true],
+    ['href' => '/admin/atualiza-bd', 'label' => 'Console SQL', 'grupo' => 'administrador', 'menu' => true, 'publico' => false, 'admin_only' => true],
 ];

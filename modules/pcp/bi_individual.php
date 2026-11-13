@@ -196,6 +196,15 @@ if (!$pg) {
   .biz-slide-trava.on { background: rgba(255,199,102,.16); border-color: rgba(255,199,102,.5); color: #ffc766; }
   .biz-slide-trava:focus-visible { outline: 2px solid var(--biz-teal); outline-offset: 2px; }
   .biz-slide-dots button:focus-visible { outline: 2px solid var(--biz-teal); outline-offset: 2px; }
+  /* O que mostrar: Bag, Sacaria ou os dois */
+  .biz-tipo { display: inline-flex; border: 1px solid var(--biz-border); border-radius: 20px; overflow: hidden; }
+  .biz-tipo button { font: inherit; font-size: clamp(11px, .8cqw, 14px); font-weight: 800; padding: 3px 11px; border: 0; cursor: pointer; background: transparent; color: var(--biz-muted); }
+  .biz-tipo button + button { border-left: 1px solid var(--biz-border); }
+  .biz-tipo button:hover { color: var(--biz-text); }
+  .biz-tipo button[aria-pressed="true"] { background: rgba(0,201,167,.16); color: var(--biz-teal); }
+  .biz-tipo button[data-tipo="BAG"][aria-pressed="true"] { background: rgba(34,197,94,.18); color: #4ade80; }
+  .biz-tipo button[data-tipo="SACARIA"][aria-pressed="true"] { background: rgba(168,85,247,.2); color: #c084fc; }
+  .biz-tipo button:focus-visible { outline: 2px solid var(--biz-teal); outline-offset: -2px; }
   /* Barra fina embaixo da lista: quanto falta para a próxima atividade */
   .biz-slide-tempo { flex: 0 0 auto; height: 3px; margin-top: 8px; border-radius: 2px; background: rgba(255,255,255,.07); overflow: hidden; }
   .biz-slide-tempo > div { height: 100%; width: 0; background: var(--biz-teal); opacity: .6; }
@@ -368,7 +377,7 @@ if (!$pg) {
         <!-- Esquerda: total de bags produzidos no dia x meta total da equipe -->
         <div class="biz-card biz-total" id="biTotalCard">
           <div class="biz-card-head">
-            <h2>Bags Produzidos <span id="biDiaTitulo"><?= biiEscape($payload['dia_label']) ?></span></h2>
+            <h2><span id="biTotalTitulo">Bags Produzidos</span> <span id="biDiaTitulo"><?= biiEscape($payload['dia_label']) ?></span></h2>
             <div class="biz-head-right">
               <button type="button" class="biz-meta-btn" id="biMetaEditBtn" title="Editar meta total do dia" aria-label="Editar meta total do dia">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
@@ -382,7 +391,7 @@ if (!$pg) {
           </div>
           <div class="biz-ring-wrap"><div class="biz-ring-shape"><svg id="biGaugeTotal"></svg></div></div>
           <div class="biz-total-foot">
-            <div class="biz-total-nums"><strong id="biTotalQtd">0</strong> / <span class="meta" id="biMetaTxt">0</span> bags</div>
+            <div class="biz-total-nums"><strong id="biTotalQtd">0</strong><span id="biTotalMetaParte"> / <span class="meta" id="biMetaTxt">0</span></span> <span id="biTotalUn">bags</span></div>
             <div class="biz-total-msg" id="biTotalMsg"></div>
             <div class="biz-total-stats">
               <div class="biz-stat"><b id="biStatPessoas">0</b><span>pessoas</span></div>
@@ -397,6 +406,11 @@ if (!$pg) {
           <div class="biz-card-head">
             <h2>Produção Individual <span class="biz-slide-titulo" id="biSlideTitulo"></span></h2>
             <div class="biz-head-right">
+              <div class="biz-tipo" id="biTipo" role="group" aria-label="O que mostrar">
+                <button type="button" data-tipo="BAG" aria-pressed="false">Bag</button>
+                <button type="button" data-tipo="SACARIA" aria-pressed="false">Sacaria</button>
+                <button type="button" data-tipo="" aria-pressed="true">Os dois</button>
+              </div>
               <div class="biz-slide-dots" id="biSlideDots" aria-label="Atividades"></div>
               <button type="button" class="biz-slide-trava" id="biSlideTrava" aria-pressed="false" title="Travar nesta atividade"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span>Travar</span></button>
               <span class="biz-count-badge" id="biFuncsCount">0</span>
@@ -481,8 +495,16 @@ function biRenderGauge(svg, pct, hit, semMeta) {
 // Só bags prontos (Análise) entram no total: as outras etapas e a sacaria
 // aparecem em cada pessoa, na sua unidade.
 function biRenderTotal(funcs) {
-  const total = funcs.reduce((s, f) => s + Number(f.bag_pronto || 0), 0);
-  const meta = biMetaAtual;
+  const sac = biTipo === 'SACARIA';
+  document.getElementById('biTotalTitulo').textContent = sac ? 'Sacarias Prontas' : 'Bags Produzidos';
+  document.getElementById('biTotalUn').textContent = sac ? 'sacarias cortadas' : 'bags';
+  document.getElementById('biTotalMetaParte').hidden = sac;
+  document.getElementById('biMetaEditBtn').hidden = sac;
+  // Sacaria: pronta é a cortada (Corte); a meta do dia é de bags
+  const total = sac
+    ? funcs.reduce((s, f) => s + (f.atividades || []).filter(a => Number(a.atp) === BI_ATP_SAC_PRONTA).reduce((t, a) => t + Number(a.qtd || 0), 0), 0)
+    : funcs.reduce((s, f) => s + Number(f.bag_pronto || 0), 0);
+  const meta = sac ? 0 : biMetaAtual;
   const hit = meta > 0 && total >= meta;
   const pct = meta > 0 ? (total / meta) * 100 : 0;
 
@@ -492,16 +514,18 @@ function biRenderTotal(funcs) {
   if (!biMetaForm.classList.contains('open')) {
     document.getElementById('biMetaTxt').textContent = meta > 0 ? biFmt(meta, 0) : '—';
   }
-  document.getElementById('biTotalMsg').textContent = meta <= 0
+  document.getElementById('biTotalMsg').textContent = sac
+    ? biResumoEtapas(funcs)
+    : meta <= 0
     ? 'Clique no lápis para definir a meta do dia'
     : hit
       ? (total > meta ? `Meta batida — ${biFmt(total - meta, 0)} acima!` : 'Meta batida!')
       : `Faltam ${biFmt(meta - total, 0)} para a meta`;
 
   const ops = new Set();
-  funcs.forEach(f => (f.ops_detalhe || []).forEach(o => ops.add(o.op)));
+  funcs.forEach(f => (f.atividades || []).forEach(a => (a.ops_detalhe || []).forEach(o => ops.add(o.op))));
   document.getElementById('biStatPessoas').textContent = funcs.length;
-  document.getElementById('biStatAgora').textContent = funcs.filter(f => f.em_producao).length;
+  document.getElementById('biStatAgora').textContent = funcs.filter(f => (f.atividades || []).some(a => a.em_producao)).length;
   document.getElementById('biStatOps').textContent = ops.size;
   return total;
 }
@@ -527,6 +551,41 @@ function biFuncOpAtiva(f) {
 const BI_SLIDE_MS = 12000;
 const BI_ATP_ANALISE = <?= (int) PROD_ATP_BAG_PRONTO ?>;
 const BI_TRAVA_CHAVE = 'bii_trava_atividade';
+const BI_ATP_SAC_PRONTA = <?= (int) PROD_ATP_SACARIA_PRONTA ?>;
+const BI_TIPO_CHAVE = 'bii_tipo';
+
+// O que mostrar: 'BAG', 'SACARIA' ou '' (os dois). ?tipo=bag|sacaria|todos na URL tem prioridade.
+let biTipo = '';
+(function biLeTipo() {
+  const daUrl = (new URLSearchParams(location.search).get('tipo') || '').toUpperCase();
+  if (daUrl) { biTipo = daUrl === 'BAG' || daUrl === 'SACARIA' ? daUrl : ''; return; }
+  try { biTipo = localStorage.getItem(BI_TIPO_CHAVE) || ''; } catch (e) { biTipo = ''; }
+  if (biTipo !== 'BAG' && biTipo !== 'SACARIA') biTipo = '';
+})();
+
+// Cada pessoa só com as atividades do tipo escolhido; quem não tem nenhuma sai
+function biFiltraTipo(funcs) {
+  if (!biTipo) return funcs;
+  return funcs
+    .map(f => Object.assign({}, f, { atividades: (f.atividades || []).filter(a => a.tipo === biTipo) }))
+    .filter(f => f.atividades.length);
+}
+
+// "Impressão sacaria: 7.300 · Cortar sacaria: 0" — cada etapa na sua conta
+function biResumoEtapas(funcs) {
+  const porEtapa = new Map();
+  funcs.forEach(f => (f.atividades || []).forEach(a => {
+    const e = porEtapa.get(a.atp) || { etapa: a.etapa, ordem: Number(a.ordem), qtd: 0 };
+    e.qtd += Number(a.qtd || 0);
+    porEtapa.set(a.atp, e);
+  }));
+  const lista = [...porEtapa.values()].sort((x, y) => x.ordem - y.ordem);
+  return lista.length ? lista.map(e => e.etapa + ': ' + biFmt(e.qtd, 0)).join(' · ') : 'Nenhuma sacaria apontada';
+}
+
+function biMostraTipo() {
+  document.querySelectorAll('#biTipo button').forEach(b => b.setAttribute('aria-pressed', b.dataset.tipo === biTipo ? 'true' : 'false'));
+}
 let biSlides = [];
 let biSlideAtp = null;
 let biSlideTimer = null;
@@ -572,7 +631,9 @@ function biSlideAtual() {
   return biSlides.find(s => s.atp === biSlideAtp) || null;
 }
 
-function biRenderFuncs(funcs) {
+function biRenderFuncs(todos) {
+  const funcs = biFiltraTipo(todos);
+  biMostraTipo();
   biRenderTotal(funcs);
   biSlides = biMontaSlides(funcs);
   if (biTrava) {
@@ -669,6 +730,24 @@ document.getElementById('biSlideDots').addEventListener('click', e => {
   if (biTrava) {
     biTrava = { atp: biSlideAtp, etapa: (biSlideAtual() || {}).etapa || '' };
     biSalvaTrava();
+  }
+  biMostraSlide(true);
+  if (!biTrava) biSlideAgenda();
+});
+
+// Bag / Sacaria / Os dois: troca na hora e fica salvo neste navegador.
+// Se a atividade travada não é do tipo escolhido, solta a trava.
+document.getElementById('biTipo').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tipo]');
+  if (!b || b.dataset.tipo === biTipo) return;
+  biTipo = b.dataset.tipo;
+  try { localStorage.setItem(BI_TIPO_CHAVE, biTipo); } catch (err) { /* vale só nesta tela */ }
+  biRenderFuncs(biUltimosFuncs);
+  if (biTrava && !biSlideAtual()) {
+    biTrava = null;
+    biSalvaTrava();
+    biSlideAtp = biSlides.length ? biSlides[0].atp : null;
+    biMostraSlide(false);
   }
   biMostraSlide(true);
   if (!biTrava) biSlideAgenda();

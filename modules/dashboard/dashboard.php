@@ -116,6 +116,8 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
   <style>
     /* ── Layout do dashboard ───────────────────────── */
     .content           { display:flex; flex-direction:column; gap:16px; overflow-y:auto; overflow-x:hidden; }
+    /* os blocos mantêm a altura e a página rola; sem isso o flex espreme os painéis e corta o gráfico */
+    .content > *       { flex-shrink:0; }
     .dash-grid         { display:grid; gap:16px; align-items:stretch; }
     .dash-grid > div   { display:flex; flex-direction:column; }
     .dash-grid > div > .panel, .dash-grid > .panel { flex:1; }
@@ -276,7 +278,7 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
               <div class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
             </div>
             <div class="kpi-value"><?= fmtNum($totHoje['pedidos']) ?></div>
-            <div class="kpi-footer">pedido<?= $totHoje['pedidos'] !== 1 ? 's' : '' ?> · <?= fmtNum($totHoje['bag']) ?> bags · <?= fmtNum($totHoje['sac']) ?> sacaria</div>
+            <div class="kpi-footer">pedido<?= $totHoje['pedidos'] !== 1 ? 's' : '' ?> · <?= fmtNum($totHoje['bag']) ?> bags · <?= fmtNum($totHoje['sac']) ?> sacarias</div>
           </div>
 
           <div class="kpi-card blue">
@@ -285,7 +287,7 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
               <div class="kpi-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
             </div>
             <div class="kpi-value"><?= fmtNum($totMes['pedidos']) ?></div>
-            <div class="kpi-footer">pedidos · <?= fmtNum($totMes['bag']) ?> bags · <?= fmtNum($totMes['sac']) ?> sacaria</div>
+            <div class="kpi-footer">pedidos · <?= fmtNum($totMes['bag']) ?> bags · <?= fmtNum($totMes['sac']) ?> sacarias</div>
           </div>
 
           <div class="kpi-card teal kpi-card-full">
@@ -371,7 +373,7 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
                 <div class="dash-row-s">
                   <?= implode(' · ', array_filter([
                       $s['bag'] != 0 ? fmtNum($s['bag']) . ' bags' : '',
-                      $s['sac'] != 0 ? fmtNum($s['sac']) . ' sacaria' : '',
+                      $s['sac'] != 0 ? fmtNum($s['sac']) . ' sacarias' : '',
                       $s['bag'] == 0 && $s['sac'] == 0 ? fmtNum($s['pecas']) . ' peças' : '',
                   ])) ?>
                 </div>

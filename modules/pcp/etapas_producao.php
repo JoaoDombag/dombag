@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/etapa_cores.php';
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  DOMBAG — Cadastro de Etapas de Produção
@@ -9,6 +10,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
 // ══════════════════════════════════════════════════════════════════════════════
 
 $pdo = dbPDO();
+$temCor = etpGarantirCor($pdo);
 $msg = '';
 $msg_tipo = '';
 
@@ -19,13 +21,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ── Criar etapa ───────────────────────────────────────────────────────────
     if ($acao === 'criar') {
         $desc = trim($_POST['descricao'] ?? '');
+        $cor  = etpCorValida($_POST['cor'] ?? '');
         if (!$desc) {
             $msg = 'Informe a descrição da etapa.';
             $msg_tipo = 'err';
         } else {
             try {
-                $pdo->prepare('INSERT INTO ETAPA_PRODUCAO (ETP_DESCRICAO) VALUES (:d)')
-                    ->execute([':d' => $desc]);
+                if ($temCor) {
+                    $pdo->prepare('INSERT INTO ETAPA_PRODUCAO (ETP_DESCRICAO, ETP_COR) VALUES (:d, :cor)')
+                        ->execute([':d' => $desc, ':cor' => $cor]);
+                } else {
+                    $pdo->prepare('INSERT INTO ETAPA_PRODUCAO (ETP_DESCRICAO) VALUES (:d)')
+                        ->execute([':d' => $desc]);
+                }
                 $msg = 'Etapa cadastrada com sucesso.';
                 $msg_tipo = 'ok';
             } catch (PDOException $e) {
@@ -41,13 +49,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($acao === 'editar') {
         $cod  = (int) ($_POST['cod'] ?? 0);
         $desc = trim($_POST['descricao'] ?? '');
+        $cor  = etpCorValida($_POST['cor'] ?? '');
         if (!$cod || !$desc) {
             $msg = 'Preencha a descrição da etapa.';
             $msg_tipo = 'err';
         } else {
             try {
-                $pdo->prepare('UPDATE ETAPA_PRODUCAO SET ETP_DESCRICAO = :d WHERE ETP_CODIGO = :c')
-                    ->execute([':d' => $desc, ':c' => $cod]);
+                if ($temCor) {
+                    $pdo->prepare('UPDATE ETAPA_PRODUCAO SET ETP_DESCRICAO = :d, ETP_COR = :cor WHERE ETP_CODIGO = :c')
+                        ->execute([':d' => $desc, ':cor' => $cor, ':c' => $cod]);
+                } else {
+                    $pdo->prepare('UPDATE ETAPA_PRODUCAO SET ETP_DESCRICAO = :d WHERE ETP_CODIGO = :c')
+                        ->execute([':d' => $desc, ':c' => $cod]);
+                }
                 $msg = 'Etapa atualizada com sucesso.';
                 $msg_tipo = 'ok';
             } catch (PDOException $e) {
@@ -85,16 +99,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ── Lista de etapas com contagem de pedidos em cada uma ───────────────────────
 try {
     $etapas = $pdo->query('
-        SELECT e.ETP_CODIGO, e.ETP_DESCRICAO,
+        SELECT e.ETP_CODIGO, e.ETP_DESCRICAO, ' . ($temCor ? 'e.ETP_COR' : 'NULL') . ' AS ETP_COR,
                COUNT(p.PRG_CODIGO) AS QTD_PEDIDOS
         FROM ETAPA_PRODUCAO e
         LEFT JOIN PCP_PROGRAMACAO p ON p.ETP_CODIGO = e.ETP_CODIGO AND p.PRG_FINALIZADO = 0
-        GROUP BY e.ETP_CODIGO, e.ETP_DESCRICAO
+        GROUP BY e.ETP_CODIGO, e.ETP_DESCRICAO' . ($temCor ? ', e.ETP_COR' : '') . '
         ORDER BY e.ETP_CODIGO
     ')->fetchAll(PDO::FETCH_ASSOC);
 } catch (Throwable) {
     $etapas = [];
 }
+foreach ($etapas as &$__e) {
+    $__e['ETP_COR'] = etpCorValida($__e['ETP_COR']) ?? ETP_COR_PADRAO;
+}
+unset($__e);
 
 $total = count($etapas);
 ?>
@@ -128,6 +146,17 @@ $total = count($etapas);
 .modal-box h3{font-size:15px;font-weight:600;margin-bottom:8px;}
 .modal-box p{font-size:12.5px;color:var(--text-muted);line-height:1.55;margin-bottom:4px;}
 .modal-actions{display:flex;gap:8px;margin-top:18px;justify-content:flex-end;}
+
+/* Cor da etapa */
+.etp-cor-chip{display:inline-flex;align-items:center;gap:8px;}
+.etp-cor-dot{width:14px;height:14px;border-radius:4px;flex-shrink:0;background:var(--etp);box-shadow:inset 0 0 0 1px rgba(255,255,255,.15);}
+.etp-paleta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;}
+.etp-paleta button{width:26px;height:26px;border-radius:7px;border:2px solid transparent;background:var(--etp);cursor:pointer;padding:0;}
+.etp-paleta button[aria-pressed="true"]{border-color:var(--text-primary);}
+.etp-paleta button:focus-visible{outline:2px solid #7db3ff;outline-offset:2px;}
+.etp-paleta input[type=color]{width:34px;height:28px;padding:0 2px;border:1px solid var(--border);border-radius:7px;background:transparent;cursor:pointer;}
+.etp-paleta .etp-outra{font-size:11px;color:var(--text-muted);margin-left:2px;}
+.etp-previa{display:inline-block;margin-top:10px;font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;color:var(--text-primary);background:color-mix(in srgb, var(--etp) 22%, transparent);border:1px solid color-mix(in srgb, var(--etp) 55%, transparent);}
 </style>
 </head>
 <body>
@@ -185,6 +214,7 @@ $total = count($etapas);
               <tr>
                 <th>Código</th>
                 <th>Descrição</th>
+                <th>Cor</th>
                 <th class="td-center">Pedidos nesta etapa</th>
                 <th>Operações</th>
               </tr>
@@ -194,13 +224,14 @@ $total = count($etapas);
             <tr>
               <td class="td-muted">#<?= (int) $e['ETP_CODIGO'] ?></td>
               <td style="font-weight:600;"><?= htmlspecialchars($e['ETP_DESCRICAO']) ?></td>
+              <td><span class="etp-cor-chip" style="--etp:<?= htmlspecialchars($e['ETP_COR']) ?>"><span class="etp-cor-dot"></span><span class="td-muted"><?= htmlspecialchars($e['ETP_COR']) ?></span></span></td>
               <td class="td-center">
                 <span class="count-pedidos"><?= (int) $e['QTD_PEDIDOS'] ?></span>
               </td>
               <td>
                 <div class="td-actions">
                   <button class="btn-sm btn-sm-edit"
-                          onclick="abrirModalEditar(<?= (int) $e['ETP_CODIGO'] ?>, '<?= addslashes($e['ETP_DESCRICAO']) ?>')">
+                          onclick="abrirModalEditar(<?= (int) $e['ETP_CODIGO'] ?>, <?= htmlspecialchars(json_encode($e['ETP_DESCRICAO'], JSON_UNESCAPED_UNICODE)) ?>, '<?= htmlspecialchars($e['ETP_COR']) ?>')">
                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     Editar
                   </button>
@@ -227,7 +258,7 @@ $total = count($etapas);
 <div class="modal-overlay" id="modalForm">
   <div class="modal-box">
     <h3 id="modalFormTitulo">Nova Etapa</h3>
-    <p>Descreva a etapa de produção como ela deve aparecer na Reunião de Planejamento.</p>
+    <p>Descreva a etapa e escolha a cor dela na Reunião de Planejamento e no Kanban.</p>
     <form method="POST" id="frmForm" onsubmit="return validarForm()">
       <input type="hidden" name="acao" id="frmAcao" value="criar">
       <input type="hidden" name="cod" id="frmCod" value="">
@@ -237,6 +268,20 @@ $total = count($etapas);
                placeholder="Ex: Em produção"
                maxlength="100" required autocomplete="off">
       </div>
+      <?php if ($temCor): ?>
+      <div class="field" style="margin-top:12px;">
+        <label id="lblCor">Cor</label>
+        <input type="hidden" name="cor" id="frmCor" value="<?= ETP_PALETA[0] ?>">
+        <div class="etp-paleta" role="group" aria-labelledby="lblCor">
+          <?php foreach (ETP_PALETA as $c): ?>
+            <button type="button" style="--etp:<?= $c ?>" data-cor="<?= $c ?>" aria-label="Cor <?= $c ?>" aria-pressed="false" onclick="escolherCor(this.dataset.cor)"></button>
+          <?php endforeach; ?>
+          <input type="color" id="frmCorLivre" aria-label="Outra cor" oninput="escolherCor(this.value)">
+          <span class="etp-outra">outra</span>
+        </div>
+        <span class="etp-previa" id="frmCorPrevia">Como aparece</span>
+      </div>
+      <?php endif; ?>
       <div class="modal-actions">
         <button type="button" class="btn-secondary" onclick="fecharModal('modalForm')">Cancelar</button>
         <button type="submit" class="btn-primary">
@@ -273,18 +318,37 @@ function abrirModalCriar() {
   document.getElementById('frmAcao').value = 'criar';
   document.getElementById('frmCod').value = '';
   document.getElementById('frmDescricao').value = '';
+  escolherCor(<?= json_encode(ETP_PALETA[0]) ?>);
   document.getElementById('modalForm').classList.add('open');
   document.getElementById('frmDescricao').focus();
 }
 
-function abrirModalEditar(cod, descricao) {
+function abrirModalEditar(cod, descricao, cor) {
   document.getElementById('modalFormTitulo').textContent = 'Editar Etapa';
   document.getElementById('frmAcao').value = 'editar';
   document.getElementById('frmCod').value = cod;
   document.getElementById('frmDescricao').value = descricao;
+  escolherCor(cor);
   document.getElementById('modalForm').classList.add('open');
   document.getElementById('frmDescricao').focus();
 }
+
+// Marca a cor escolhida na paleta e mostra a prévia com o nome da etapa
+function escolherCor(cor) {
+  const campo = document.getElementById('frmCor');
+  if (!campo || !cor) return;
+  cor = String(cor).toLowerCase();
+  campo.value = cor;
+  document.getElementById('frmCorLivre').value = cor;
+  document.querySelectorAll('.etp-paleta button').forEach(b => b.setAttribute('aria-pressed', b.dataset.cor === cor ? 'true' : 'false'));
+  const previa = document.getElementById('frmCorPrevia');
+  previa.style.setProperty('--etp', cor);
+  previa.textContent = document.getElementById('frmDescricao').value.trim() || 'Como aparece';
+}
+document.getElementById('frmDescricao').addEventListener('input', () => {
+  const c = document.getElementById('frmCor');
+  if (c) escolherCor(c.value);
+});
 
 function validarForm() {
   const desc = document.getElementById('frmDescricao').value.trim();

@@ -3,6 +3,7 @@ declare(strict_types=1);
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/agendamento_dados.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/etapa_cores.php';
 
 // ══════════════════════════════════════════════════════════════
 //  DOMBAG — Reunião de Planejamento (Programação de Pedidos)
@@ -210,7 +211,7 @@ function p2FetchProgramacao(PDO $db, $pg): array
         FROM PCP_PROGRAMACAO p
         LEFT JOIN ETAPA_PRODUCAO e ON e.ETP_CODIGO = p.ETP_CODIGO
         WHERE p.PRG_FINALIZADO = 0
-        ORDER BY p.PRG_ADICIONADO_EM DESC
+        ORDER BY p.DATA_ENTREGA_ESPERADA IS NULL, p.DATA_ENTREGA_ESPERADA, p.DATA_ENTREGA IS NULL, p.DATA_ENTREGA, p.PROD_CODIGO
     ');
     $locais = $stmt->fetchAll(PDO::FETCH_ASSOC);
     if (!$locais || !$pg) {
@@ -416,12 +417,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') ==
 }
 
 // ── Lista de etapas de produção (para o seletor da grid) ─────────────────────
-try {
-    $etapasProducao = $pdo->query('SELECT ETP_CODIGO, ETP_DESCRICAO FROM ETAPA_PRODUCAO ORDER BY ETP_CODIGO')
-                          ->fetchAll(PDO::FETCH_ASSOC);
-} catch (Throwable) {
-    $etapasProducao = [];
-}
+$etapasProducao = etpListar($pdo);
+$corEtapa = array_column($etapasProducao, 'ETP_COR', 'ETP_CODIGO');
 
 // ── Carga inicial da página ────────────────────────────────────────────────────
 $error = '';
@@ -433,6 +430,18 @@ try {
 } catch (Throwable $e) {
     $error = $e->getMessage();
 }
+// Tipos de cada pedido (vêm dos itens da OP no ERP) e quantos há de cada
+$tiposPorPrg = [];
+$qtdPorTipo = [PROD_TIPO_BAG => 0, PROD_TIPO_SACARIA => 0];
+foreach ($programacao as $r) {
+    $t = array_keys($progresso[(int) $r['prg_codigo']]['tipos'] ?? []);
+    $tiposPorPrg[(int) $r['prg_codigo']] = $t;
+    foreach ($t as $tt) {
+        $qtdPorTipo[$tt] = ($qtdPorTipo[$tt] ?? 0) + 1;
+    }
+}
+$nomeTipo = [PROD_TIPO_BAG => 'Big Bag', PROD_TIPO_SACARIA => 'Sacaria'];
+
 if (!$pg && $error === '') {
     $error = 'ERP indisponível — exibindo apenas dados salvos localmente (podem estar desatualizados).';
 }
@@ -450,10 +459,53 @@ if (!$pg && $error === '') {
   .p2-empty-row td { text-align: center; padding: 28px 16px; color: var(--text-muted); font-size: 12.5px; }
 
   .status-sel {
-    font-size: 11px; padding: 2px 5px; border-radius: 6px;
-    border: 1px solid var(--border); background: var(--card-bg);
+    font-size: 11px; padding: 3px 6px; border-radius: 6px; font-weight: 600;
+    border: 1px solid var(--border); border-left: 4px solid var(--etp, var(--border));
+    background: var(--card-bg);
     color: var(--text-primary); cursor: pointer; display: block;
   }
+  /* a lista aberta é nativa e não aceita fundo transparente: usa cor sólida do tema */
+  .status-sel { color-scheme: dark; }
+  :root[data-theme="claro"] .status-sel { color-scheme: light; }
+  .status-sel option { background: var(--modal-bg, #152845); color: var(--text-primary); }
+
+  /* Big Bag e Sacaria: as mesmas cores do Agendamento */
+  .tipo-BAG     { --tipo: 34,197,94;  --tipo-txt: #4ade80; }
+  .tipo-SACARIA { --tipo: 168,85,247; --tipo-txt: #c084fc; }
+  :root[data-theme="claro"] .tipo-BAG     { --tipo-txt: #15803d; }
+  :root[data-theme="claro"] .tipo-SACARIA { --tipo-txt: #7e22ce; }
+  .p2-tipos { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+  .p2-tipo-btn {
+    display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 11px; border-radius: 8px; cursor: pointer;
+    border: 1px solid rgba(var(--tipo), .45); background: rgba(var(--tipo), .16);
+    color: var(--text-primary); font: 600 12px 'Segoe UI', sans-serif;
+  }
+  .p2-tipo-btn::before { content: ''; width: 10px; height: 10px; border-radius: 3px; background: rgb(var(--tipo)); }
+  .p2-tipo-btn b { font-weight: 700; color: var(--text-muted); }
+  .p2-tipo-btn[aria-pressed="false"] { background: none; border-color: var(--border); color: var(--text-muted); text-decoration: line-through; }
+  .p2-tipo-btn[aria-pressed="false"]::before { opacity: .3; }
+  .p2-tipo-btn:focus-visible { outline: 2px solid #7db3ff; outline-offset: 2px; }
+  /* Tipo do produto: faixa na borda esquerda da linha (metade de cada cor quando a OP tem os dois) */
+  #p2Tbody td.p2-cod { padding-left: 16px; background: linear-gradient(rgb(var(--t1)) 0 50%, rgb(var(--t2)) 50% 100%) left / 5px 100% no-repeat; }
+  .p2-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .p2-ordem { font-size: 11.5px; color: var(--text-muted); font-weight: 400; margin-left: 8px; }
+
+  /* ── Filtros ─────────────────────────────────────────── */
+  .p2-filtros { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: flex-end; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+  .p2-filtro { display: flex; flex-direction: column; gap: 5px; }
+  .p2-filtro label { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+  .p2-filtro select, .p2-filtro input { height: 32px; padding: 0 9px; font-size: 12.5px; font-family: 'Segoe UI', sans-serif; border-radius: 7px; color-scheme: dark; }
+  :root[data-theme="claro"] .p2-filtro select, :root[data-theme="claro"] .p2-filtro input { color-scheme: light; }
+  .p2-filtro select option { background: var(--modal-bg, #152845); color: var(--text-primary); }
+  .p2-filtro select { min-width: 150px; }
+  .p2-filtro input[type="search"] { width: 230px; }
+  .p2-filtro select.ativo, .p2-filtro input.ativo { border-color: #7db3ff; box-shadow: 0 0 0 1px #7db3ff inset; }
+  .p2-limpar { height: 32px; padding: 0 12px; border-radius: 7px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font: 600 12px 'Segoe UI', sans-serif; cursor: pointer; }
+  .p2-limpar:hover { color: var(--text-primary); border-color: #7db3ff; }
+  .p2-limpar[hidden] { display: none; }
+  .p2-filtro select:focus-visible, .p2-filtro input:focus-visible, .p2-limpar:focus-visible { outline: 2px solid #7db3ff; outline-offset: 2px; }
+  .p2-nada td { text-align: center; padding: 28px 16px; color: var(--text-muted); font-size: 12.5px; }
+  @media (max-width: 700px) { .p2-filtro, .p2-filtro select, .p2-filtro input[type="search"] { width: 100%; } }
 
   /* ── Modal grande: buscar/adicionar pedidos ──────────────────────────────── */
   .p2-modal-box { width: 1180px; max-width: calc(100vw - 32px); max-height: 85vh; display: flex; flex-direction: column; }
@@ -512,9 +564,47 @@ if (!$pg && $error === '') {
 
       <div class="panel-table">
         <div class="panel-header">
-          <span class="panel-title">Pedidos Programados</span>
+          <span class="panel-title">Pedidos Programados <span class="p2-ordem">pela entrega esperada</span></span>
           <span class="filter-count-badge" id="p2CountBadge" style="background:rgba(45,106,255,.12);color:#7db3ff;"><?= count($programacao) ?></span>
+          <div class="p2-tipos" role="group" aria-label="Mostrar Big Bag ou Sacaria">
+            <?php foreach ($nomeTipo as $tipo => $nome): ?>
+              <button type="button" class="p2-tipo-btn tipo-<?= $tipo ?>" data-tipo="<?= $tipo ?>" aria-pressed="true"><?= $nome ?> <b><?= (int) ($qtdPorTipo[$tipo] ?? 0) ?></b></button>
+            <?php endforeach; ?>
+          </div>
         </div>
+        <?php if ($programacao): ?>
+        <div class="p2-filtros" id="p2Filtros">
+          <div class="p2-filtro">
+            <label for="p2FMes">Mês da entrega esperada</label>
+            <select id="p2FMes"><option value="">Todos os meses</option></select>
+          </div>
+          <div class="p2-filtro">
+            <label for="p2FEtapa">Etapa</label>
+            <select id="p2FEtapa">
+              <option value="">Todas as etapas</option>
+              <?php foreach ($etapasProducao as $etp): ?>
+                <option value="<?= (int) $etp['ETP_CODIGO'] ?>"><?= p2Escape($etp['ETP_DESCRICAO']) ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div class="p2-filtro">
+            <label for="p2FSituacao">Situação</label>
+            <select id="p2FSituacao">
+              <option value="">Todas</option>
+              <option value="atrasado">Entrega atrasada</option>
+              <option value="semana">Entrega nos próximos 7 dias</option>
+              <option value="saldo">Falta agendar</option>
+              <option value="sem_inicio">Sem início da produção</option>
+              <option value="concluido">Produção concluída</option>
+            </select>
+          </div>
+          <div class="p2-filtro">
+            <label for="p2FBusca">Buscar</label>
+            <input type="search" id="p2FBusca" placeholder="OP, cliente ou pedido" autocomplete="off">
+          </div>
+          <button type="button" class="p2-limpar" id="p2FLimpar" hidden>Limpar filtros</button>
+        </div>
+        <?php endif; ?>
         <div class="table-wrap">
           <table>
             <thead>
@@ -538,8 +628,25 @@ if (!$pg && $error === '') {
                 <tr class="p2-empty-row"><td colspan="12">Nenhum pedido na programação. Clique em "Adicionar Pedido à Programação" para começar.</td></tr>
               <?php else: ?>
                 <?php foreach ($programacao as $row): ?>
-                  <tr id="p2-row-<?= (int) $row['prg_codigo'] ?>">
-                    <td class="p2-cod"><?= p2Escape($row['prod_codigo']) ?></td>
+                  <?php
+                    $tiposRow = $tiposPorPrg[(int) $row['prg_codigo']] ?? [];
+                    $corRow = $corEtapa[(int) ($row['etp_codigo'] ?? 0)] ?? null;
+                    $progRow = $progresso[(int) $row['prg_codigo']] ?? null;
+                    $saldoRow = array_sum(array_column($progRow['tipos'] ?? [], 'saldo'));
+                    $buscaRow = mb_strtolower(implode(' ', [$row['prod_codigo'], $row['cli_nome'] ?? '', $row['cli_codigo'] ?? '', $row['venda_ref'] ?? '', $row['ven_cod_pedido'] ?? '']));
+                  ?>
+                  <tr id="p2-row-<?= (int) $row['prg_codigo'] ?>" data-tipos="<?= p2Escape(implode(' ', $tiposRow)) ?>"
+                      data-entrega="<?= p2Escape($row['data_entrega_esperada'] ?? '') ?>" data-entrega-erp="<?= p2Escape(substr((string) ($row['data_entrega'] ?? ''), 0, 10)) ?>" data-op="<?= (int) $row['prod_codigo'] ?>"
+                      data-etp="<?= (int) ($row['etp_codigo'] ?? 0) ?>" data-inicio="<?= p2Escape($row['data_inicio_producao'] ?? '') ?>"
+                      data-saldo="<?= $saldoRow > 0 ? 1 : 0 ?>" data-concluido="<?= !empty($progRow['concluido']) ? 1 : 0 ?>" data-busca="<?= p2Escape($buscaRow) ?>"
+                      <?= $corRow ? 'style="--etp:' . p2Escape($corRow) . '"' : '' ?>>
+                    <?php
+                      $rgbTipo = [PROD_TIPO_BAG => '34,197,94', PROD_TIPO_SACARIA => '168,85,247'];
+                      $nomesRow = implode(' e ', array_map(static fn ($t) => $nomeTipo[$t] ?? $t, $tiposRow));
+                      $t1 = $rgbTipo[$tiposRow[0] ?? ''] ?? null;
+                      $t2 = $rgbTipo[$tiposRow[1] ?? ''] ?? $t1;
+                    ?>
+                    <td class="p2-cod"<?= $t1 ? ' style="--t1:' . $t1 . ';--t2:' . $t2 . '" title="' . p2Escape($nomesRow) . '"' : '' ?>><?= p2Escape($row['prod_codigo']) ?><?php if ($nomesRow !== ''): ?><span class="p2-sr"> (<?= p2Escape($nomesRow) ?>)</span><?php endif; ?></td>
                     <td><?= p2Escape($row['cli_nome'] ?? '—') ?> <span class="p2-cod">(<?= p2Escape($row['cli_codigo'] ?? '—') ?>)</span></td>
                     <td><?= p2Escape($row['venda_ref'] ?: ($row['ven_cod_pedido'] ?: '—')) ?></td>
                     <td><?= p2Escape(p2FmtDate($row['prod_data'] ?? '')) ?></td>
@@ -570,7 +677,7 @@ if (!$pg && $error === '') {
                         onchange="p2AtualizarEtapa(this)">
                         <option value="">— Selecione —</option>
                         <?php foreach ($etapasProducao as $etp): ?>
-                        <option value="<?= (int) $etp['ETP_CODIGO'] ?>" <?= (int) ($row['etp_codigo'] ?? 0) === (int) $etp['ETP_CODIGO'] ? 'selected' : '' ?>>
+                        <option value="<?= (int) $etp['ETP_CODIGO'] ?>" data-cor="<?= p2Escape($etp['ETP_COR']) ?>" <?= (int) ($row['etp_codigo'] ?? 0) === (int) $etp['ETP_CODIGO'] ? 'selected' : '' ?>>
                           <?= p2Escape($etp['ETP_DESCRICAO']) ?>
                         </option>
                         <?php endforeach; ?>
@@ -762,8 +869,7 @@ function p2Finalizar(prgCodigo) {
       }
       const row = document.getElementById('p2-row-' + prgCodigo);
       if (row) row.remove();
-      const badge = document.getElementById('p2CountBadge');
-      if (badge) badge.textContent = Math.max(0, (parseInt(badge.textContent, 10) || 1) - 1);
+      if (window.p2AplicarTipos) window.p2AplicarTipos();
       const tbody = document.getElementById('p2Tbody');
       if (tbody && !tbody.querySelector('tr:not(.p2-empty-row)')) {
         tbody.innerHTML = '<tr class="p2-empty-row"><td colspan="12">Nenhum pedido na programação. Clique em "Adicionar Pedido à Programação" para começar.</td></tr>';
@@ -789,6 +895,13 @@ function p2AtualizarData(input, campo) {
         return;
       }
       input.dataset.prev = input.value;
+      if (campo === 'entrega') {
+        input.closest('tr').dataset.entrega = input.value;
+        p2Ordenar();
+      } else {
+        input.closest('tr').dataset.inicio = input.value;
+      }
+      if (window.p2AplicarTipos) window.p2AplicarTipos();
     })
     .catch(() => {
       alert('Erro ao salvar a data.');
@@ -817,6 +930,9 @@ function p2AtualizarEtapa(sel) {
         return;
       }
       sel.dataset.prev = etpCodigo;
+      sel.closest('tr').dataset.etp = etpCodigo;
+      p2PintarEtapa(sel);
+      if (window.p2AplicarTipos) window.p2AplicarTipos();
     })
     .catch(() => {
       alert('Erro ao atualizar a etapa.');
@@ -824,6 +940,134 @@ function p2AtualizarEtapa(sel) {
     })
     .finally(() => { sel.disabled = false; });
 }
+
+// ── Cor da etapa: pinta a linha com a cor cadastrada em Etapas de Produção ───
+function p2PintarEtapa(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  const cor = opt && opt.dataset.cor;
+  const tr = sel.closest('tr');
+  if (cor) tr.style.setProperty('--etp', cor); else tr.style.removeProperty('--etp');
+}
+
+// ── Ordem pela entrega esperada (sem data no fim), depois entrega do ERP e OP ─
+function p2Ordenar() {
+  const tbody = document.getElementById('p2Tbody');
+  const chave = tr => [tr.dataset.entrega || '9999-99-99', tr.dataset.entregaErp || '9999-99-99', String(tr.dataset.op || '').padStart(10, '0')].join('|');
+  Array.from(tbody.querySelectorAll('tr[data-op]'))
+    .sort((a, b) => chave(a).localeCompare(chave(b)))
+    .forEach(tr => tbody.appendChild(tr));
+}
+
+// ── Filtros: Big Bag / Sacaria, mês, etapa, situação e busca ─────────────────
+// Tudo no navegador; a escolha fica salva para a próxima vez (?mes=2026-11 na URL também vale).
+(function () {
+  const CHAVE = 'p2_tipos_ocultos';
+  const CHAVE_F = 'p2_filtros';
+  const botoes = Array.from(document.querySelectorAll('.p2-tipo-btn'));
+  const el = { mes: 'p2FMes', etapa: 'p2FEtapa', situacao: 'p2FSituacao', busca: 'p2FBusca' };
+  Object.keys(el).forEach(k => { el[k] = document.getElementById(el[k]); });
+  const limpar = document.getElementById('p2FLimpar');
+  const MESES = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+  // datas no fuso local (toISOString sozinho é UTC e vira o dia depois das 21h)
+  const diaLocal = ms => { const d = new Date(ms); return new Date(ms - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+  const hoje = diaLocal(Date.now());
+  const em7 = diaLocal(Date.now() + 7 * 86400000);
+  let ocultos = [];
+  try { ocultos = JSON.parse(localStorage.getItem(CHAVE) || '[]'); } catch (e) { ocultos = []; }
+  let salvos = {};
+  try { salvos = JSON.parse(localStorage.getItem(CHAVE_F) || '{}') || {}; } catch (e) { salvos = {}; }
+  const daUrl = new URLSearchParams(location.search).get('mes');
+  if (daUrl) salvos.mes = daUrl;
+  const linhas = () => Array.from(document.querySelectorAll('#p2Tbody tr[data-op]'));
+
+  // Meses que existem na lista, com a quantidade de pedidos de cada um
+  function montarMeses() {
+    if (!el.mes) return;
+    const atual = el.mes.value || salvos.mes || '';
+    const qtd = {};
+    linhas().forEach(tr => { const m = (tr.dataset.entrega || '').slice(0, 7) || 'sem'; qtd[m] = (qtd[m] || 0) + 1; });
+    const chaves = Object.keys(qtd).filter(m => m !== 'sem').sort();
+    let html = '<option value="">Todos os meses</option>';
+    chaves.forEach(m => {
+      const nome = MESES[parseInt(m.slice(5, 7), 10) - 1] + ' de ' + m.slice(0, 4);
+      html += '<option value="' + m + '">' + nome.charAt(0).toUpperCase() + nome.slice(1) + ' (' + qtd[m] + ')</option>';
+    });
+    if (qtd.sem) html += '<option value="sem">Sem entrega esperada (' + qtd.sem + ')</option>';
+    el.mes.innerHTML = html;
+    el.mes.value = (atual === 'sem' ? qtd.sem : qtd[atual]) ? atual : '';
+  }
+
+  function passa(tr, f) {
+    const tipos = (tr.dataset.tipos || '').split(' ').filter(Boolean);
+    // pedido sem tipo (ERP fora do ar) continua aparecendo
+    if (tipos.length && !tipos.some(t => !ocultos.includes(t))) return false;
+    const ent = tr.dataset.entrega || '';
+    if (f.mes === 'sem' ? ent !== '' : (f.mes && ent.slice(0, 7) !== f.mes)) return false;
+    if (f.etapa && tr.dataset.etp !== f.etapa) return false;
+    const concluido = tr.dataset.concluido === '1';
+    switch (f.situacao) {
+      case 'atrasado':   if (!(ent && ent < hoje && !concluido)) return false; break;
+      case 'semana':     if (!(ent && ent >= hoje && ent <= em7 && !concluido)) return false; break;
+      case 'saldo':      if (tr.dataset.saldo !== '1') return false; break;
+      case 'sem_inicio': if (tr.dataset.inicio) return false; break;
+      case 'concluido':  if (!concluido) return false; break;
+    }
+    if (f.busca && !(tr.dataset.busca || '').includes(f.busca)) return false;
+    return true;
+  }
+
+  function aplicar() {
+    botoes.forEach(b => b.setAttribute('aria-pressed', ocultos.includes(b.dataset.tipo) ? 'false' : 'true'));
+    montarMeses();
+    const f = {
+      mes: el.mes ? el.mes.value : '',
+      etapa: el.etapa ? el.etapa.value : '',
+      situacao: el.situacao ? el.situacao.value : '',
+      busca: el.busca ? el.busca.value.trim().toLowerCase() : '',
+    };
+    let visiveis = 0;
+    linhas().forEach(tr => { const ok = passa(tr, f); tr.hidden = !ok; if (ok) visiveis++; });
+    ['mes', 'etapa', 'situacao', 'busca'].forEach(k => { if (el[k]) el[k].classList.toggle('ativo', !!f[k]); });
+    if (limpar) limpar.hidden = !(f.mes || f.etapa || f.situacao || f.busca);
+    const badge = document.getElementById('p2CountBadge');
+    if (badge) badge.textContent = visiveis;
+    // aviso quando o filtro esconde tudo
+    const tbody = document.getElementById('p2Tbody');
+    let nada = document.getElementById('p2Nada');
+    if (linhas().length && !visiveis) {
+      if (!nada) {
+        nada = document.createElement('tr');
+        nada.id = 'p2Nada';
+        nada.className = 'p2-nada';
+        nada.innerHTML = '<td colspan="12">Nenhum pedido com esses filtros. Use "Limpar filtros" para ver todos.</td>';
+        tbody.appendChild(nada);
+      }
+    } else if (nada) {
+      nada.remove();
+    }
+    try { localStorage.setItem(CHAVE_F, JSON.stringify({ mes: f.mes, etapa: f.etapa, situacao: f.situacao })); } catch (e) {}
+  }
+
+  if (el.etapa && salvos.etapa) el.etapa.value = salvos.etapa;
+  if (el.situacao && salvos.situacao) el.situacao.value = salvos.situacao;
+  ['mes', 'etapa', 'situacao'].forEach(k => { if (el[k]) el[k].addEventListener('change', aplicar); });
+  if (el.busca) el.busca.addEventListener('input', aplicar);
+  if (limpar) limpar.addEventListener('click', () => {
+    ['mes', 'etapa', 'situacao', 'busca'].forEach(k => { if (el[k]) el[k].value = ''; });
+    salvos = {};
+    aplicar();
+  });
+  botoes.forEach(b => b.addEventListener('click', () => {
+    const t = b.dataset.tipo;
+    ocultos = ocultos.includes(t) ? ocultos.filter(x => x !== t) : ocultos.concat(t);
+    // nunca deixa os dois desligados: desligar o último liga o outro
+    if (ocultos.length >= botoes.length) ocultos = botoes.map(x => x.dataset.tipo).filter(x => x !== t);
+    try { localStorage.setItem(CHAVE, JSON.stringify(ocultos)); } catch (e) {}
+    aplicar();
+  }));
+  window.p2AplicarTipos = aplicar;
+  aplicar();
+})();
 </script>
 </body>
 </html>

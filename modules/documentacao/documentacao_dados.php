@@ -16,7 +16,7 @@ const DOC_AREAS = [
     'produzir'  => ['Produção', 'O que está acontecendo na fábrica agora.'],
     'conferir'  => ['Conferência', 'Defeitos, rastreio e fechamento da produção.'],
     'saida'     => ['Saída e estoque', 'O que saiu da fábrica e o que há em estoque.'],
-    'cadastros' => ['Cadastros e CRM', 'Produtos, máquinas, Trello e WhatsApp dos vendedores.'],
+    'cadastros' => ['Cadastros e CRM', 'Produtos, máquinas e WhatsApp dos vendedores.'],
     'conta'     => ['Conta e acesso', 'Sua senha, usuários e grupos.'],
     'admin'     => ['Administração', 'Telas exclusivas de quem administra o sistema.'],
 ];
@@ -38,16 +38,16 @@ const DOC_TELAS = [
     '/dashboard/widgets' => ['inicio', 'Escolha o que aparece no seu Dashboard. Vale só para você.'],
 
     '/vendas'            => ['vendas', 'Pedidos já importados do ERP, com a data de Saída/Faturamento da venda atacado. Clique no + de um pedido para ver a data e os itens.'],
-    '/yzidro/pedidos'    => ['vendas', 'No menu Yzidro: compara os pedidos aprovados no ERP com os do sistema e importa os selecionados. Mostra a Saída/Faturamento na lista e no + de cada pedido.'],
-    '/yzidro/consulta'   => ['vendas', 'Pedidos aprovados no ERP que ainda não foram finalizados.'],
+    '/yzidro/pedidos'    => ['vendas', 'Importar Pedidos do ERP, no menu Vendas: compara os pedidos aprovados no ERP com os do sistema e importa os selecionados. Mostra a Saída/Faturamento na lista e no + de cada pedido.'],
+    '/yzidro/consulta'   => ['vendas', 'Pedidos em Aberto no ERP: pedidos aprovados no ERP que ainda não foram finalizados.'],
     '/vendas/simulacao'  => ['vendas', 'Mostra a ocupação de cada máquina e a capacidade livre para novos pedidos.'],
 
-    '/pcp/reuniao'       => ['planejar', 'Programação dos pedidos. Na linha de cada um você altera entrega esperada, início da produção e etapa, e vê o andamento com o link para o calendário.'],
+    '/pcp/reuniao'       => ['planejar', 'Programação dos pedidos, na ordem da entrega esperada: quem entrega antes fica em cima, e pedido sem data vai para o fim. A faixa à esquerda de cada linha mostra o tipo: verde é Big Bag e roxo é Sacaria (meio a meio quando a OP tem os dois). Os botões Big Bag e Sacaria mostram ou escondem cada tipo. Os filtros acima da lista separam por mês da entrega esperada, etapa, situação (entrega atrasada, entrega nos próximos 7 dias, falta agendar, sem início da produção, produção concluída) e busca por OP, cliente ou pedido. As escolhas ficam salvas no seu navegador, e o contador mostra quantos pedidos estão na tela. Na linha de cada pedido você altera entrega esperada, início da produção e etapa, e vê o andamento com o link para o calendário. O seletor da etapa tem uma faixa na cor dela.'],
     '/pcp/agendamento'   => ['planejar', 'Calendário do mês com os pedidos planejados. Arraste de "A agendar" para definir o dia, divida a quantidade em vários dias e marque o realizado. Pedido sem dia na agenda fica só em "A agendar". Big Bag aparece em verde e Sacaria em roxo.'],
-    '/pcp/tv'            => ['planejar', 'O calendário do Agendamento para a TV da fábrica, somente leitura. No dia de hoje mostra também o que está em produção sem agendamento. Os pedidos da Reunião que já saíram aparecem como Finalizado, no dia da Saída/Faturamento do Yzidro.', '/pcp/agendamento'],
-    '/pcp/kanban'        => ['planejar', 'Quadro com os pedidos por etapa. Arraste um card para mudar a etapa. Cada card mostra o andamento e o link para o calendário.'],
+    '/pcp/tv'            => ['planejar', 'O calendário do Agendamento para a TV da fábrica, somente leitura. Fica no menu Planejamento e vale a permissão do Agendamento. No dia de hoje mostra também o que está em produção sem agendamento. Os pedidos da Reunião que já saíram aparecem como Finalizado, no dia da Saída/Faturamento do Yzidro.', '/pcp/agendamento'],
+    '/pcp/kanban'        => ['planejar', 'Quadro com os pedidos por etapa, cada coluna com a cor da etapa. Arraste um card para mudar a etapa. Cada card mostra o andamento e o link para o calendário.'],
     '/pcp/planejamento'  => ['planejar', 'Pedidos em produção, marcados no kanban antes da reunião.'],
-    '/pcp/etapas'        => ['planejar', 'Cadastro das etapas usadas na Reunião de Planejamento.', '/pcp/reuniao'],
+    '/pcp/etapas'        => ['planejar', 'Cadastro das etapas usadas na Reunião de Planejamento, cada uma com a sua cor. A cor aparece na Reunião e no topo da coluna do Kanban.', '/pcp/reuniao'],
     '/pcp/status-ops'    => ['planejar', 'Situação das OPs programadas, com o andamento e o link para o calendário. Pedido todo produzido não conta como atrasado.'],
 
     '/pcp/tempo-real'    => ['produzir', 'Acompanhe os apontamentos abertos de todas as etapas, de bag e de sacaria, com atualização automática. Com muitas máquinas, cada quadro rola por dentro.'],
@@ -57,7 +57,7 @@ const DOC_TELAS = [
     '/pcp/fila'          => ['produzir', 'Fila de trabalho das máquinas.'],
     '/pcp/painel-funcionarios' => ['produzir', 'Bags analisados por pessoa no período e, à parte, o que cada uma fez em outras etapas (costuras, impressão, sacaria). Gera PDF.'],
     '/pcp/bi'            => ['produzir', 'Painel para TV com bags produzidos (analisados) no mês, meta, OPs ativas e bags analisados por pessoa.'],
-    '/pcp/bi-individual' => ['produzir', 'Bags produzidos (analisados) do dia contra a meta. Ao lado, o que cada pessoa fez passa como slides, uma atividade por vez (Costura alça, Análise, Impressão...), trocando a cada 12 segundos. As bolinhas no topo levam direto a uma atividade e o botão Travar deixa a tela parada nela. Para uma TV sempre na mesma atividade, abra com ?atividade=7 (Análise) ou o código da atividade.'],
+    '/pcp/bi-individual' => ['produzir', 'Bags produzidos (analisados) do dia contra a meta. Ao lado, o que cada pessoa fez passa como slides, uma atividade por vez (Costura alça, Análise, Impressão...), trocando a cada 12 segundos. As bolinhas no topo levam direto a uma atividade e o botão Travar deixa a tela parada nela. Os botões Bag, Sacaria e Os dois escolhem o que aparece. Em Sacaria, o total mostra as sacarias cortadas (o Corte é a etapa final) e, embaixo, quanto saiu em cada etapa da sacaria; a meta do dia continua sendo de bags. Para uma TV sempre na mesma atividade, abra com ?atividade=7 (Análise) ou o código da atividade; para fixar o tipo, use ?tipo=bag, ?tipo=sacaria ou ?tipo=todos.'],
     '/yzidro/producao'   => ['produzir', 'Ordens finalizadas, com os itens separados por setor.'],
 
     '/relatorios/producao'      => ['conferir', 'Produção por máquina e por dia, com bag e sacaria somados. Gera PDF.'],
@@ -72,7 +72,7 @@ const DOC_TELAS = [
 
     '/produtos'          => ['cadastros', 'Lista dos produtos cadastrados.'],
     '/maquinas'          => ['cadastros', 'Consulta das máquinas cadastradas no ERP.'],
-    '/trello'            => ['cadastros', 'Quadro de pedidos do Trello dentro do sistema.'],
+    '/trello'            => ['vendas', 'Pedidos no Trello: o quadro de pedidos do Trello dentro do sistema.'],
     '/modules/crm/whatsapp_sincronizar.php' => ['cadastros', 'Conecta o WhatsApp Web de cada vendedor. Faça isso antes de sincronizar os contatos.'],
     '/modules/crm/whatsapp_contatos.php'    => ['cadastros', 'Agenda dos vendedores em um só lugar, com origem e último contato.'],
 
@@ -161,6 +161,8 @@ const DOC_NUMEROS = [
      'É a data informada na venda atacado do ERP. Ela pode estar no futuro enquanto o pedido aguarda produção, então não significa que o pedido já saiu.'],
     ['O que muda no ERP quando uso o sistema?',
      'Nada. As consultas ao ERP Yzidro são somente leitura. Reunião, agenda, etapas e datas ficam no sistema DOMBAG.'],
+    ['Onde estão as telas que eram do menu Yzidro, Relatórios, Trello e Máquinas?',
+     'O menu foi organizado pelo caminho do pedido: Planejamento, Produção, Conferência, Vendas, Saída e Estoque e Cadastros. Pedidos do ERP e Trello ficam em Vendas, Painel de OPs em Produção, Rastreabilidade e relatórios de produção e defeitos em Conferência, estoque e histórico de pedidos em Saída e Estoque, e Produtos, Máquinas e WhatsApp em Cadastros. As permissões não mudaram.'],
     ['O que o Assistente IA responde?',
      'Administradores consultam pedidos, faturamento e produção. Representantes consultam só os próprios pedidos. Os demais usuários tiram dúvidas sobre o uso do sistema, com base nesta documentação.'],
     ['O lote mostrado na Rastreabilidade é sempre o físico?',

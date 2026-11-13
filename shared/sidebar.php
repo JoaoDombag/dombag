@@ -39,6 +39,9 @@ function sb_can(string $href): bool {
     global $_sb_admin, $_sb_perms, $__sb_always_visible;
     if ($_sb_admin) return true;
     if (in_array($href, $__sb_always_visible, true)) return true;
+    // Telas liberadas pela permissão de outra (mesma cobertura de login/auth.php)
+    $cobertura = ['/pcp/tv' => '/pcp/agendamento'];
+    if (isset($cobertura[$href]) && in_array($cobertura[$href], $_sb_perms, true)) return true;
     return in_array($href, $_sb_perms, true);
 }
 
