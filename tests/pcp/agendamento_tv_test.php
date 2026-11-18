@@ -41,12 +41,14 @@ confere('avisos', agTvCard(card(['aberto' => 5.0, 'tarde' => true]), $hoje)['avi
 
 // Produção sem agendamento
 $livre = ['plan' => 0.0, 'status' => 'produzido'];
-confere('com leitura mostra a quantidade', agTvCard(card($livre + ['real' => 50.0]), $hoje)['qtd'], '50 bags s/ agenda');
+confere('com leitura mostra a quantidade', agTvCard(card($livre + ['real' => 50.0]), $hoje)['qtd'], '50 bags');
 confere('parada hoje fica cheia', agTvCard(card($livre + ['real' => 50.0]), $hoje)['pct'], 100);
 confere('ativa não fica cheia', agTvCard(card($livre + ['real' => 50.0, 'agora' => true]), $hoje)['pct'], 0);
-confere('sacaria em aberto', agTvCard(card($livre + ['tipo' => 'SACARIA', 'aberto' => 5000.0]), $hoje)['qtd'], '5.000 sacarias em aberto');
-confere('em aberto não repete no aviso', agTvCard(card($livre + ['tipo' => 'SACARIA', 'aberto' => 5000.0]), $hoje)['avisos'], []);
-confere('ativa sem leitura mostra o tipo', agTvCard(card($livre + ['agora' => true]), $hoje)['qtd'], 'Big Bag sem agenda');
+confere('só fechamento mostra apontamento finalizado', agTvCard(card($livre + ['tipo' => 'SACARIA', 'aberto' => 5000.0]), $hoje)['qtd'], 'Apontamento finalizado');
+confere('só fechamento sem aviso', agTvCard(card($livre + ['tipo' => 'SACARIA', 'aberto' => 5000.0, 'op_feito' => 0.0, 'op_total' => 5000.0]), $hoje)['avisos'], []);
+confere('só fechamento com total da OP', agTvCard(card($livre + ['tipo' => 'SACARIA', 'aberto' => 5000.0, 'op_feito' => 0.0, 'op_total' => 5000.0]), $hoje)['qtd'], 'Apontamento finalizado');
+confere('produzindo agora com fechamento em aberto', agTvCard(card($livre + ['tipo' => 'SACARIA', 'aberto' => 5000.0, 'agora' => true]), $hoje)['qtd'], '5.000 sacarias em aberto');
+confere('ativa sem leitura mostra o tipo', agTvCard(card($livre + ['agora' => true]), $hoje)['qtd'], 'Big Bag');
 confere('card comum não está ativo', agTvCard(card([]), $hoje)['agora'], false);
 
 // OPs com apontamento aberto
@@ -60,7 +62,26 @@ confere('OP de outra empresa fica fora', count($comAtivas), 3);
 confere('bag ativo não marca a sacaria', agTvComAtivas([card(['tipo' => 'SACARIA'])], [$ativa(3187)], $info, $hoje)[0]['agora'] ?? false, false);
 confere('sacaria ativa é marcada', agTvComAtivas([card(['tipo' => 'SACARIA'])], [$ativa(3187, 'SACARIA')], $info, $hoje)[0]['agora'] ?? false, true);
 $sacAtiva = agTvComAtivas([], [$ativa(4000, 'SACARIA')], $info, $hoje);
-confere('sacaria ativa sem card ganha um', [$sacAtiva[0]['tipo'], agTvCard($sacAtiva[0], $hoje)['qtd']], ['SACARIA', 'Sacaria sem agenda']);
+confere('sacaria ativa sem card ganha um', [$sacAtiva[0]['tipo'], agTvCard($sacAtiva[0], $hoje)['qtd']], ['SACARIA', 'Sacaria']);
+
+// Andamento da OP nos cards produzindo agora
+$infoAnd = [3187 => ['tipos' => ['BAG' => ['qtd' => 1000.0], 'SACARIA' => ['qtd' => 0.0]]]];
+$prodAnd = [['op' => 3187, 'tipo' => 'BAG', 'qtd' => 200.0], ['op' => 3187, 'tipo' => 'BAG', 'qtd' => 67.0],
+            ['op' => 3187, 'tipo' => 'SACARIA', 'qtd' => 50.0]];
+$and = agTvComAndamento([card(['op' => 3187, 'agora' => true, 'plan' => 100.0, 'real' => 20.0]),
+                         card(['op' => 3187]),
+                         card(['op' => 3187, 'tipo' => 'SACARIA', 'agora' => true, 'plan' => 0.0])], $prodAnd, $infoAnd, $hoje);
+confere('produzindo mostra produzido / a produzir', agTvCard($and[0], $hoje)['qtd'], '267 / 1.000 bags');
+confere('barra segue o andamento da OP', round(agTvCard($and[0], $hoje)['pct'], 1), 26.7);
+confere('parado não muda', agTvCard($and[1], $hoje)['qtd'], '100 bags prev.');
+confere('sem quantidade na OP não muda', agTvCard($and[2], $hoje)['qtd'], 'Sacaria');
+$parada = agTvComAndamento([card(['op' => 3187, 'plan' => 0.0, 'real' => 2.0, 'status' => 'produzido']),
+                            card(['op' => 3187, 'plan' => 0.0, 'aberto' => 500.0, 'status' => 'produzido'])], $prodAnd, $infoAnd, $hoje);
+confere('sem agenda e parada também mostra o total', agTvCard($parada[0], $hoje)['qtd'], '267 / 1.000 bags');
+confere('sem agenda e parada não fica cheia', round(agTvCard($parada[0], $hoje)['pct'], 1), 26.7);
+confere('em aberto vira aviso', [agTvCard($parada[1], $hoje)['qtd'], agTvCard($parada[1], $hoje)['avisos']], ['267 / 1.000 bags', ['500 em aberto no ERP']]);
+confere('outro dia sem agenda não muda', isset(agTvComAndamento([card(['op' => 3187, 'dia' => '2026-11-03', 'plan' => 0.0])], $prodAnd, $infoAnd, $hoje)[0]['op_total']), false);
+confere('OP sem produção começa do zero', agTvCard(agTvComAndamento([card(['op' => 3187, 'agora' => true])], [], $infoAnd, $hoje)[0], $hoje)['qtd'], '0 / 1.000 bags');
 
 // Grade: novembro/2026 cobre 6 semanas completas
 $cards = [
@@ -79,8 +100,16 @@ confere('título do mês', $p['mes_titulo'], 'Novembro de 2026');
 
 $diaHoje = $p['semanas'][1][2];
 confere('hoje está na quarta da 2a semana', [$diaHoje['num'], $diaHoje['hoje']], [4, true]);
-confere('produção sem agendamento aparece hoje', count($diaHoje['cards']), 4);
-confere('bag antes de sacaria, maior primeiro', array_column($diaHoje['cards'], 'qtd'), ['300 bags prev.', '100 bags prev.', '50 bags s/ agenda', '2.000 sacarias prev.']);
+confere('cards de hoje saem da grade', [$diaHoje['cards'], $diaHoje['no_painel']], [[], 4]);
+confere('produção sem agendamento aparece no painel de hoje', count($p['lateral']['cards']), 4);
+confere('bag antes de sacaria, maior primeiro', array_column($p['lateral']['cards'], 'qtd'), ['300 bags prev.', '100 bags prev.', '50 bags', '2.000 sacarias prev.']);
+confere('somas do painel com unidade', [$p['lateral']['soma_bag'], $p['lateral']['soma_sac']], ['400 bags agendados', '2.000 sacarias agendadas']);
+confere('título do painel', $p['lateral']['titulo'], 'Hoje · 04/11');
+$comAgora = agTvPainel($base + ['cards' => [card(['plan' => 300.0]), card(['op' => 1, 'plan' => 100.0, 'agora' => true])]]);
+confere('produzindo agora vem primeiro', array_column($comAgora['lateral']['cards'], 'agora'), [true, false]);
+confere('outros dias continuam na grade', count(agTvPainel($base + ['cards' => [card(['dia' => '2026-11-05'])]])['semanas'][1][3]['cards']), 1);
+$outroMes = agTvPainel(['mes' => '2026-12', 'hoje' => $hoje] + array_combine(['ini', 'fim'], agGrade('2026-12')) + ['cards' => []]);
+confere('sem hoje na grade não há painel', $outroMes['lateral'], null);
 confere('soma do dia usa o agendado (bag)', $diaHoje['soma_bag'], '400');
 confere('soma do dia usa o agendado (sacaria)', $diaHoje['soma_sac'], '2.000');
 confere('dia de outro mês', $p['semanas'][0][0]['outro_mes'], true);
@@ -97,12 +126,12 @@ $comMarco = agTvPainel($base + ['cards' => [], 'marcos' => ['2026-11-04' => [
     ['marco' => 'inicio', 'pedido' => '3829', 'cliente' => 'Cliente', 'op' => 3187],
     ['marco' => 'inicio', 'pedido' => '', 'cliente' => 'Cliente', 'op' => 3187],
 ]]]);
-confere('marcos no dia', array_column($comMarco['semanas'][1][2]['marcos'], 'texto'), ['Início 3829 Cliente', 'Início OP 3187 Cliente']);
+confere('marcos no dia', array_column($comMarco['semanas'][1][2]['marcos'], 'texto'), ['3829 Cliente', 'OP 3187 Cliente']);
 confere('sem ERP não há situação', $comMarco['semanas'][1][2]['marcos'][0]['detalhe'], '');
 confere('bag iniciada', agMarcoDetalhe(PROD_TIPO_BAG, true), 'Big Bag · Iniciada');
 confere('sacaria não iniciada', agMarcoDetalhe(PROD_TIPO_SACARIA, false), 'Sacaria · Não iniciada');
 confere('marco leva o tipo para a tela', agTvMarco(['marco' => 'inicio', 'pedido' => '1', 'cliente' => 'C', 'op' => 1, 'tipo' => 'SACARIA', 'iniciada' => false, 'detalhe' => 'x']),
-    ['marco' => 'inicio', 'texto' => 'Início 1 C', 'tipo' => 'SACARIA', 'iniciada' => false, 'detalhe' => 'x']);
+    ['marco' => 'inicio', 'texto' => '1 C', 'rotulo' => 'Início', 'tipo' => 'SACARIA', 'iniciada' => false, 'detalhe' => 'x']);
 confere('dia sem marco', $comMarco['semanas'][1][3]['marcos'], []);
 confere('marco não conta como agendado', $comMarco['tem_agenda'], false);
 
@@ -163,12 +192,12 @@ confere('um marcador por pedido', array_column($fins['2026-11-05'], 'pedido'), [
 confere('finalizado mostra o tipo', [$fins['2026-11-05'][0]['tipo'], $fins['2026-11-05'][0]['detalhe']], ['BAG', 'Big Bag']);
 confere('pedido com os dois tipos', [$fins['2026-11-05'][1]['tipo'], $fins['2026-11-05'][1]['detalhe']], [null, 'Big Bag e Sacaria']);
 confere('finalizado não fica pendente', $fins['2026-11-05'][1]['iniciada'], true);
-confere('texto do finalizado', agTvMarco($fins['2026-11-05'][0])['texto'], 'Finalizado 100 Cliente A');
+confere('texto do finalizado', agTvMarco($fins['2026-11-05'][0])['texto'], '100 Cliente A');
 confere('finalizado sem OP conhecida', agTvMarcosFinalizados([['op' => 99, 'pedido' => '102', 'dia' => '2026-11-05']], [])['2026-11-05'][0]['detalhe'], '');
 
 // Demonstração: precisa se identificar e cobrir os estados do calendário
 $demo = agTvDemo(date('Y-m'));
-$demoCards = array_merge(...array_column(array_merge(...$demo['semanas']), 'cards'));
+$demoCards = array_merge($demo['lateral']['cards'] ?? [], ...array_column(array_merge(...$demo['semanas']), 'cards'));
 confere('demonstração se identifica', $demo['demo'], true);
 confere('demonstração tem agenda', $demo['tem_agenda'], true);
 confere('demonstração sem cliente ou pedido real', array_filter($demoCards, static fn ($c) => (int) $c['pedido'] < 7000), []);

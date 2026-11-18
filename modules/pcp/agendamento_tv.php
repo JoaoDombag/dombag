@@ -10,6 +10,8 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/pcp/agendamento_tv_dados.php'
 //  autossuficiente e usa só ES5 e CSS sem variáveis, grid, clamp ou gap.
 //  Não reaproveita sidebar nem unified_admin.css, que dependem de recursos
 //  modernos. Mantenha essas restrições ao editar.
+//  Os pedidos de hoje ficam num painel lateral, fora da grade, para o dia
+//  atual não espremer o resto do calendário.
 //  Parâmetros: ?mes=YYYY-MM fixa o mês; ?diag=1 abre o diagnóstico;
 //  ?demo=1 mostra dados fictícios, com aviso na tela, sem consultar nem gravar.
 // ══════════════════════════════════════════════════════════════
@@ -109,7 +111,7 @@ session_write_close();
   .leg .agora { border-color: #58d6c9; }
   .leg .inicio { background: #a3e635; border-color: #a3e635; }
   .leg .finalizado { background: #38bdf8; border-color: #38bdf8; }
-  #vazio { display: none; margin-left: auto; font-size: .8rem; color: #8fa0b3; }
+  #vazio { display: none; margin-left: auto; padding-left: .6rem; font-size: .7rem; color: #8fa0b3; white-space: nowrap; }
 
   /* ── Aviso de dados desatualizados / erro ── */
   #aviso { display: none; -webkit-flex: 0 0 auto; flex: 0 0 auto; margin-bottom: .4rem; padding: .45rem 1rem; border-radius: .6rem; font-size: 1.1rem; font-weight: 700; }
@@ -117,9 +119,25 @@ session_write_close();
   .erro #aviso { display: block; background: #4d1a1a; color: #ffc4c4; }
   #aviso a { color: #fff; }
 
+  /* ── Corpo: calendário à esquerda, painel de hoje à direita ── */
+  #corpo { display: -webkit-flex; display: flex; -webkit-flex: 1 1 auto; flex: 1 1 auto; min-height: 0; }
+
   /* ── Calendário: fim de semana mais estreito, como na página original ── */
-  #calendario { display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; -webkit-flex: 1 1 auto; flex: 1 1 auto; min-height: 0; background: #0d1117; border: 1px solid #222a33; border-radius: .6rem; overflow: hidden; }
-  .desatualizado #grade { opacity: .6; }
+  #calendario { display: -webkit-flex; display: flex; -webkit-flex-direction: column; flex-direction: column; -webkit-flex: 1 1 auto; flex: 1 1 auto; min-width: 0; min-height: 0; background: #0d1117; border: 1px solid #222a33; border-radius: .6rem; overflow: hidden; }
+  .desatualizado #grade, .desatualizado #latLista { opacity: .6; }
+
+  /* ── Painel de hoje: o que está agendado e em produção no dia ── */
+  #lateral { display: none; -webkit-flex-direction: column; flex-direction: column; -webkit-flex: 0 0 24rem; flex: 0 0 24rem; width: 24rem; min-height: 0; margin-left: .7rem; padding: .5rem .6rem; background: #0d1117; border: 3px solid #2d6aff; border-radius: .6rem; overflow: hidden; }
+  #latTitulo { -webkit-flex: 0 0 auto; flex: 0 0 auto; font-size: 1.4rem; font-weight: 900; color: #fff; white-space: nowrap; }
+  #latSomas { -webkit-flex: 0 0 auto; flex: 0 0 auto; padding-bottom: .35rem; margin-bottom: .1rem; border-bottom: 1px solid #222a33; font-size: .95rem; font-weight: 800; }
+  #latSomas div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #latSomas .bag { color: #4ade80; }
+  #latSomas .sac { color: #c084fc; }
+  #latLista { -webkit-flex: 1 1 auto; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  #latLista .cartao { margin-top: .35em; padding: .25em .5em .25em .75em; }
+  #latLista .cartao .faixa { width: .3em; }
+  #latVazio { margin-top: 1rem; text-align: center; font-size: 1.1rem; font-weight: 700; color: #8fa0b3; }
+  .verPainel { margin-top: .15em; font-size: .8em; font-weight: 700; color: #7fa8ff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .semana { display: -webkit-flex; display: flex; }
   #cabecalho { -webkit-flex: 0 0 auto; flex: 0 0 auto; border-bottom: 1px solid #222a33; font-size: .95rem; font-weight: 700; color: #8fa0b3; }
   #cabecalho div { padding: .2rem .5rem; }
@@ -140,8 +158,9 @@ session_write_close();
   .somaSac { color: #c084fc; font-weight: 800; margin-left: .5em; }
 
   .marco { margin-top: .15em; padding: 0 .3em; border-radius: .2em; font-size: .8em; font-weight: 700; line-height: 1.25; color: #eef2f7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .marco.inicio { background: rgba(163,230,53,.18); border-left: .25em solid #a3e635; }
-  .marco.finalizado { background: rgba(56,189,248,.2); border-left: .25em solid #38bdf8; }
+  /* A etapa é a cor do fundo (legenda "Pedido"); a borda é o tipo */
+  .marco.inicio { background: rgba(163,230,53,.32); border-left: .25em solid #a3e635; }
+  .marco.finalizado { background: rgba(56,189,248,.35); border-left: .25em solid #38bdf8; }
   .marco.BAG { border-left-color: #22c55e; }
   .marco.SACARIA { border-left-color: #a855f7; }
   .marcoSub { font-size: .85em; font-weight: 600; color: #a9b6c4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -213,11 +232,18 @@ setTimeout(function () {
   <div id="aviso" role="status"></div>
   <noscript><div style="font-size:1.5rem;color:#ffc4c4;padding:1rem">Este painel precisa de JavaScript habilitado.</div></noscript>
 
-  <div id="calendario">
-    <div class="semana" id="cabecalho">
-      <div class="col">Segunda</div><div class="col">Terça</div><div class="col">Quarta</div><div class="col">Quinta</div><div class="col">Sexta</div><div class="col fds">Sábado</div><div class="col fds">Domingo</div>
+  <div id="corpo">
+    <div id="calendario">
+      <div class="semana" id="cabecalho">
+        <div class="col">Segunda</div><div class="col">Terça</div><div class="col">Quarta</div><div class="col">Quinta</div><div class="col">Sexta</div><div class="col fds">Sábado</div><div class="col fds">Domingo</div>
+      </div>
+      <div id="grade"><div id="estado">Carregando dados…</div></div>
     </div>
-    <div id="grade"><div id="estado">Carregando dados…</div></div>
+    <div id="lateral">
+      <div id="latTitulo">Hoje</div>
+      <div id="latSomas"></div>
+      <div id="latLista"></div>
+    </div>
   </div>
 
   <div id="legenda">
@@ -255,10 +281,17 @@ setTimeout(function () {
   var ALT_AVISO = 1.05;
   var ALT_MARCO = 1.15;
   var ALT_MARCO_SUB = 0.9;
+  var ALT_VER_PAINEL = 1.15;
   var ALT_SEMANA_MIN = 3.2;
   var FONTE_MIN_REM = 0.7;     // abaixo disso os cards passam a ter uma linha só
-  var FONTE_MAX_REM = 1.25;
+  var FONTE_MAX_REM = 1.05;    // com hoje no painel sobra altura; maior que isso corta os nomes
   var FONTE_MAX_COMPACTO_REM = 1;
+
+  // Painel de hoje: cards maiores, com mais respiro.
+  var ALT_CARD_LAT = 3.1;
+  var ALT_COMPACTO_LAT = 2.1;
+  var FONTE_MIN_LAT_REM = 0.85;
+  var FONTE_MAX_LAT_REM = 1.35;
 
   var MES_FIXO = <?= json_encode($mesFixo) ?>;
   var DIAG = <?= !empty($_GET['diag']) ? 'true' : 'false' ?>;
@@ -304,7 +337,7 @@ setTimeout(function () {
   }
 
   function altDia(d, compacto) {
-    var alt = ALT_TOPO + d.marcos.length * ALT_MARCO;
+    var alt = ALT_TOPO + d.marcos.length * ALT_MARCO + (d.no_painel ? ALT_VER_PAINEL : 0);
     for (var m = 0; m < d.marcos.length; m++) {
       if (d.marcos[m].detalhe) { alt += ALT_MARCO_SUB; }
     }
@@ -351,11 +384,70 @@ setTimeout(function () {
     topo.appendChild(somas);
     el.appendChild(topo);
 
+    if (d.no_painel) {
+      el.appendChild(criar('div', 'verPainel', d.no_painel + (d.no_painel === 1 ? ' pedido' : ' pedidos') + ' →'));
+    }
     for (var m = 0; m < d.marcos.length; m++) {
       el.appendChild(criaMarco(d.marcos[m]));
     }
     for (var i = 0; i < d.cards.length; i++) { el.appendChild(criaCartao(d.cards[i], compacto)); }
     return el;
+  }
+
+  // ── Painel de hoje ─────────────────────────────────────────────────────────
+  // Mesma ideia da grade: fonte grande enquanto couber; se não couber, cards
+  // de uma linha e, se preciso, fonte menor até todos aparecerem.
+  function somaLateral(cards, compacto) {
+    var soma = 0;
+    for (var i = 0; i < cards.length; i++) {
+      soma += (compacto ? ALT_COMPACTO_LAT : ALT_CARD_LAT) + cards[i].avisos.length * ALT_AVISO;
+    }
+    return soma;
+  }
+
+  function montaLateral(cards, compacto, fonte) {
+    var lista = $('latLista');
+    lista.textContent = '';
+    lista.style.fontSize = fonte + 'px';
+    for (var i = 0; i < cards.length; i++) { lista.appendChild(criaCartao(cards[i], compacto)); }
+  }
+
+  function desenhaLateral(d) {
+    var lat = $('lateral');
+    if (!d.lateral) {
+      lat.style.display = 'none';
+      return;
+    }
+    lat.style.display = 'flex';
+    if (lat.style.display !== 'flex') { lat.style.display = '-webkit-flex'; }
+
+    var p = d.lateral;
+    texto('latTitulo', p.titulo);
+    var somas = $('latSomas');
+    somas.textContent = '';
+    if (p.soma_bag) { somas.appendChild(criar('div', 'bag', p.soma_bag)); }
+    if (p.soma_sac) { somas.appendChild(criar('div', 'sac', p.soma_sac)); }
+    somas.style.display = (p.soma_bag || p.soma_sac) ? 'block' : 'none';
+
+    var lista = $('latLista');
+    if (!p.cards.length) {
+      lista.textContent = '';
+      var vazio = criar('div', '', 'Nada agendado nem em produção hoje.');
+      vazio.id = 'latVazio';
+      lista.appendChild(vazio);
+      return;
+    }
+    lista.textContent = '';
+    var altura = lista.clientHeight;
+    var rem = parseFloat(document.documentElement.style.fontSize) || 20;
+    var soma = somaLateral(p.cards, false);
+    var compacto = altura / soma < FONTE_MIN_LAT_REM * rem;
+    if (compacto) { soma = somaLateral(p.cards, true); }
+    var fonte = Math.min(altura / soma, FONTE_MAX_LAT_REM * rem);
+    for (var fator = 1; fator >= 0.4; fator -= 0.05) {
+      montaLateral(p.cards, compacto, fonte * fator);
+      if (lista.scrollHeight <= lista.clientHeight) { return; }
+    }
   }
 
   function criaMarco(m) {
@@ -407,6 +499,7 @@ setTimeout(function () {
   function desenhaDados(d) {
     texto('titulo', 'Agendamento de Produção — ' + d.mes_titulo + (d.demo ? ' — DEMONSTRAÇÃO' : ''));
     $('vazio').style.display = d.tem_agenda ? 'none' : 'block';
+    desenhaLateral(d); // antes da grade: o painel tira largura do calendário
     desenhaGrade(d);
   }
 

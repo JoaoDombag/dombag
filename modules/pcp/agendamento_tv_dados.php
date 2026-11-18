@@ -41,31 +41,47 @@ function agTvMesTitulo(string $mes): string
     return AGTV_MESES[(int) $m - 1] . ' de ' . $ano;
 }
 
+// OP sem agendamento só com o lançamento de fechamento no ERP, ainda em aberto,
+// sem produção apontada nem etapa em andamento (ex.: sacaria tirada do estoque).
+function agTvSoFechamento(array $c): bool
+{
+    return $c['aberto'] > 0 && $c['plan'] <= 0 && empty($c['agora']) && $c['real'] <= 0 && ($c['op_feito'] ?? 0.0) <= 0;
+}
+
 // Texto da quantidade: com previsto, mesmas regras de htmlCard em agendamento.php.
+// Sem previsto, só a quantidade ou o tipo: a TV não destaca a falta de agenda.
 function agTvQtd(array $c, string $hoje): string
 {
     $un = AGTV_UNIDADE[$c['tipo']];
+    if (agTvSoFechamento($c)) {
+        return 'Apontamento finalizado';
+    }
+    if (isset($c['op_total'])) {
+        return agTvNum($c['op_feito']) . ' / ' . agTvNum($c['op_total']) . " {$un}";
+    }
     if ($c['plan'] > 0) {
         return ($c['real'] > 0 || $c['dia'] < $hoje)
             ? agTvNum($c['real']) . " {$un} de " . agTvNum($c['plan'])
             : agTvNum($c['plan']) . " {$un} prev.";
     }
     return match (true) {
-        $c['real'] > 0   => agTvNum($c['real']) . " {$un} s/ agenda",
+        $c['real'] > 0   => agTvNum($c['real']) . " {$un}",
         $c['aberto'] > 0 => agTvNum($c['aberto']) . " {$un} em aberto",
-        default          => AG_TIPO_NOME[$c['tipo']] . ' sem agenda',
+        default          => AG_TIPO_NOME[$c['tipo']],
     };
 }
 
 function agTvCard(array $c, string $hoje): array
 {
     $agora = !empty($c['agora']);
-    $pct   = $c['plan'] > 0
-        ? min(100, $c['real'] / $c['plan'] * 100)
-        : ($c['real'] > 0 && !$agora ? 100 : 0);
+    $pct   = match (true) {
+        isset($c['op_total']) => min(100, $c['op_feito'] / $c['op_total'] * 100),
+        $c['plan'] > 0        => min(100, $c['real'] / $c['plan'] * 100),
+        default               => $c['real'] > 0 && !$agora ? 100 : 0,
+    };
 
     $avisos = [];
-    if ($c['aberto'] > 0 && ($c['plan'] > 0 || $c['real'] > 0)) {
+    if ($c['aberto'] > 0 && !agTvSoFechamento($c) && ($c['plan'] > 0 || $c['real'] > 0 || isset($c['op_total']))) {
         $avisos[] = agTvNum($c['aberto']) . ' em aberto no ERP';
     }
     if ($c['tarde']) {
@@ -132,12 +148,40 @@ function agTvComAtivas(array $cards, array $ativas, array $info, string $hoje): 
     return $cards;
 }
 
+// Cards de hoje que mostram o andamento da OP: os produzindo agora e os sem agendamento.
+function agTvMostraAndamento(array $c, string $hoje): bool
+{
+    return $c['dia'] === $hoje && (!empty($c['agora']) || $c['plan'] <= 0);
+}
+
+// Andamento da OP nesses cards: produzido em todos os dias (mesma regra de
+// pronto do Agendamento) e a quantidade da OP no tipo do card.
+// $producao vem de agProducaoOps; $info, de agOpsInfo.
+function agTvComAndamento(array $cards, array $producao, array $info, string $hoje): array
+{
+    $feito = [];
+    foreach ($producao as $r) {
+        $k = (int) $r['op'] . '|' . $r['tipo'];
+        $feito[$k] = ($feito[$k] ?? 0.0) + (float) $r['qtd'];
+    }
+    foreach ($cards as &$c) {
+        $total = $info[$c['op']]['tipos'][$c['tipo']]['qtd'] ?? 0.0;
+        if ($total > 0 && agTvMostraAndamento($c, $hoje)) {
+            $c['op_feito'] = $feito["{$c['op']}|{$c['tipo']}"] ?? 0.0;
+            $c['op_total'] = $total;
+        }
+    }
+    unset($c);
+    return $cards;
+}
+
 function agTvMarco(array $m): array
 {
     $pedido = $m['pedido'] !== '' ? $m['pedido'] : 'OP ' . $m['op'];
     return [
         'marco'    => $m['marco'],
-        'texto'    => trim(AGTV_MARCOS[$m['marco']] . " {$pedido} {$m['cliente']}"),
+        'texto'    => trim("{$pedido} {$m['cliente']}"),  // a etapa é a cor do marco, explicada na legenda
+        'rotulo'   => AGTV_MARCOS[$m['marco']],
         'tipo'     => $m['tipo'] ?? null,
         'iniciada' => $m['iniciada'] ?? null,
         'detalhe'  => $m['detalhe'] ?? '',
@@ -201,9 +245,13 @@ function agTvMostra(array $c, string $hoje): bool
         || ($c['dia'] === $hoje && (!empty($c['agora']) || $c['real'] > 0 || $c['aberto'] > 0));
 }
 
-// Grade do mês em semanas de 7 dias, pronta para desenhar.
+// Grade do mês em semanas de 7 dias, pronta para desenhar. Os cards de hoje
+// saem da grade e vão para o painel lateral ('lateral'), com quem está
+// produzindo agora primeiro; a célula de hoje guarda só marcos e a contagem.
+// 'lateral' é null quando hoje não está na grade (?mes= de outro mês).
 function agTvPainel(array $d): array
 {
+    $lateral = null;
     $porDia = [];
     $temAgenda = false;
     foreach ($d['cards'] as $c) {
@@ -226,18 +274,30 @@ function agTvPainel(array $d): array
             $soma[$c['tipo']] += $c['plan'];
         }
 
+        $ehHoje = $dia === $d['hoje'];
+        if ($ehHoje) {
+            usort($cards, static fn ($a, $b) => !empty($b['agora']) <=> !empty($a['agora'])); // estável: mantém a ordem acima
+            $lateral = [
+                'titulo'   => 'Hoje · ' . $dt->format('d/m'),
+                'soma_bag' => $soma[PROD_TIPO_BAG] > 0 ? agTvNum($soma[PROD_TIPO_BAG]) . ' bags agendados' : '',
+                'soma_sac' => $soma[PROD_TIPO_SACARIA] > 0 ? agTvNum($soma[PROD_TIPO_SACARIA]) . ' sacarias agendadas' : '',
+                'cards'    => array_map(static fn ($c) => agTvCard($c, $d['hoje']), $cards),
+            ];
+        }
+
         if (count(end($semanas)) === 7) {
             $semanas[] = [];
         }
         $semanas[array_key_last($semanas)][] = [
             'num'       => (int) $dt->format('j'),
-            'hoje'      => $dia === $d['hoje'],
+            'hoje'      => $ehHoje,
             'fds'       => (int) $dt->format('N') >= 6,
             'outro_mes' => !str_starts_with($dia, $d['mes']),
             'soma_bag'  => $soma[PROD_TIPO_BAG] > 0 ? agTvNum($soma[PROD_TIPO_BAG]) : '',
             'soma_sac'  => $soma[PROD_TIPO_SACARIA] > 0 ? agTvNum($soma[PROD_TIPO_SACARIA]) : '',
             'marcos'    => array_map('agTvMarco', $d['marcos'][$dia] ?? []),
-            'cards'     => array_map(static fn ($c) => agTvCard($c, $d['hoje']), $cards),
+            'cards'     => $ehHoje ? [] : array_map(static fn ($c) => agTvCard($c, $d['hoje']), $cards),
+            'no_painel' => $ehHoje ? count($cards) : 0,
         ];
     }
 
@@ -247,6 +307,7 @@ function agTvPainel(array $d): array
         'hoje'       => $d['hoje'],
         'tem_agenda' => $temAgenda,
         'semanas'    => $semanas,
+        'lateral'    => $lateral,
     ];
 }
 
@@ -315,6 +376,15 @@ function agTvBuscar(PDO $pdo, $pg, string $mes): array
     $d      = agMontar($pdo, $pg, $mes);
     $ativas = agTvOpsAtivas($pg);
     $d['cards'] = agTvComAtivas($d['cards'], $ativas, agOpsInfo($pg, array_unique(array_column($ativas, 'op'))), $d['hoje']);
+
+    $opsHoje = [];
+    foreach ($d['cards'] as $c) {
+        if (agTvMostraAndamento($c, $d['hoje'])) {
+            $opsHoje[$c['op']] = true;
+        }
+    }
+    $opsHoje = array_keys($opsHoje);
+    $d['cards'] = agTvComAndamento($d['cards'], agProducaoOps($pg, $opsHoje), agOpsInfo($pg, $opsHoje), $d['hoje']);
 
     $finalizados = agTvBuscarFinalizados($pdo, $pg, $d['ini'], $d['fim']);
     $info = agOpsInfo($pg, array_column($finalizados, 'op'));
