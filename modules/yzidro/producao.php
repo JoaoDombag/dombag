@@ -209,7 +209,7 @@ $totalQtdBaixa = array_reduce($ordens, fn($c, $r) => $c + (float) ($r['total_qtd
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Produção ERP Yzidro | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
-<link rel="icon" href="/public/css/icone.ico" type="image/png">
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
 <style>
 /* ── Filtros ────────────────────────────────────────── */
 .filter-card {

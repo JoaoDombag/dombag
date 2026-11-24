@@ -168,7 +168,7 @@ $DOMBAG_PAGINAS = [
     ['href' => '/usuarios/grupos/cadastro', 'label' => 'Cadastro de Grupos', 'grupo' => 'usuarios', 'menu' => false, 'publico' => false, 'admin_only' => true],
 
     // ── Parâmetros ──────────────────────────────────────────────────────────────
-    ['href' => '/modules/parametros/parametros.php', 'label' => 'Parâmetros do Sistema', 'grupo' => 'parametros', 'menu' => true, 'publico' => false],
+    ['href' => '/modules/parametros/parametros.php', 'label' => 'Parâmetros do Sistema', 'grupo' => 'parametros', 'menu' => true, 'publico' => true],
     ['href' => '/dashboard/widgets', 'label' => 'Widgets do Dashboard', 'grupo' => 'parametros', 'menu' => true, 'publico' => true],
 
     // ── Administrador (admin_only) ──────────────────────────────────────────────

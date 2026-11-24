@@ -289,7 +289,7 @@ $totalOPs = array_sum($contagens);
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Painel de OPs | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
-<link rel="icon" href="/public/css/icone.ico" type="image/png">
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
 <style>
   .kpi-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
   @media (max-width: 900px) { .kpi-grid-4 { grid-template-columns: repeat(2, 1fr); } }

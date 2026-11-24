@@ -399,7 +399,7 @@ $js_por_dia       = jz($porDia);
 <title>Análise de Apontamento de Atividades | DOMBAG</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
-<link rel="icon" href="/public/css/icone.ico" type="image/png">
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
 <style>
   .kpi-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 

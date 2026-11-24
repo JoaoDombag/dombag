@@ -79,7 +79,7 @@ const DOC_TELAS = [
     '/minha-senha'       => ['conta', 'Altere a sua senha de acesso.'],
     '/usuarios'          => ['conta', 'Gerencie quem acessa o sistema.'],
     '/usuarios/grupos'   => ['conta', 'Organize os usuários em grupos para controlar as permissões.'],
-    '/modules/parametros/parametros.php' => ['conta', 'Integrações e preferências gerais do sistema.'],
+    '/modules/parametros/parametros.php' => ['conta', 'Na aba Aplicativo, cada usuário escolhe o ícone do sistema instalado e pode instalá-lo. Integrações, tema e Assistente IA aparecem só para administradores.'],
 
     '/admin/migrations'  => ['admin', 'Histórico das atualizações do banco de dados.'],
     '/admin/atualiza-bd' => ['admin', 'Executa SQL direto no banco. Use com cuidado: a alteração é imediata.'],

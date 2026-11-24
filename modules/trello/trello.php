@@ -260,7 +260,7 @@ function renderKanbanBoard(array $bd, array $cbl, array $lhex, array $lname): st
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Trello | DOMBAG</title>
   <link rel="stylesheet" href="/public/css/unified_admin.css">
-<link rel="icon" href="/public/css/icone.ico" type="image/png">
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
   <style>
 /* ══ Abas de board ════════════════════════════════ */
 .board-tabs-bar{display:flex;align-items:center;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0;}

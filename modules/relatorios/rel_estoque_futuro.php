@@ -174,7 +174,7 @@ function efEsc($v): string {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Estoque Futuro | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
-<link rel="icon" href="/public/css/icone.ico" type="image/png">
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
 <style>
 /* ── Layout ── */
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}

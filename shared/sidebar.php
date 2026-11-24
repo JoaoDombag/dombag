@@ -33,7 +33,7 @@ if (!empty($_SESSION['usu_codigo'])) {
 }
 
 // Páginas sempre visíveis na sidebar para qualquer usuário autenticado
-$__sb_always_visible = ['/dashboard', '/dashboard/widgets', '/minha-senha', '/documentacao'];
+$__sb_always_visible = ['/dashboard', '/dashboard/widgets', '/minha-senha', '/modules/parametros/parametros.php', '/documentacao'];
 
 function sb_can(string $href): bool {
     global $_sb_admin, $_sb_perms, $__sb_always_visible;

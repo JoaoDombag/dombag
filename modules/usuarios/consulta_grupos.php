@@ -77,7 +77,7 @@ $total_usuarios  = array_sum(array_column($grupos_db, 'QTD_USUARIOS'));
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grupos de Usuários | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
-<link rel="icon" href="/public/css/icone.ico" type="image/png">
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
 <style>
 .td-actions{display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
 .btn-sm{padding:4px 10px;border-radius:6px;font-size:11.5px;font-weight:600;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:all .15s;border:1px solid transparent;text-decoration:none;}

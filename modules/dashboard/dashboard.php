@@ -111,7 +111,7 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard | DOMBAG</title>
   <link rel="stylesheet" href="/public/css/unified_admin.css">
-  <link rel="icon" href="/public/css/icone.ico" type="image/png">
+  <?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
     /* ── Layout do dashboard ───────────────────────── */

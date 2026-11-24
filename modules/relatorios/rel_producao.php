@@ -374,7 +374,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 </style>
 
 <link rel="stylesheet" href="/public/css/unified_admin.css">
-<link rel="icon" href="/public/css/icone.ico" type="image/png">
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
 </head>
 <body>
 <div class="app-wrapper">

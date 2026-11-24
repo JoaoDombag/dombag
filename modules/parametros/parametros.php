@@ -1,9 +1,13 @@
 <?php
 require_once $_SERVER['DOCUMENT_ROOT'] . '/config/config.php';
 require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/login/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php';
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  DOMBAG — Parâmetros do Sistema
+//  Tela aberta a todos. A aba Aplicativo (ícone do app, por usuário) é de
+//  qualquer um; Integrações, Aparência (tema global) e Assistente IA têm
+//  credenciais ou afetam todos, por isso ficam só para administradores.
 // ══════════════════════════════════════════════════════════════════════════════
 
 $pdo = dbPDO();
@@ -35,10 +39,11 @@ function setParam(PDO $pdo, string $chave, string $valor): void
     ')->execute([':k' => $chave, ':v' => $valor, ':v2' => $valor]);
 }
 
-// ── Assistente IA: só administradores ────────────────────────────────────────
+// ── Quem é administrador ─────────────────────────────────────────────────────
 $st = $pdo->prepare('SELECT USU_ADMIN FROM USUARIOS WHERE USU_CODIGO = ?');
 $st->execute([usuCodigo()]);
 $ehAdmin = !empty($st->fetchColumn());
+$abasPermitidas = $ehAdmin ? ['integracoes', 'aparencia', 'ia', 'aplicativo'] : ['aplicativo'];
 if (empty($_SESSION['par_csrf'])) {
     $_SESSION['par_csrf'] = bin2hex(random_bytes(32));
 }
@@ -92,16 +97,26 @@ function iaTestarConexao(): array
 //  Todas as abas exigem o token CSRF. Sucesso → redireciona (PRG), pra que
 //  atualizar a página (F5) não reenvie o formulário. Erro → mostra na hora.
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $aba = (string) ($_POST['aba'] ?? 'integracoes');
+    $aba = (string) ($_POST['aba'] ?? 'aplicativo');
 
     if (!hash_equals($_SESSION['par_csrf'], (string) ($_POST['csrf'] ?? ''))) {
         $ia_erros[] = 'Sua sessão expirou. Recarregue a página e tente de novo.';
-    } elseif ($aba === 'ia' && !$ehAdmin) {
+    } elseif (!in_array($aba, $abasPermitidas, true)) {
         http_response_code(403);
         exit('Sem permissão.');
     } else {
         try {
-            if ($aba === 'ia') {
+            if ($aba === 'aplicativo') {
+                $icone = (string) ($_POST['icone'] ?? '');
+                if (!isset(APP_ICONES[$icone])) {
+                    $ia_erros[] = 'Ícone inválido.';
+                } else {
+                    $pdo->prepare('UPDATE USUARIOS SET USU_ICONE_APP = :i WHERE USU_CODIGO = :c')
+                        ->execute([':i' => $icone, ':c' => usuCodigo()]);
+                    $_SESSION['app_icone'] = $icone;
+                    appIconeCookie($icone);
+                }
+            } elseif ($aba === 'ia') {
                 // Valida tudo antes de gravar qualquer coisa.
                 $novos = [];
                 foreach (DOMBAG_CONFIG_IA as $k => $d) {
@@ -168,14 +183,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ── Leitura atual ─────────────────────────────────────────────────────────────
-$trello_key           = getParam($pdo, 'trello_api_key');
-$trello_token         = getParam($pdo, 'trello_token');
-$trello_default_board = getParam($pdo, 'trello_default_board');
+// Credenciais só são lidas para administrador (nunca chegam ao HTML de outros).
+$trello_key           = $ehAdmin ? getParam($pdo, 'trello_api_key') : '';
+$trello_token         = $ehAdmin ? getParam($pdo, 'trello_token') : '';
+$trello_default_board = $ehAdmin ? getParam($pdo, 'trello_default_board') : '';
 // Mesmo padrão do resto do sistema (dombagTema): sem parâmetro salvo = escuro
 $tema                 = getParam($pdo, 'tema_sistema', dombagTema());
+$icone_atual          = appIconeAtual();
+appIconeCookie($icone_atual);
 
-$aba_ativa  = $_POST['aba'] ?? ($_GET['aba'] ?? 'integracoes');
-if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['integracoes', 'aparencia'])) $aba_ativa = 'integracoes';
+$aba_ativa  = $_POST['aba'] ?? ($_GET['aba'] ?? $abasPermitidas[0]);
+if (!in_array($aba_ativa, $abasPermitidas, true)) $aba_ativa = $abasPermitidas[0];
 ?>
 <!DOCTYPE html>
 <html lang="pt-br">
@@ -184,7 +202,7 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Parâmetros | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
-<link rel="icon" href="/public/css/icone.ico" type="image/png">
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
 <style>
 /* ── Abas ─────────────────────────────────────────────────────────────────── */
 .tabs-bar {
@@ -317,6 +335,19 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
 .trello-status.err { color: var(--red); }
 .ia-teste.ok  { color: var(--teal); }
 .ia-teste.err { color: var(--red); }
+/* ── Aba Aplicativo ── */
+.icone-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 12px; max-width: 640px; }
+.icone-opcao { position: relative; cursor: pointer; }
+.icone-opcao input { position: absolute; opacity: 0; pointer-events: none; }
+.icone-caixa { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 8px 10px;
+               border: 2px solid var(--border); border-radius: 12px; transition: border-color .15s, background .15s; }
+.icone-caixa img { width: 84px; height: 84px; border-radius: 20px; box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+.icone-caixa span { font-size: 12.5px; font-weight: 600; color: var(--text-primary); }
+.icone-opcao:hover .icone-caixa { background: var(--card-hover); }
+.icone-opcao input:checked + .icone-caixa { border-color: var(--blue-accent); background: var(--card-hover); }
+.icone-opcao input:focus-visible + .icone-caixa { outline: 2px solid var(--blue-accent); outline-offset: 2px; }
+.icone-nota { font-size: 12px; color: var(--text-muted); line-height: 1.6; margin-top: 12px; max-width: 640px; }
+.icone-nota b { color: var(--text-primary); }
 </style>
 </head>
 <body>
@@ -328,7 +359,7 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
       <div class="topbar-left">
         <div class="page-title">
           <h1>Parâmetros do Sistema</h1>
-          <p>Configure integrações e preferências globais do sistema</p>
+          <p><?= $ehAdmin ? 'Configure integrações, preferências do sistema e o seu aplicativo' : 'Configure o seu aplicativo' ?></p>
         </div>
       </div>
       <div class="topbar-actions">
@@ -361,6 +392,7 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
 
         <!-- ── Abas ─────────────────────────────────────────────────────── -->
         <div class="tabs-bar">
+          <?php if ($ehAdmin): ?>
           <button class="tab-btn <?= $aba_ativa === 'integracoes' ? 'active' : '' ?>"
                   data-aba="integracoes" onclick="trocarAba('integracoes')" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -384,7 +416,6 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
             </svg>
             Aparência
           </button>
-          <?php if ($ehAdmin): ?>
           <button class="tab-btn <?= $aba_ativa === 'ia' ? 'active' : '' ?>"
                   data-aba="ia" onclick="trocarAba('ia')" type="button">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -393,9 +424,50 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
             Assistente IA
           </button>
           <?php endif; ?>
+          <button class="tab-btn <?= $aba_ativa === 'aplicativo' ? 'active' : '' ?>"
+                  data-aba="aplicativo" onclick="trocarAba('aplicativo')" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>
+            </svg>
+            Aplicativo
+          </button>
         </div>
 
-        <!-- ── Aba: Integrações ──────────────────────────────────────────── -->
+        <!-- ── Aba: Aplicativo (todos; ícone é por usuário) ──────────────── -->
+        <div class="tab-pane <?= $aba_ativa === 'aplicativo' ? 'active' : '' ?>" id="pane-aplicativo">
+          <form method="POST" class="par-form">
+            <input type="hidden" name="aba" value="aplicativo">
+            <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['par_csrf']) ?>">
+            <div class="form-body">
+              <div class="field">
+                <label>Ícone do aplicativo</label>
+                <div class="icone-grade">
+                  <?php foreach (APP_ICONES as $nomeIcone => [$rotuloIcone]): ?>
+                  <label class="icone-opcao">
+                    <input type="radio" name="icone" value="<?= $nomeIcone ?>" <?= $nomeIcone === $icone_atual ? 'checked' : '' ?>>
+                    <span class="icone-caixa">
+                      <img src="/public/img/app/<?= $nomeIcone ?>-192.png" alt="" width="84" height="84">
+                      <span><?= htmlspecialchars($rotuloIcone) ?></span>
+                    </span>
+                  </label>
+                  <?php endforeach; ?>
+                </div>
+                <p class="icone-nota">
+                  A escolha é só sua e vale em qualquer aparelho em que você entrar. O ícone da aba do navegador muda na hora.
+                  No <b>aplicativo já instalado</b>, o navegador troca o ícone sozinho na próxima vez que abrir o app, o que pode levar até um dia,
+                  e o Chrome pode pedir para confirmar. Se não mudar, desinstale o app e instale de novo.
+                </p>
+              </div>
+              <div class="field" id="campoInstalar" hidden>
+                <label>Instalar</label>
+                <div><button type="button" class="btn-secondary" id="btnInstalar">Instalar aplicativo neste aparelho</button></div>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <?php if ($ehAdmin): ?>
+        <!-- ── Aba: Integrações (só admin) ───────────────────────────────── -->
         <div class="tab-pane <?= $aba_ativa === 'integracoes' ? 'active' : '' ?>" id="pane-integracoes">
           <form method="POST" class="par-form">
             <input type="hidden" name="aba" value="integracoes">
@@ -533,6 +605,7 @@ if (!in_array($aba_ativa, $ehAdmin ? ['integracoes', 'aparencia', 'ia'] : ['inte
             </div>
           </form>
         </div>
+        <?php endif; ?>
 
         <?php if ($ehAdmin):
             $origemTxt = [
@@ -748,6 +821,22 @@ function carregarBoards(silencioso) {
 <?php if ($trello_key && $trello_token): ?>
 document.addEventListener('DOMContentLoaded', () => carregarBoards(true));
 <?php endif; ?>
+
+// Instalar o app: o navegador só libera o pedido quando o site é instalável
+let pedidoInstalar = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  pedidoInstalar = e;
+  document.getElementById('campoInstalar').hidden = false;
+});
+document.getElementById('btnInstalar').addEventListener('click', () => {
+  if (!pedidoInstalar) return;
+  pedidoInstalar.prompt();
+  pedidoInstalar.userChoice.finally(() => {
+    pedidoInstalar = null;
+    document.getElementById('campoInstalar').hidden = true;
+  });
+});
 
 const alertEl = document.getElementById('alertMsg');
 if (alertEl) setTimeout(() => {

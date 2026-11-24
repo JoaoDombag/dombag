@@ -113,7 +113,7 @@ $total_paginas = count($paths_validos);
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Permissões por Grupo | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
-<link rel="icon" href="/public/css/icone.ico" type="image/png">
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
 <style>
 .content{overflow-y:auto;overflow-x:hidden;}
 .perm-layout{display:grid;grid-template-columns:270px 1fr;gap:20px;align-items:start;}

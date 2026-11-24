@@ -61,7 +61,7 @@ $qsPdf = http_build_query($filters);
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Relatório de Defeitos | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
-<link rel="icon" href="/public/css/icone.ico" type="image/png">
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
 <style>
   .filter-card {
     background: var(--card-bg); border: 1px solid var(--border);

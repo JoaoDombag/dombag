@@ -16,7 +16,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/documentacao/documentacao_dad
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Documentação | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
-<link rel="icon" href="/public/css/icone.ico" type="image/png">
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
 </head>
 <body>
 <div class="app-wrapper">

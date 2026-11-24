@@ -68,7 +68,7 @@ $mesInicial = agMes((string) ($_GET['mes'] ?? ''));
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Agendamento de Produção | DOMBAG</title>
 <link rel="stylesheet" href="/public/css/unified_admin.css">
-<link rel="icon" href="/public/css/icone.ico" type="image/png">
+<?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
 <style>
   .tipo-BAG     { --tipo: 34,197,94;   --tipo-txt: #4ade80; }
   .tipo-SACARIA { --tipo: 168,85,247;  --tipo-txt: #c084fc; }
