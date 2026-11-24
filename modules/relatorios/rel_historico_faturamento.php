@@ -432,20 +432,20 @@ $qsPdf = http_build_query(array_filter([
           <span class="source-badge src-erp">ERP</span>
         </div>
         <div class="table-wrap">
-          <table>
+          <table class="tabela-cards">
             <thead>
               <tr>
-                <th>Saída</th>
-                <th>Pedido</th>
+                <th data-destaque>Saída</th>
+                <th data-destaque="titulo">Pedido</th>
                 <th>Doc. ERP</th>
-                <th>Cliente</th>
+                <th data-destaque>Cliente</th>
                 <th>Cidade</th>
                 <th>Representante</th>
                 <th>Tipo</th>
                 <th class="hf-right">Bag</th>
                 <th class="hf-right">Sacaria</th>
                 <th class="hf-right">Peças</th>
-                <th class="hf-right">Valor</th>
+                <th data-destaque class="hf-right">Valor</th>
               </tr>
             </thead>
             <tbody>

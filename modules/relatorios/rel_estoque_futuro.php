@@ -338,15 +338,15 @@ tbody tr:hover td{background:rgba(255,255,255,.03);}
           <span class="source-badge src-pg">PostgreSQL · ERP</span>
         </div>
         <div class="table-wrap">
-          <table id="tblEstoque">
+          <table class="tabela-cards" id="tblEstoque">
             <thead>
               <tr>
-                <th>Código</th>
-                <th>Produto</th>
-                <th class="num">Est. Atual</th>
+                <th data-destaque>Código</th>
+                <th data-destaque>Produto</th>
+                <th data-destaque class="num">Est. Atual</th>
                 <th class="num">A Receber</th>
                 <th class="num">Reservado</th>
-                <th class="num">Est. Futuro</th>
+                <th data-destaque class="num">Est. Futuro</th>
                 <th class="num">Vl. Unit. Atual</th>
                 <th class="num">Vl. Unit. Futuro</th>
                 <th class="num">Média Vl. Unit.</th>

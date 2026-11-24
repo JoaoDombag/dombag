@@ -133,6 +133,14 @@ function e($v): string { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8
     .kpi-footer a { font-weight:600; text-decoration:none; }
     .dash-sec { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); margin:4px 2px -6px; }
     .kpi-value-full { font-size:22px; letter-spacing:-.5px; white-space:nowrap; }
+    /* No celular o .content vira display:block (unified_admin.css) e o gap:16px
+       some: os blocos ficavam colados. A margem devolve o espaço entre eles. */
+    @media(max-width:768px) {
+      .content > * + * { margin-top:14px; }
+      .content > .dash-sec + * { margin-top:0; }
+      .dash-sec { margin:20px 2px 8px; }
+      .content > .dash-sec:first-child { margin-top:4px; }
+    }
     @media(max-width:480px) { .dash-kpis { grid-template-columns:1fr 1fr; } .kpi-value { font-size:22px; } .kpi-card-full { grid-column:span 2; } }
 
     /* ── Gráfico ───────────────────────────────────── */

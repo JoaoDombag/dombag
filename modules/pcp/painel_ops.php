@@ -476,17 +476,17 @@ $totalOPs = array_sum($contagens);
           <span class="source-badge src-erp">ERP</span>
         </div>
         <div class="table-wrap">
-          <table>
+          <table class="tabela-cards">
             <thead>
               <tr>
                 <th>Status</th>
-                <th>Cód. OP</th>
+                <th data-destaque>Cód. OP</th>
                 <th>Emissão</th>
                 <th>Entrega</th>
-                <th>Cliente</th>
-                <th>Produto</th>
+                <th data-destaque>Cliente</th>
+                <th data-destaque>Produto</th>
                 <th class="td-right">Qtd. Pedido</th>
-                <th>Progresso</th>
+                <th data-destaque>Progresso</th>
                 <th>Máquinas Ativas</th>
                 <th>Operadores Ativos</th>
               </tr>

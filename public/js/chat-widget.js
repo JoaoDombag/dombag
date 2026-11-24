@@ -55,7 +55,9 @@
     'button{font:inherit}',
     /* botão flutuante */
     '.fab{position:fixed;right:20px;bottom:20px;width:56px;height:56px;border-radius:50%;border:0;cursor:pointer;',
-    ' background:var(--blue-accent,#1e4fc9);color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;z-index:9000;transition:transform .15s}',
+    ' background:var(--blue-accent,#1e4fc9);color:#fff;box-shadow:0 6px 20px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;z-index:9000;transition:transform .15s,opacity .15s}',
+    /* celular: some ao rolar para baixo, volta ao rolar para cima */
+    '.fab.oculto{transform:translateY(96px);opacity:0;pointer-events:none}',
     '.fab:hover{transform:scale(1.06)}.fab:focus-visible{outline:3px solid var(--teal,#00c9a7);outline-offset:2px}',
     '.fab svg{width:26px;height:26px}',
     /* janela do chat */
@@ -534,7 +536,23 @@
     setInterval(carregarUso, 60000);   // a janela de 1 hora vai liberando mensagens
     setTimeout(function () { input.focus(); }, 50);
   } else {
-    root.querySelector('.fab').addEventListener('click', function () { panel.classList.contains('open') ? fechar() : abrir(); });
+    var fab = root.querySelector('.fab');
+    fab.addEventListener('click', function () { panel.classList.contains('open') ? fechar() : abrir(); });
     if (store('get', KEY_OPEN)) abrir();
+
+    // Celular: o botão sai da frente enquanto a pessoa rola a lista para baixo e
+    // volta ao rolar para cima. Capture no document pega também telas que rolam
+    // dentro de um container, e não na janela.
+    var celular = window.matchMedia ? window.matchMedia('(max-width: 768px)') : null;
+    var ultimoTopo = new WeakMap();
+    document.addEventListener('scroll', function (e) {
+      var el = e.target === document ? (document.scrollingElement || document.documentElement) : e.target;
+      if (!el || typeof el.scrollTop !== 'number') return;
+      var topo = el.scrollTop, antes = ultimoTopo.has(el) ? ultimoTopo.get(el) : topo;
+      ultimoTopo.set(el, topo);
+      if (!celular || !celular.matches || panel.classList.contains('open')) { fab.classList.remove('oculto'); return; }
+      if (topo - antes > 8 && topo > 80) fab.classList.add('oculto');
+      else if (antes - topo > 8 || topo <= 80) fab.classList.remove('oculto');
+    }, { capture: true, passive: true });
   }
 })();

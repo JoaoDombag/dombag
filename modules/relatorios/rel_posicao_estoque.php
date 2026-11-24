@@ -252,6 +252,16 @@ $temFiltro = $filtro_codigo || $filtro_produto || $filtro_local || $filtro_bloqu
 .btn-export{height:36px;padding:0 14px;background:rgba(0,201,167,.1);border:1px solid rgba(0,201,167,.25);border-radius:8px;color:var(--teal);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;text-decoration:none;margin-left:auto;}
 .btn-export:hover{background:rgba(0,201,167,.2);}
 .sep-filtro{width:1px;height:24px;background:var(--border);margin:0 2px;}
+/* Celular: filtros em grade, rótulo acima, todos da mesma largura, botões numa linha só deles.
+   !important vence as larguras fixas escritas no style="" de cada campo. */
+@media(max-width:768px){
+  .rel-topbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end;}
+  .rel-topbar .filter-group{flex-direction:column;align-items:stretch;gap:4px;min-width:0;}
+  .rel-topbar .filter-group label{font-size:12px;}
+  .rel-topbar input,.rel-topbar select{width:100% !important;min-width:0;height:40px;}
+  .rel-topbar .sep-filtro{display:none;}
+  .rel-topbar .btn-filtrar,.rel-topbar .btn-limpar{grid-column:1/-1;justify-content:center;height:44px;}
+}
 
 /* ── KPIs ── */
 .kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;flex-shrink:0;margin-bottom:14px;}
@@ -404,15 +414,15 @@ tr.bloqueado td{opacity:.45;}
         </div>
         <?php else: ?>
         <div class="table-wrap">
-          <table>
+          <table class="tabela-cards">
             <thead>
               <tr>
-                <th>Código</th>
-                <th>Descrição</th>
+                <th data-destaque>Código</th>
+                <th data-destaque>Descrição</th>
                 <th>Un.</th>
                 <th>Grupo / Subgrupo</th>
                 <th>Local</th>
-                <th class="r">Saldo</th>
+                <th data-destaque class="r">Saldo</th>
                 <th class="r">Reservado</th>
                 <th class="r">Disponível</th>
                 <th class="r">Est. Mín.</th>
@@ -422,7 +432,7 @@ tr.bloqueado td{opacity:.45;}
                 <th class="r">Total Custo</th>
                 <th class="r">Total Venda</th>
                 <th>Ult. Recebimento</th>
-                <th>Situação</th>
+                <th data-destaque>Situação</th>
               </tr>
             </thead>
             <tbody id="tbl-body">

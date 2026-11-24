@@ -383,7 +383,6 @@ $totalVendas = count($vendas);
 
   @media (max-width: 1280px) { .filter-grid { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 900px) {
-    .kpi-grid-3 { grid-template-columns: 1fr; }
     .filter-grid { grid-template-columns: 1fr 1fr; }
     .cv-cliente-col { min-width: 140px; }
   }

@@ -161,6 +161,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
 @media(max-width:1100px){.stat-strip{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:640px){.search-box input{width:140px;}}
 @media(max-width:480px){.stat-strip{grid-template-columns:1fr 1fr;}.search-box input{width:auto;flex:1;}}
+/* Celular: área de toque mínima de 44px */
+@media (max-width:768px){ #emptyState a { min-height:44px; display:inline-flex !important; align-items:center; } }
 </style>
 </head>
 <body>
@@ -253,18 +255,18 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--blue-deep);col
         <span class="results-count" id="resultsPanel"></span>
       </div>
       <div class="table-wrap">
-        <table class="prod-table">
+        <table class="prod-table tabela-cards">
           <thead><tr>
-            <th data-col="pro_descricao">Produto <span class="sort-icon active" id="s-pro_descricao">↑</span></th>
-            <th data-col="pro_tipo">Tipo <span class="sort-icon" id="s-pro_tipo">↕</span></th>
+            <th data-destaque data-col="pro_descricao">Produto <span class="sort-icon active" id="s-pro_descricao">↑</span></th>
+            <th data-destaque data-col="pro_tipo">Tipo <span class="sort-icon" id="s-pro_tipo">↕</span></th>
             <th data-col="pro_comprimento">Comp. (cm) <span class="sort-icon" id="s-pro_comprimento">↕</span></th>
             <th>Impressão</th>
             <th>Valvulado</th>
             <th>Máq. Impressão</th>
             <th>Fluxo de Produção</th>
             <th>Pedidos</th>
-            <th>Cód. YZ</th>
-            <th style="text-align:center;">Ações</th>
+            <th data-destaque>Cód. YZ</th>
+            <th data-destaque style="text-align:center;">Ações</th>
           </tr></thead>
           <tbody id="tbody"></tbody>
         </table>

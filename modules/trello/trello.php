@@ -614,6 +614,11 @@ function renderKanbanBoard(array $bd, array $cbl, array $lhex, array $lname): st
   cursor: pointer; background: none; border: none; padding: 0;
 }
 #lightbox-open-btn:hover { color: #fff; }
+/* Celular: área de toque mínima de 44px */
+@media (max-width: 768px) {
+  .trello-open-btn, a[href*="aba=integracoes"] { min-height: 44px; }
+  .modal-close { min-width: 44px; min-height: 44px; }
+}
 </style>
 </head>
 <body>

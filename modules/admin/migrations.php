@@ -89,6 +89,8 @@ $pendingCount = count(array_filter($migrations, fn($m) => !$m['applied']));
   <?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
   <style>
 .content{display:flex;flex-direction:column;gap:18px;}
+/* celular: .content vira display:block (unified_admin.css) e o gap some */
+@media(max-width:768px){ .content > * + * { margin-top:18px; } }
 
 .info-box{background:rgba(45,106,255,.07);border:1px solid rgba(45,106,255,.2);border-radius:8px;padding:11px 16px;font-size:12px;color:rgba(125,179,255,.9);display:flex;align-items:flex-start;gap:8px;line-height:1.6;}
 .info-box code{background:rgba(255,255,255,.08);padding:1px 6px;border-radius:4px;font-family:'Cascadia Code','Fira Code',monospace;font-size:11px;}

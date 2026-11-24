@@ -706,6 +706,11 @@ button.mob-item.open { color: var(--text-primary); background: rgba(255,255,255,
 .mob-scroll:hover { background: #17305a; }
 @media (max-width: 768px) {
   .mob-scroll.show { display: flex; }
+  .mob-scroll { width: 44px; }   /* área de toque mínima */
+  .mob-item { font-size: 12px; }  /* rótulos legíveis (eram 10px) */
+  .mob-sub-title { font-size: 12px; }
+  /* /pcp/tv é a tela da TV da fábrica: fora do menu do celular */
+  .mob-sub a[href="/pcp/tv"] { display: none; }
 }
 
 /* Painel de subitens (dropdown da topbar mobile) */
@@ -887,6 +892,8 @@ button.mob-item.open { color: var(--text-primary); background: rgba(255,255,255,
 })();
 </script>
 
+<script src="/public/js/tabelas-mobile.js?v=1" defer></script>
+
 <?php // ── Chat com IA: só aparece com a chave do provedor (Gemini ou Claude) configurada ──
 // Sem botão flutuante nas telas de BI e de Relatórios (área de leitura cheia);
 // lá o assistente continua acessível pelo menu "Assistente IA".
@@ -896,7 +903,7 @@ if ((dombagConfig('GEMINI_API_KEY') || dombagConfig('ANTHROPIC_API_KEY')) && (!e
     if (empty($_SESSION['chat_csrf'])) {
         $_SESSION['chat_csrf'] = bin2hex(random_bytes(32));
     } ?>
-<script src="/public/js/chat-widget.js?v=6" defer
+<script src="/public/js/chat-widget.js?v=7" defer
         data-csrf="<?= htmlspecialchars($_SESSION['chat_csrf']) ?>"
         data-usuario="<?= (int) ($_SESSION['usu_codigo'] ?? 0) ?>"
         data-max="<?= (int) (dombagConfig('CHAT_MAX_CHARS') ?? 2000) ?>"

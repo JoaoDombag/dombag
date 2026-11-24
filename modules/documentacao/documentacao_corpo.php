@@ -79,6 +79,11 @@ $h = static fn (string $t): string => htmlspecialchars($t, ENT_QUOTES, 'UTF-8');
   }
   @media (max-width: 760px) {
     .doc-capa-in { max-width: none; }
+    /* área de toque mínima de 44px */
+    .doc-caminho a { min-height: 44px; }
+    .doc-guia summary { padding: 12px 0; min-height: 44px; }
+    /* links das telas e da busca: área de toque maior sem mexer no desenho */
+    .doc-linha > a, .doc-linha > span a, .doc-busca p a { display: inline-block; padding: 13px 0; margin: -13px 0; }
     .doc-caminho { grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 28px; }
     .doc-caminho::before {
       right: auto; bottom: 30px; width: 3px; height: auto; animation-name: doc-costura-v;

@@ -774,7 +774,9 @@ $totalNovos = count(array_filter($vendas, fn ($r) => !$r['no_mysql']));
   }
 
   @media (max-width: 1280px) { .filter-grid { grid-template-columns: repeat(3, 1fr); } .kpi-grid-4 { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 900px)  { .filter-grid { grid-template-columns: 1fr 1fr; } .kpi-grid-4 { grid-template-columns: 1fr; } }
+  @media (max-width: 900px)  { .filter-grid { grid-template-columns: 1fr 1fr; } }
+  /* Celular: área de toque de 44px no link "ver todos" sem mexer no desenho */
+  @media (max-width: 768px) { a[href*="emissao_ini=2000-01-01"] { display: inline-block; padding: 14px 4px; margin: -14px -4px; } }
 </style>
 </head>
 <body>

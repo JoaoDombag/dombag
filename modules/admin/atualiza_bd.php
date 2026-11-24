@@ -91,6 +91,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $action === '') {
 <?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
   <style>
 .content{display:flex;flex-direction:column;gap:18px;}
+/* celular: .content vira display:block (unified_admin.css) e o gap some */
+@media(max-width:768px){ .content > * + * { margin-top:18px; } }
 
 .warn-box{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:11px 16px;font-size:12px;color:rgba(252,165,165,.85);display:flex;align-items:flex-start;gap:8px;line-height:1.5;}
 

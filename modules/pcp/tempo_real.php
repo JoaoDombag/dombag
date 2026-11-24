@@ -262,6 +262,34 @@ $jsParadas = json_encode($paradas, JSON_UNESCAPED_UNICODE);
 
   .tr-empty-row td { text-align: center; padding: 28px 16px; color: var(--text-muted); font-size: 12.5px; }
 
+  /* Celular: cada máquina ativa vira um card (a tabela de 6 colunas não cabe).
+     Linha 1: máquina | status · 2: operador · 3: O.P | tempo · 4: cliente (2 linhas). */
+  @media (max-width: 600px) {
+    .tr-ativas thead { display: none; }
+    .tr-ativas, .tr-ativas tbody { display: block; width: 100%; }
+    .tr-ativas tr.tr-row {
+      display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px;
+      padding: 14px; border-bottom: 1px solid var(--border);
+    }
+    .tr-ativas tr.tr-row td { display: block; padding: 0; border: 0; font-size: 13px; min-width: 0; text-align: left; }
+    .tr-ativas td[data-label]::before {
+      content: attr(data-label); display: block; margin-bottom: 1px;
+      font-size: 12px; font-weight: 600; color: var(--text-muted);
+    }
+    .tr-ativas .tr-c-maq    { grid-column: 1; }
+    .tr-ativas .tr-c-maq .tr-ct-name { font-size: 14px; }
+    .tr-ativas .tr-c-maq .tr-ct-code { font-size: 12px; }
+    .tr-ativas .tr-c-status { grid-column: 2; grid-row: 1; justify-self: end; align-self: start; }
+    .tr-ativas .tr-c-oper   { grid-column: 1 / -1; grid-row: 2; }
+    .tr-ativas .tr-c-op     { grid-column: 1; grid-row: 3; }
+    .tr-ativas .tr-c-tempo  { grid-column: 2; grid-row: 3; text-align: right; }
+    .tr-ativas .tr-c-cli    { grid-column: 1 / -1; grid-row: 4; }
+    .tr-ativas .tr-cli {
+      display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+    }
+    .tr-ativas .tr-empty-row td { display: block; }
+  }
+
   .last-update { font-size: .72rem; color: var(--text-muted); }
   .last-update span { color: var(--teal); font-weight: 600; }
 
@@ -366,7 +394,7 @@ $jsParadas = json_encode($paradas, JSON_UNESCAPED_UNICODE);
             <span class="source-badge src-erp">ERP</span>
           </div>
           <div class="table-wrap">
-            <table>
+            <table class="tr-ativas">
               <thead>
                 <tr>
                   <th>Centro de Trabalho</th>
@@ -476,15 +504,15 @@ function renderGrids() {
   } else {
     tbAtivas.innerHTML = ATIVAS.map(m => `
       <tr class="tr-row${selecionado && selecionado.tipo === 'ativa' && selecionado.codigo === +m.ct_codigo ? ' selected' : ''}" data-ct="${m.ct_codigo}">
-        <td>
+        <td class="tr-c-maq">
           <div class="tr-ct-name">${trEsc(m.ct_descricao)}</div>
           <div class="tr-ct-code">${m.etapa ? trEsc(m.etapa) + ' · ' : ''}Cód. ${trEsc(m.ct_codigo)}</div>
         </td>
-        <td>${trStatusPill(m.oiap_status)}</td>
-        <td>${trEsc(m.fu_nome)}</td>
-        <td>${trEsc(m.prod_codigo ?? '—')}</td>
-        <td>${trEsc(m.cli_nome)}</td>
-        <td class="td-right tr-op-time" data-inicio="${trEsc(m.oiap_data_hora_inicio)}">${trFmtElapsed(m.oiap_data_hora_inicio)}</td>
+        <td class="tr-c-status">${trStatusPill(m.oiap_status)}</td>
+        <td class="tr-c-oper" data-label="Operador">${trEsc(m.fu_nome)}</td>
+        <td class="tr-c-op" data-label="Cód. OP">${trEsc(m.prod_codigo ?? '—')}</td>
+        <td class="tr-c-cli" data-label="Cliente"><span class="tr-cli">${trEsc(m.cli_nome)}</span></td>
+        <td class="td-right tr-op-time tr-c-tempo" data-label="Tempo" data-inicio="${trEsc(m.oiap_data_hora_inicio)}">${trFmtElapsed(m.oiap_data_hora_inicio)}</td>
       </tr>
     `).join('');
   }

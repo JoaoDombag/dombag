@@ -407,9 +407,8 @@ $totalAndamento = $totalVendas - $totalFin;
   .filter-amostras.ativo{opacity:.7;color:#c4b5fd;border-color:rgba(139,92,246,.25);}
 
   @media (max-width: 1280px) { .filter-grid { grid-template-columns: repeat(3, 1fr); } .kpi-grid-4 { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 900px)  { .filter-grid { grid-template-columns: 1fr 1fr; } .kpi-grid-4 { grid-template-columns: 1fr; } }
+  @media (max-width: 900px)  { .filter-grid { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 640px)  { .filter-grid { grid-template-columns: 1fr; } .pi-table-wrap { overflow-x: auto; } }
-  @media (max-width: 480px)  { .kpi-grid-4 { grid-template-columns: 1fr 1fr; } }
 </style>
 </head>
 <body>

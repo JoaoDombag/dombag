@@ -606,17 +606,17 @@ if (!$pg && $error === '') {
         </div>
         <?php endif; ?>
         <div class="table-wrap">
-          <table>
+          <table class="tabela-cards">
             <thead>
               <tr>
-                <th>Cód. OP</th>
-                <th>Cliente</th>
+                <th data-destaque>Cód. OP</th>
+                <th data-destaque>Cliente</th>
                 <th>Pedido / Venda Ref.</th>
                 <th>Emissão</th>
                 <th>Entrega</th>
-                <th>Entrega Esperada</th>
+                <th data-destaque>Entrega Esperada</th>
                 <th>Início da Produção</th>
-                <th>Andamento</th>
+                <th data-destaque>Andamento</th>
                 <th>Etapa de Produção</th>
                 <th>Adicionado em</th>
                 <th>Adicionado por</th>
@@ -722,15 +722,15 @@ if (!$pg && $error === '') {
         <button type="button" class="btn-refresh" id="p2BtnBuscar">Buscar</button>
       </div>
       <div class="table-wrap" style="max-height:44vh;">
-        <table>
+        <table class="tabela-cards">
           <thead>
             <tr>
-              <th>Cód. OP</th>
-              <th>Cliente</th>
-              <th>Pedido / Venda Ref.</th>
+              <th data-destaque>Cód. OP</th>
+              <th data-destaque>Cliente</th>
+              <th data-destaque>Pedido / Venda Ref.</th>
               <th>Emissão</th>
               <th>Entrega</th>
-              <th>Entrega Esperada</th>
+              <th data-destaque>Entrega Esperada</th>
               <th>Início da Produção</th>
               <th></th>
             </tr>
