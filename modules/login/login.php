@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<meta name="facebook-domain-verification" content="jwz4aj5ceglw1r598ys5vbobqqrv5i" />
+<meta name="facebook-domain-verification" content="v7zcvle4a6fq5mb7pervgbspuvswxe" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DOMBAG — Entrar</title>
 <?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/app_icone.php'; appHeadTags(); ?>
