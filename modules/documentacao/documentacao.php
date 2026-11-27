@@ -35,6 +35,7 @@ require_once $_SERVER['DOCUMENT_ROOT'] . '/modules/documentacao/documentacao_dad
     <?php
     // sidebar.php acabou de carregar as permissões de quem está logado
     $telasPorArea = docTelasPorArea($DOMBAG_PAGINAS, 'sb_can', $_sb_admin, $_sb_desativados);
+    $novidades    = novidadesTodas('sb_can');
     include __DIR__ . '/documentacao_corpo.php';
     ?>
   </div>

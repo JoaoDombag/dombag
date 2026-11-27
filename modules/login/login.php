@@ -342,6 +342,7 @@ input.has-error{border-color:rgba(239,68,68,.5)!important;background:rgba(239,68
 
     <div class="card-footer">
       DOMBAG &mdash; Gestão Industrial &copy; <?= date('Y') ?>
+      <?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/versao.php'; if ($__versao = dombagVersaoTexto()): ?><br><span style="opacity:.75"><?= $__versao ?></span><?php endif; ?>
     </div>
 
   </div>

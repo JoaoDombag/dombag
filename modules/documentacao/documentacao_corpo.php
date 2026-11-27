@@ -1,5 +1,5 @@
 <?php
-// Corpo da Documentação. Recebe $telasPorArea de documentacao.php.
+// Corpo da Documentação. Recebe $telasPorArea e $novidades de documentacao.php.
 $h = static fn (string $t): string => htmlspecialchars($t, ENT_QUOTES, 'UTF-8');
 ?>
 <style>
@@ -70,6 +70,17 @@ $h = static fn (string $t): string => htmlspecialchars($t, ENT_QUOTES, 'UTF-8');
   .doc-guia li { padding-left: 4px; margin-top: 3px; }
   .doc-guia li::marker { font-weight: 700; color: var(--doc-linha); }
 
+  .doc-versao { margin-top: 18px; padding: 0 0 0 0; font: 700 17px/1.2 var(--doc-titulo); font-stretch: 75%; }
+  .doc-versao span { font: 400 13px 'Segoe UI', system-ui, sans-serif; color: var(--text-muted); }
+  .doc-secao > .doc-versao + .doc-linha { margin-top: 6px; border-top: 1px solid var(--border); }
+  .doc-tipo { display: inline-block; justify-self: start; align-self: start; padding: 1px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 700; }
+  .doc-tipo-novo     { background: rgba(0,201,167,.14);  color: var(--teal); }
+  .doc-tipo-melhoria { background: rgba(45,106,255,.15); color: var(--blue-light); }
+  .doc-tipo-correcao { background: rgba(245,158,11,.15); color: var(--amber); }
+  :root[data-theme="claro"] .doc-tipo-novo { color: #047857; }
+  :root[data-theme="claro"] .doc-tipo-correcao { color: #b45309; }
+  .doc-linha > span a { color: var(--blue-light); font-weight: 600; text-underline-offset: 3px; }
+
   .doc [hidden] { display: none; }
 
   @media (max-width: 1000px) {
@@ -124,6 +135,7 @@ $h = static fn (string $t): string => htmlspecialchars($t, ENT_QUOTES, 'UTF-8');
       <hr>
       <a href="#numeros">Dúvidas sobre os números</a>
       <a href="#termos">Termos</a>
+      <?php if ($novidades): ?><a href="#novidades">Novidades</a><?php endif; ?>
     </nav>
 
     <main>
@@ -176,6 +188,22 @@ $h = static fn (string $t): string => htmlspecialchars($t, ENT_QUOTES, 'UTF-8');
           <div class="doc-linha" data-doc><strong><?= $h($termo) ?></strong><span><?= $h($sentido) ?></span></div>
         <?php endforeach; ?>
       </section>
+
+      <?php if ($novidades): ?>
+      <section class="doc-secao" id="novidades" data-doc-secao>
+        <h3>Novidades</h3>
+        <p>O que mudou em cada atualização, da mais recente para a mais antiga. Depois de cada uma, a primeira tela que você abre mostra estas novidades numa janela.</p>
+        <?php foreach ($novidades as $v): ?>
+          <h4 class="doc-versao"><?= $h($v['data']) ?><?php if ($v['titulo'] !== ''): ?> <span>· <?= $h($v['titulo']) ?></span><?php endif; ?></h4>
+          <?php foreach ($v['itens'] as $i): ?>
+            <div class="doc-linha" data-doc>
+              <strong><span class="doc-tipo doc-tipo-<?= $h($i['tipo']) ?>"><?= $h($i['rotulo']) ?></span></strong>
+              <span><?= $h($i['texto']) ?><?php if ($i['href'] !== null && $i['href'] !== '/documentacao'): ?> <a href="<?= $h($i['href']) ?>">Abrir</a><?php endif; ?></span>
+            </div>
+          <?php endforeach; ?>
+        <?php endforeach; ?>
+      </section>
+      <?php endif; ?>
     </main>
   </div>
 </div>

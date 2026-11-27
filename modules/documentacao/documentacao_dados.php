@@ -1,6 +1,9 @@
 <?php
 declare(strict_types=1);
 
+// Histórico das atualizações: seção Novidades e texto do Assistente
+require_once __DIR__ . '/../../config/novidades.php';
+
 // ══════════════════════════════════════════════════════════════
 //  DOMBAG — Conteúdo da Documentação (/documentacao)
 //  Ao criar uma tela em config/pages.php, descreva-a em DOC_TELAS.
@@ -220,6 +223,15 @@ function docTextoParaIa(array $paginas, array $desativadas = []): string
     }
     $partes[] = "Perguntas frequentes\n" . implode("\n", array_map(static fn ($p) => "- {$p[0]} {$p[1]}", DOC_NUMEROS));
     $partes[] = "Termos\n" . implode("\n", array_map(static fn ($t) => "- {$t[0]}: {$t[1]}", DOC_TERMOS));
+    // Últimas atualizações, para responder "o que mudou no sistema?"
+    $novidades = array_slice(novidadesTodas(static fn (): bool => true), 0, NOVIDADES_MAX_JANELA);
+    if ($novidades) {
+        $partes[] = "Novidades (atualizações recentes do sistema)\n" . implode("\n", array_map(
+            static fn ($v) => "{$v['data']}" . ($v['titulo'] !== '' ? " - {$v['titulo']}" : '') . "\n"
+                . implode("\n", array_map(static fn ($i) => "- {$i['rotulo']}: {$i['texto']}", $v['itens'])),
+            $novidades
+        ));
+    }
     return implode("\n\n", $partes);
 }
 

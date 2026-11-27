@@ -11,5 +11,6 @@ deployment:
     #    site e o Apache respondia 403 em tudo. O .manutencao fica de fora do
     #    --delete para não sair do modo manutenção no meio da cópia.
     # 4) Na mesma linha (com ";"), mesmo se o rsync falhar: garante 755 na pasta
-    #    do site e desliga o modo manutenção, para o site não ficar preso nele.
-    - rsync -a --chmod=D755,F644 --delete --exclude='.git' --exclude='uploads' --exclude='/.manutencao' "$(pwd)/" "${DEST}/" 2>&1; chmod 755 "${DEST}"; rm -f "${DEST}/.manutencao"
+    #    do site, grava config/versao.txt (commit e hora, mostrados no rodapé do
+    #    login e do menu) e desliga o modo manutenção, para o site não ficar preso nele.
+    - rsync -a --chmod=D755,F644 --delete --exclude='.git' --exclude='uploads' --exclude='/.manutencao' "$(pwd)/" "${DEST}/" 2>&1; chmod 755 "${DEST}"; printf '%s %s\n' "$(git rev-parse --short HEAD 2>/dev/null || cut -c1-7 .git/refs/heads/master)" "$(date +%s)" > "${DEST}/config/versao.txt"; rm -f "${DEST}/.manutencao"

@@ -345,6 +345,9 @@ unset($_pag, $gkey, $item);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
+/* Data e commit do último deploy (shared/versao.php) */
+.sidebar-versao { padding: 6px 12px 0; font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar.collapsed .sidebar-versao { display: none; }
 .sidebar-logout {
   display: flex;
   align-items: center;
@@ -584,6 +587,9 @@ unset($_pag, $gkey, $item);
       </span>
       <span class="nav-text">Sair</span>
     </a>
+    <?php require_once $_SERVER['DOCUMENT_ROOT'] . '/shared/versao.php'; if ($__versao = dombagVersaoTexto()): ?>
+    <div class="sidebar-versao" title="Última atualização do sistema"><?= $__versao ?></div>
+    <?php endif; ?>
   </div>
 </aside>
 
@@ -911,3 +917,6 @@ if ((dombagConfig('GEMINI_API_KEY') || dombagConfig('ANTHROPIC_API_KEY')) && (!e
         data-modo="pagina" data-alvo="#assistente-chat"
 <?php endif; ?>></script>
 <?php endif; ?>
+
+<?php // ── Janela "O que mudou": aparece na primeira tela depois de uma atualização ──
+include $_SERVER['DOCUMENT_ROOT'] . '/shared/novidades.php'; ?>

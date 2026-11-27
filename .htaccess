@@ -133,5 +133,8 @@ RewriteRule ^assistente$               modules/assistente/assistente.php       [
 RewriteRule ^api/chat$                modules/chat/api.php                    [L,QSA]
 RewriteRule ^api/chat/relatorio/([a-f0-9]{32})$ modules/chat/relatorio.php?t=$1 [L]
 
+# Novidades ("O que mudou"): marca como vistas ao fechar a janela
+RewriteRule ^api/novidades$           modules/novidades/api.php               [L,QSA]
+
 # Rota raiz → login
 RewriteRule ^$                         modules/login/login.php                 [L,QSA]

@@ -25,3 +25,6 @@ Thumbs.db
 
 # Modo manutenção (criado só no servidor durante o deploy)
 .manutencao
+
+# Versão publicada (gravada pelo deploy no servidor)
+config/versao.txt
