@@ -22,3 +22,6 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# Modo manutenção (criado só no servidor durante o deploy)
+.manutencao

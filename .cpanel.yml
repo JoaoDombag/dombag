@@ -1,4 +1,15 @@
 ---
 deployment:
   tasks:
-    - rsync -a --delete --exclude='.git' --exclude='uploads' "$(pwd)/" "${HOME}/sistemadombag.com/" 2>&1
+    - export DEST="${HOME}/sistemadombag.com"
+    # 1) Garante que a página de manutenção já está no destino (primeiro deploy)
+    - mkdir -p "${DEST}" && cp -f "$(pwd)/manutencao.html" "${DEST}/manutencao.html" && chmod 755 "${DEST}"
+    # 2) Liga o modo manutenção: o .htaccess passa a responder 503 com a página
+    - touch "${DEST}/.manutencao"
+    # 3) Copia o sistema. --chmod fixa pastas em 755 e arquivos em 644: sem ele o
+    #    rsync -a copiava a permissão 0700 da pasta do repositório para a pasta do
+    #    site e o Apache respondia 403 em tudo. O .manutencao fica de fora do
+    #    --delete para não sair do modo manutenção no meio da cópia.
+    # 4) Na mesma linha (com ";"), mesmo se o rsync falhar: garante 755 na pasta
+    #    do site e desliga o modo manutenção, para o site não ficar preso nele.
+    - rsync -a --chmod=D755,F644 --delete --exclude='.git' --exclude='uploads' --exclude='/.manutencao' "$(pwd)/" "${DEST}/" 2>&1; chmod 755 "${DEST}"; rm -f "${DEST}/.manutencao"

@@ -1,6 +1,26 @@
 Options -Indexes
 RewriteEngine On
 
+# ── Modo manutenção ─────────────────────────────────────────────────────────
+# Enquanto existir o arquivo .manutencao na raiz do site, toda requisição
+# recebe 503 com a página manutencao.html (o .cpanel.yml cria o arquivo antes
+# do deploy e apaga no final). Para ativar à mão, crie um arquivo vazio
+# chamado .manutencao pelo Gerenciador de Arquivos; para sair, apague.
+ErrorDocument 503 /manutencao.html
+# Rede de segurança: troca a tela padrão de 403 da HostGator pela mesma página.
+ErrorDocument 403 /manutencao.html
+
+RewriteCond %{DOCUMENT_ROOT}/.manutencao -f
+RewriteCond %{REQUEST_URI} !^/manutencao\.html$
+RewriteRule ^ - [R=503,L]
+
+<IfModule mod_headers.c>
+    <Files "manutencao.html">
+        Header always set Cache-Control "no-store, no-cache, must-revalidate"
+        Header always set Retry-After "15"
+    </Files>
+</IfModule>
+
 # ── Segurança ────────────────────────────────────────────────────────────────
 
 # Bloqueia arquivos SQL expostos na raiz

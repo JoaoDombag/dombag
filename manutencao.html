@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="refresh" content="15">
+<meta name="robots" content="noindex">
+<title>DOMBAG — Atualizando</title>
+<!--
+  Página de manutenção. Autocontida de propósito: é servida enquanto o
+  deploy copia os arquivos, então não pode depender de CSS, JS, imagens
+  ou PHP do sistema. Recarrega sozinha a cada 15 segundos.
+-->
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;width:100%;}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  background:#0a1628;
+  color:#e8edf5;
+  overflow-x:hidden;
+}
+.bg-deco{position:fixed;top:0;right:0;bottom:0;left:0;pointer-events:none;z-index:0;}
+.bg-deco::before{
+  content:'';position:absolute;top:0;right:0;bottom:0;left:0;
+  background-image:
+    linear-gradient(rgba(45,106,255,.035) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(45,106,255,.035) 1px,transparent 1px);
+  background-size:52px 52px;
+  animation:gridMove 32s linear infinite;
+}
+@keyframes gridMove{0%{background-position:0 0;}100%{background-position:52px 52px;}}
+.bg-deco::after{
+  content:'';position:absolute;left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  width:900px;height:900px;max-width:180vw;max-height:180vw;
+  background:radial-gradient(circle,rgba(30,79,201,.12) 0%,transparent 65%);
+  border-radius:50%;
+}
+.page{
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;padding:20px 16px;
+  position:relative;z-index:1;
+}
+.card{
+  background:#112240;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:18px;
+  box-shadow:0 32px 80px rgba(0,0,0,.55),0 8px 24px rgba(0,0,0,.3);
+  width:100%;max-width:520px;overflow:hidden;
+  animation:fadeUp .4s cubic-bezier(.4,0,.2,1) both;
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:none;}}
+.card-top{
+  border-top:3px solid #2d6aff;
+  padding:36px 44px 28px;
+  background:linear-gradient(135deg,rgba(30,79,201,.14) 0%,transparent 60%);
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.brand{display:flex;align-items:center;gap:10px;margin-bottom:28px;}
+.brand-dot{
+  width:9px;height:9px;background:#2d6aff;border-radius:50%;
+  box-shadow:0 0 12px rgba(45,106,255,.8);
+  animation:pulse 1.6s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+.brand-name{font-size:20px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#e8edf5;}
+.brand-name span{color:#2d6aff;}
+.title{font-size:24px;font-weight:700;letter-spacing:-.3px;line-height:1.25;}
+.sub{font-size:15px;color:#7a90b0;margin-top:8px;line-height:1.55;}
+.card-body{padding:28px 44px 34px;}
+.status{display:flex;align-items:center;gap:14px;}
+.spinner{
+  flex:0 0 auto;width:28px;height:28px;
+  border:3px solid rgba(45,106,255,.2);border-top-color:#2d6aff;
+  border-radius:50%;animation:spin .9s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.status-text{font-size:14px;line-height:1.5;color:#e8edf5;}
+.status-text small{display:block;color:#7a90b0;font-size:13px;margin-top:2px;}
+.bar{margin-top:22px;height:4px;border-radius:4px;background:rgba(255,255,255,.06);overflow:hidden;}
+.bar-fill{height:100%;width:0;background:#2d6aff;border-radius:4px;animation:fill 15s linear forwards;}
+@keyframes fill{to{width:100%;}}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  margin-top:24px;width:100%;min-height:48px;padding:12px 20px;
+  background:#1e4fc9;color:#fff;border:0;border-radius:10px;
+  font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;
+  text-decoration:none;
+}
+.btn:hover,.btn:focus{background:#2d6aff;}
+@media (max-width:520px){
+  .card-top,.card-body{padding-left:24px;padding-right:24px;}
+  .card-top{padding-top:28px;}
+  .title{font-size:21px;}
+}
+@media (prefers-reduced-motion:reduce){
+  .bg-deco::before,.brand-dot,.spinner,.bar-fill,.card{animation:none;}
+}
+</style>
+</head>
+<body>
+<div class="bg-deco"></div>
+<div class="page">
+  <div class="card" role="status" aria-live="polite">
+    <div class="card-top">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <span class="brand-name">DOM<span>BAG</span></span>
+      </div>
+      <h1 class="title">Estamos atualizando o sistema</h1>
+      <p class="sub">Volte em instantes. Nenhum dado é perdido durante a atualização.</p>
+    </div>
+    <div class="card-body">
+      <div class="status">
+        <span class="spinner" aria-hidden="true"></span>
+        <p class="status-text">
+          Instalando a nova versão…
+          <small>Esta página tenta de novo sozinha a cada 15 segundos.</small>
+        </p>
+      </div>
+      <div class="bar" aria-hidden="true"><div class="bar-fill"></div></div>
+      <a class="btn" href="/">Tentar agora</a>
+    </div>
+  </div>
+</div>
+<script>
+// Durante o 503 o Apache serve esta página no próprio endereço pedido
+// (ex.: /pcp/agendamento), então recarregar volta para a tela certa.
+// Se a página foi aberta direto por /manutencao.html, volta para a raiz,
+// senão ficaria presa aqui depois do deploy.
+// Também reforça o <meta refresh>, que alguns navegadores de tablet ignoram.
+(function () {
+  var direto = /\/manutencao\.html$/.test(location.pathname);
+  function tentar() { if (direto) { location.replace('/'); } else { location.reload(); } }
+  setTimeout(tentar, direto ? 14000 : 15000);
+  var btn = document.querySelector('.btn');
+  if (btn) { btn.onclick = function () { tentar(); return false; }; }
+})();
+</script>
+</body>
+</html>
